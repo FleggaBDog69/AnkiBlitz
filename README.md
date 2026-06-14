@@ -1,17 +1,24 @@
 # AnkiBlitz suite
 
-Three review-pacing add-ons for Anki. **AnkiBlitz** is the full integrated suite;
-the other two are standalone spin-offs of its two reviewer features, for people
-who only want that one piece.
+Four study add-ons for Anki. **AnkiBlitz** is the full integrated suite; the
+other three are standalone spin-offs — **AnkiBlitz Core** (everything *except* the
+two reviewer-reveal features) plus the two reveal features on their own — for
+people who only want one piece.
 
 > Don't run a standalone spin-off *and* the full AnkiBlitz at the same time — the
-> timers would double up. AnkiBlitz already includes both features.
+> timers/counters would double up. AnkiBlitz already includes all of them, and
+> AnkiBlitz Core already includes the Blitz/Pomodoro/Focus/profiles/music stack.
 
 | Add-on | What it does | Install |
 |--------|--------------|---------|
 | **[AnkiBlitz](AnkiBlitz/)** | The whole suite: timed Blitz sessions, Pomodoro, Focus Lock, profiles, in-app music, **plus** adaptive auto-reveal and progressive word reveal. | [`dist/AnkiBlitz.ankiaddon`](dist/AnkiBlitz.ankiaddon) |
+| **[AnkiBlitz Core](ankiblitz-core/)** | The session-discipline stack **without** the reveal timers: timed Blitz sessions, Pomodoro, Focus Lock, profiles, in-app music. | [`dist/AnkiBlitzCore.ankiaddon`](dist/AnkiBlitzCore.ankiaddon) |
 | **[Adaptive Speed Focus (aSFM)](aSFM/)** | Just the auto-**reveal** timer: waits a delay computed from the card's length and FSRS difficulty, then shows the answer. Never grades. | [`dist/aSFM.ankiaddon`](dist/aSFM.ankiaddon) |
 | **[Progressive Word Reveal](progressive-reveal/)** | Just the word-by-word fade-in of the question, at a set reading pace (optionally TTS-synced). | [`dist/ProgressiveWordReveal.ankiaddon`](dist/ProgressiveWordReveal.ankiaddon) |
+
+Mix and match: **AnkiBlitz Core + aSFM + Progressive Word Reveal** together equal
+the full **AnkiBlitz** — install Core plus whichever reveal feature(s) you want,
+or just grab the all-in-one AnkiBlitz.
 
 ---
 
@@ -26,6 +33,7 @@ pick the matching `.ankiaddon` from [`dist/`](dist/), then restart Anki.
 | Source folder here | Copy into `addons21/` as |
 |--------------------|--------------------------|
 | `AnkiBlitz/` | `focus_suite` |
+| `ankiblitz-core/` | `ankiblitz_core` |
 | `aSFM/` | `asfm` |
 | `progressive-reveal/` | `progressive_reveal` |
 
@@ -34,7 +42,7 @@ only needed if you're hacking on the source.)
 
 ---
 
-## The three, in detail
+## The four, in detail
 
 ### AnkiBlitz
 The integrated experience. Adaptive auto-reveal and progressive reveal run on any
@@ -42,6 +50,13 @@ review; on top of that you get timed **Blitz** sessions (by card count, time, or
 fraction of what's due) with a progress bar, **Pomodoro** work/break cycles,
 **Focus Lock**, momentum nudges, an in-app **music** player, and whole-config
 **profiles** (Default / Blitz / Relaxed). Controlled from **Tools ▸ AnkiBlitz**.
+
+### AnkiBlitz Core
+The same Blitz/Pomodoro/Focus/profiles/music stack as the full suite, but **with
+the two reviewer-reveal features removed** — for people who want the session
+discipline without the answer ever revealing itself. Pair it with aSFM and/or
+Progressive Word Reveal to add reveal pacing back piece by piece. Controlled from
+**Tools ▸ AnkiBlitz Core**.
 
 ### Adaptive Speed Focus (aSFM)
 The auto-reveal timer on its own. `delay = (base + per-word × words) × familiarity
@@ -60,7 +75,7 @@ Progressive Word Reveal**.
 
 ## Credits & licence
 
-All three reimagine concepts from **Glutanimate's** add-ons — *Speed Focus Mode*,
+These reimagine concepts from **Glutanimate's** add-ons — *Speed Focus Mode*,
 *Progressive Word Reveal*, and *Sprint Mode* — which are licensed under the GNU
 AGPLv3. Accordingly, everything here is distributed under the **GNU AGPLv3**; see
 each add-on's `LICENSE`.

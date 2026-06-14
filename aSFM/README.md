@@ -44,7 +44,25 @@ Everything is under **Tools ▸ Adaptive Speed Focus**:
 The live preview table in Settings always agrees with the runtime — both compute
 the delay the same way.
 
+## Credits & acknowledgements
+
+- **Glutanimate's _Speed Focus Mode_** — the original auto-reveal-timer idea that
+  aSFM reworks. aSFM deliberately differs: it **never grades**, computes the delay
+  from question length **and FSRS difficulty**, and times new vs learning cards
+  separately.
+- **The AnKing team** — their note types and `{{tts}}` conventions drove the
+  visible-word-count handling (hidden tag chips and hint/Extra chrome don't
+  inflate the timer) and the set-time picture-card mode.
+- **Anki** and its community — the platform this runs on.
+
+aSFM is one of three add-ons split out of the **AnkiBlitz** suite — the full
+integrated version of this feature and more:
+<https://github.com/FleggaBDog69/AnkiBlitz>
+
 ## Licence
 
-Reworks the auto-reveal concept from Glutanimate's Speed Focus Mode (GNU AGPLv3),
-so this add-on is distributed under the **GNU AGPLv3** too. See [LICENSE](LICENSE).
+Because it reworks Glutanimate's Speed Focus Mode (GNU AGPLv3), aSFM is
+distributed under the **GNU Affero General Public License v3.0 (AGPLv3)**. You may
+use, study, modify and share it; if you distribute a modified version (or run it
+as a network service) you must release your source under the same licence. The
+full text is in [LICENSE](LICENSE).

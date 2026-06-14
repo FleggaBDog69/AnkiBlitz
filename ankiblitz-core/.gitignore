@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# macOS
+.DS_Store
+
+# Anki add-on runtime / personal data — never publish
+meta.json
+user_files/
+
+# Local build artifact
+*.ankiaddon

@@ -40,7 +40,27 @@ Everything is under **Tools ▸ Progressive Word Reveal**:
 | Settings… | Speed, mode, chunk size, reveal key, TTS sync, exclusions, live preview. |
 | Enabled | Master on/off. |
 
+## Credits & acknowledgements
+
+- **Glutanimate's _Progressive Word Reveal_** — the original word-by-word fade-in
+  idea that this add-on reworks.
+- **TTS sync** reads the card's native **Anki** `{{tts}}` tags (Anki's
+  `MacTTSPlayer` runs `say -r base×speed`) and the **AnKing** note-type TTS
+  conventions, so the reveal can lock to the spoken pace. No speech engine is
+  bundled — this only *syncs to* the TTS that Anki / AnKing already produce.
+- **The AnKing team** — their note types drove the visible-word handling
+  (CSS-hidden tag chips / hint chrome are skipped, so the pace tracks what you
+  actually read).
+- **Anki** and its community — the platform this runs on.
+
+This is one of three add-ons split out of the **AnkiBlitz** suite — the full
+integrated version of this feature and more:
+<https://github.com/FleggaBDog69/AnkiBlitz>
+
 ## Licence
 
-Reworks Glutanimate's Progressive Word Reveal (GNU AGPLv3), so this add-on is
-distributed under the **GNU AGPLv3** too. See [LICENSE](LICENSE).
+Because it reworks Glutanimate's Progressive Word Reveal (GNU AGPLv3), this add-on
+is distributed under the **GNU Affero General Public License v3.0 (AGPLv3)**. You
+may use, study, modify and share it; if you distribute a modified version (or run
+it as a network service) you must release your source under the same licence. The
+full text is in [LICENSE](LICENSE).

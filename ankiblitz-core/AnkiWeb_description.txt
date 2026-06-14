@@ -1,0 +1,61 @@
+AnkiBlitz Core — session discipline, without the reveal timers
+
+═══════════════════════════════════════════════════════════
+WHAT IT DOES
+═══════════════════════════════════════════════════════════
+
+AnkiBlitz Core is the lean build of AnkiBlitz: focused, timed study with real
+structure, but WITHOUT the card-reveal timers. One engine, one menu, one
+settings window:
+
+• Blitz sessions — focused, timed runs (by card count, time, or a fraction of
+  what's due) with a progress bar and a completion screen.
+
+• Pomodoro — chain work blocks with short and long breaks, a break screen with
+  journaling and focus ratings, and configurable auto-return.
+
+• Focus Lock — make leaving a session progressively harder (confirm → min-cards
+  → finish), with an optional Focus Score.
+
+• In-app music — a SoundCloud / YouTube Music player on the break screen, as a
+  floating review dock, and on the deck list.
+
+PROFILES
+Three built-ins — Default (everyday), Blitz (a committed, locked-in run), and
+Relaxed (low friction) — flip the *feel* in one click: Focus Lock, the near-end
+nudge, anti-pressure display. They deliberately leave your session shape (you
+pick mode/target each launch) and music alone. Save your own, too; your current
+setup is kept as a "My setup" profile so nothing is lost.
+
+═══════════════════════════════════════════════════════════
+WANT REVEAL PACING TOO?
+═══════════════════════════════════════════════════════════
+
+Core leaves out the card-reveal timers on purpose. Two companion add-ons add
+them and run alongside Core:
+  • Adaptive Speed Focus (aSFM) — adaptive auto-reveal timer.
+  • Progressive Word Reveal — fades the answer in word by word.
+Or install the all-in-one AnkiBlitz add-on, which bundles everything.
+
+═══════════════════════════════════════════════════════════
+BEFORE YOU START
+═══════════════════════════════════════════════════════════
+
+DISABLE these to avoid double timers/counters (Tools ▸ Add-ons):
+  • Sprint Mode
+  • the full AnkiBlitz add-on (it already includes Core)
+A one-time welcome wizard reminds you on first launch.
+
+═══════════════════════════════════════════════════════════
+SHORTCUTS  (Tools ▸ AnkiBlitz Core)
+═══════════════════════════════════════════════════════════
+  Start Blitz        Ctrl+Shift+S
+  Start Pomodoro     Ctrl+Shift+P
+  Music player       Ctrl+Shift+M
+
+═══════════════════════════════════════════════════════════
+NOTES
+═══════════════════════════════════════════════════════════
+• Works standalone. Your stats and settings are preserved across updates.
+• Builds on the idea of Glutanimate's Sprint Mode; licensed under the GNU AGPLv3.
+• Tested on Anki 2.1.50+ (Qt6).
