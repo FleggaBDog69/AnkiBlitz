@@ -173,7 +173,15 @@ AnkiBlitz only *syncs to* the TTS that Anki / AnKing already produce.
 
 ## Licence
 
-Distributed under the **GNU Affero General Public License v3.0** (AGPLv3). You may
+Distributed under the **GNU Affero General Public License v3.0 (AGPLv3)**. You may
 use, study, modify and share it; if you distribute a modified version (or run it
-as a network service) you must release your source under the same licence. See
-[LICENSE](LICENSE) for the full terms.
+as a network service) you must release your source under the same licence.
+
+Because AnkiBlitz incorporates and reworks **Glutanimate's Speed Focus Mode**
+(Copyright (C) 2017-2021 Aristotelis P., <https://glutanimate.com/>), it is also
+subject to **Glutanimate's additional terms under AGPL Section 7**: you must
+**preserve all copyright and author attributions**, **not misrepresent the
+origin** of the work, and you are **not granted any right to use the
+"Glutanimate" name or logo** for endorsement. Those additional terms are
+reproduced in full in [LICENSE](LICENSE) (per term 6, the complete licence text is
+included).

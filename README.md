@@ -84,6 +84,11 @@ These reimagine concepts from three Anki add-ons:
 - **Sprint Mode** by **Patrick Lee** (<https://www.patricklee.com.au/>) — the
   timed/counted-session idea behind Blitz.
 
-Everything here is distributed under the **GNU AGPLv3** (Glutanimate's Speed Focus
-Mode is AGPLv3, which the bundled/reworked code inherits); see each add-on's
+Everything here is distributed under the **GNU AGPLv3**. Glutanimate's Speed Focus
+Mode is AGPLv3 **with additional terms under Section 7** (preserve all copyright /
+author attributions, don't misrepresent the work's origin, and no right to use the
+"Glutanimate" name or logo for endorsement). Those additional terms apply to the
+add-ons that incorporate or rework Speed Focus Mode — **AnkiBlitz** and **aSFM** —
+and are reproduced in full in their `LICENSE` files. (AnkiBlitz Core and
+Progressive Word Reveal contain no Speed Focus Mode code.) See each add-on's
 `LICENSE`.

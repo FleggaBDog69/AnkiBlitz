@@ -46,23 +46,28 @@ the delay the same way.
 
 ## Credits & acknowledgements
 
-- **Glutanimate's _Speed Focus Mode_** — the original auto-reveal-timer idea that
-  aSFM reworks. aSFM deliberately differs: it **never grades**, computes the delay
-  from question length **and FSRS difficulty**, and times new vs learning cards
-  separately.
+- **Glutanimate's _Speed Focus Mode_** — Copyright (C) 2017-2021 Aristotelis P.
+  (Glutanimate), <https://glutanimate.com/> — the original auto-reveal-timer idea
+  that aSFM reworks. aSFM deliberately differs: it **never grades**, computes the
+  delay from question length **and FSRS difficulty**, and times new vs learning
+  cards separately.
 - **The AnKing team** — their note types and `{{tts}}` conventions drove the
   visible-word-count handling (hidden tag chips and hint/Extra chrome don't
   inflate the timer) and the set-time picture-card mode.
 - **Anki** and its community — the platform this runs on.
 
-aSFM is one of three add-ons split out of the **AnkiBlitz** suite — the full
+aSFM is one of four add-ons split out of the **AnkiBlitz** suite — the full
 integrated version of this feature and more:
 <https://github.com/FleggaBDog69/AnkiBlitz>
 
 ## Licence
 
-Because it reworks Glutanimate's Speed Focus Mode (GNU AGPLv3), aSFM is
-distributed under the **GNU Affero General Public License v3.0 (AGPLv3)**. You may
-use, study, modify and share it; if you distribute a modified version (or run it
-as a network service) you must release your source under the same licence. The
-full text is in [LICENSE](LICENSE).
+aSFM reworks Glutanimate's Speed Focus Mode, which is licensed under the **GNU
+Affero General Public License v3.0 (AGPLv3)** **with additional terms under AGPL
+Section 7**, so aSFM is distributed under those same terms. You may use, study,
+modify and share it; if you distribute a modified version (or run it as a network
+service) you must release your source under the same licence. In addition, per
+Glutanimate's Section 7 terms you must **preserve all copyright and author
+attributions**, **not misrepresent the origin** of the work, and you are **not
+granted any right to use the "Glutanimate" name or logo** for endorsement. The
+full licence text, including the additional terms, is in [LICENSE](LICENSE).

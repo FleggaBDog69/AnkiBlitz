@@ -26,8 +26,11 @@ Tools ▸ Adaptive Speed Focus ▸ Settings… — all the knobs plus a live pre
 always matches the runtime.
 
 NOTES
-• Reworks the auto-reveal concept from Glutanimate's Speed Focus Mode; licensed
-  under the GNU AGPLv3.
+• Reworks the auto-reveal concept from Glutanimate's Speed Focus Mode (Copyright
+  (C) 2017-2021 Aristotelis P., https://glutanimate.com/); licensed under the GNU
+  AGPLv3 WITH Glutanimate's Section 7 additional terms (preserve attribution,
+  don't misrepresent origin, no use of the Glutanimate name for endorsement). Full
+  terms in LICENSE.
 • To change the warning sound, drop your own alert.mp3 into the add-on's
   user_files/ folder.
 • Tested on Anki 2.1.50+ (Qt6).
