@@ -1412,12 +1412,15 @@ class PresetsPanel(QWidget):
 
         layout.addWidget(QLabel("<b>Profiles</b>"))
         layout.addWidget(_hint(
-            "A profile is a whole-config snapshot — reveal speed, auto-reveal, "
-            "anti-pressure, Focus Lock, and your Blitz + Pomodoro launch "
-            "defaults. Applying one overwrites those settings on the other tabs "
-            "with the profile's values (your note-type / deck exclusions and "
-            "quick-picks are left untouched). Your settings as they were are kept "
-            "as the “My setup” profile."))
+            "A profile flips the <i>feel</i> of reviewing in one click: the "
+            "auto-reveal pace, Focus Lock, the near-end nudge, and the "
+            "anti-pressure / progress display. It deliberately leaves alone how "
+            "you launch a session (Blitz mode / target, Pomodoro blocks — you pick "
+            "those each time), your word-reveal speed, the music, and your "
+            "note-type / deck exclusions. Built-ins: <b>Default</b> (everyday), "
+            "<b>Blitz</b> (committed run), <b>Relaxed</b> (low friction). Applying "
+            "overwrites the feel settings on the other tabs; your settings as they "
+            "were are kept as the “My setup” profile."))
 
         self.active_lbl = QLabel()
         self.active_lbl.setStyleSheet("font-size: 12px; margin: 4px 0;")

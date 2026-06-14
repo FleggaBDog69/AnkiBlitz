@@ -23,7 +23,7 @@ from aqt.qt import (
 from aqt.utils import tooltip
 
 from ..config import get_section, suite_enabled
-from . import session, injection, stats, focus, presets
+from . import session, injection, stats, focus
 from .session import MODE_CARDS, MODE_TIME, MODE_FRACTION
 from .stats import record_completed_sprint
 
@@ -102,16 +102,6 @@ def start_blitz_dialog():
 
     lay.addWidget(QLabel(f"<b>{due_now}</b> cards due right now."))
 
-    # One-off launch picker: pre-fill mode + target from a profile WITHOUT
-    # applying it (your active profile is unchanged). "Current settings" keeps the
-    # Blitz defaults. Full feel (Focus Lock etc.) still follows the active profile.
-    launch_combo = QComboBox()
-    launch_combo.addItem("Current settings", None)
-    for _name in presets.list_profiles():
-        launch_combo.addItem(_name, _name)
-    lay.addWidget(QLabel("Launch as:"))
-    lay.addWidget(launch_combo)
-
     lay.addWidget(QLabel("Blitz mode:"))
     mode_combo = QComboBox()
     mode_combo.addItem("Card count", MODE_CARDS)
@@ -180,26 +170,6 @@ def start_blitz_dialog():
     if start_idx >= 0:
         mode_combo.setCurrentIndex(start_idx)
         stack.setCurrentIndex(start_idx)
-
-    def _prefill_from_profile(idx):
-        name = launch_combo.itemData(idx)
-        if not name:
-            return
-        ov = presets.resolve(name) or {}
-        sp = ov.get("sprint", {})
-        qs = ov.get("quick_start", {})
-        if "default_target" in sp:
-            card_spin.setValue(int(sp["default_target"]))
-        if "default_time_minutes" in sp:
-            time_spin.setValue(int(sp["default_time_minutes"]))
-        if qs.get("mode") == MODE_FRACTION and qs.get("target"):
-            denom_spin.setValue(max(2, int(qs["target"])))
-        m = sp.get("default_mode")
-        if m:
-            mi = mode_combo.findData(m)
-            if mi >= 0:
-                mode_combo.setCurrentIndex(mi)
-    launch_combo.currentIndexChanged.connect(_prefill_from_profile)
 
     # Counting-rule reminder (the bar's unit).
     count_mode = cfg.get("count_mode", "unique")

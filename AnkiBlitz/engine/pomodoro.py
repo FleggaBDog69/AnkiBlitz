@@ -36,7 +36,7 @@ from aqt.qt import (
 from aqt.utils import tooltip
 
 from ..config import get_section, suite_enabled
-from . import sprint, stats, injection, presets
+from . import sprint, stats, injection
 from .session import MODE_CARDS, MODE_TIME, MODE_FRACTION
 
 
@@ -976,16 +976,6 @@ def _show_start_dialog(cfg, deck_id) -> Optional[PomodoroState]:
 
     cur = {"mode": cfg.get("work_mode", "time")}
 
-    # One-off launch picker: pre-fill the work block from a profile WITHOUT
-    # applying it (your active profile is unchanged). "Current settings" keeps the
-    # Pomodoro defaults.
-    launch_combo = QComboBox()
-    launch_combo.addItem("Current settings", None)
-    for _name in presets.list_profiles():
-        launch_combo.addItem(_name, _name)
-    lay.addWidget(QLabel("Launch as:"))
-    lay.addWidget(launch_combo)
-
     summary_lbl = QLabel(_work_summary(cur["mode"]))
     lay.addWidget(summary_lbl)
 
@@ -1016,28 +1006,6 @@ def _show_start_dialog(cfg, deck_id) -> Optional[PomodoroState]:
     if lidx >= 0:
         level.setCurrentIndex(lidx)
     form.addRow("When break ends:", level)
-
-    def _prefill_from_profile(idx):
-        name = launch_combo.itemData(idx)
-        if not name:
-            return
-        po = (presets.resolve(name) or {}).get("pomodoro", {})
-        m = po.get("work_mode", cur["mode"])
-        cur["mode"] = m
-        target.setPrefix(""); target.setSuffix("")
-        _apply_target_units(target, m)
-        if "work_target" in po:
-            target.setValue(int(po["work_target"]))
-        if "break_minutes" in po:
-            brk.setValue(int(po["break_minutes"]))
-        if "cycles" in po:
-            cycles.setValue(int(po["cycles"]))
-        if "auto_return_level" in po:
-            li = level.findData(int(po["auto_return_level"]))
-            if li >= 0:
-                level.setCurrentIndex(li)
-        summary_lbl.setText(_work_summary(m))
-    launch_combo.currentIndexChanged.connect(_prefill_from_profile)
 
     lay.addLayout(form)
 

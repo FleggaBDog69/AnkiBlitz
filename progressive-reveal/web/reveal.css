@@ -1,0 +1,7 @@
+/* Progressive Word Reveal — spans start hidden and fade in. */
+.pwr-word {
+  transition: opacity 0.12s ease;
+}
+.pwr-hidden {
+  opacity: 0;
+}

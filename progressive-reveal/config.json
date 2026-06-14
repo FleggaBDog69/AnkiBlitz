@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "words_per_second": 6.0,
+  "reveal_mode": "words",
+  "chunk_words": 3,
+  "reveal_on_answer": false,
+  "reveal_key": "p",
+  "tts_auto_match": true,
+  "tts_base_wpm": 170,
+  "excluded_note_types": [],
+  "excluded_decks": []
+}

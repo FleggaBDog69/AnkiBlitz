@@ -1,169 +1,66 @@
-# AnkiBlitz
+# AnkiBlitz suite
 
-A review-pacing toolkit for Anki that rolls three ideas into one engine, one
-menu, and one settings window:
+Three review-pacing add-ons for Anki. **AnkiBlitz** is the full integrated suite;
+the other two are standalone spin-offs of its two reviewer features, for people
+who only want that one piece.
 
-- **Adaptive auto-reveal** (Speed Focus) — shows the answer automatically after a
-  delay computed from the card's length and difficulty. **It never grades for
-  you** — you still press the button.
-- **Progressive word reveal** — fades the question in word-by-word at a set
-  reading pace, optionally synced to `{{tts}}` playback.
-- **Blitz sessions** — focused, timed review runs (by card count, time, or a
-  fraction of what's due) with a progress bar, plus Pomodoro work/break cycles,
-  Focus Lock, momentum nudges, an in-app music player, and whole-config
-  **profiles**.
+> Don't run a standalone spin-off *and* the full AnkiBlitz at the same time — the
+> timers would double up. AnkiBlitz already includes both features.
 
-Everything is controlled from **Tools ▸ AnkiBlitz**.
+| Add-on | What it does | Install |
+|--------|--------------|---------|
+| **[AnkiBlitz](AnkiBlitz/)** | The whole suite: timed Blitz sessions, Pomodoro, Focus Lock, profiles, in-app music, **plus** adaptive auto-reveal and progressive word reveal. | [`dist/AnkiBlitz.ankiaddon`](dist/AnkiBlitz.ankiaddon) |
+| **[Adaptive Speed Focus (aSFM)](aSFM/)** | Just the auto-**reveal** timer: waits a delay computed from the card's length and FSRS difficulty, then shows the answer. Never grades. | [`dist/aSFM.ankiaddon`](dist/aSFM.ankiaddon) |
+| **[Progressive Word Reveal](progressive-reveal/)** | Just the word-by-word fade-in of the question, at a set reading pace (optionally TTS-synced). | [`dist/ProgressiveWordReveal.ankiaddon`](dist/ProgressiveWordReveal.ankiaddon) |
 
 ---
 
 ## Install
 
-This is a folder add-on. The package folder is `focus_suite` (the historical
-internal name — kept so existing settings and stats are preserved; the add-on
-presents itself everywhere as **AnkiBlitz**).
+**Easiest — packaged file:** in Anki, **Tools ▸ Add-ons ▸ Install from file…** and
+pick the matching `.ankiaddon` from [`dist/`](dist/), then restart Anki.
 
-- **From the packaged file:** Anki ▸ Tools ▸ Add-ons ▸ Install from file… ▸ pick
-  `AnkiBlitz.ankiaddon`, then restart Anki.
-- **Manually:** drop the `focus_suite` folder into your Anki
-  `addons21/` directory and restart.
+**Manual — from source:** copy the add-on's source folder into your Anki
+`addons21/` directory and restart. The folder must be named so Anki can import it:
 
-On first launch a short welcome wizard appears once. It asks you to **disable any
-add-ons that do the same job** so timers don't double up — in particular:
+| Source folder here | Copy into `addons21/` as |
+|--------------------|--------------------------|
+| `AnkiBlitz/` | `focus_suite` |
+| `aSFM/` | `asfm` |
+| `progressive-reveal/` | `progressive_reveal` |
 
-- Speed Focus Mode (SFM)
-- Progressive Word Reveal
-- Sprint Mode
-
-Disable those in **Tools ▸ Add-ons** and restart.
+(The packaged `.ankiaddon` files handle this naming for you — manual copying is
+only needed if you're hacking on the source.)
 
 ---
 
-## Using it
+## The three, in detail
 
-Menu (**Tools ▸ AnkiBlitz**):
+### AnkiBlitz
+The integrated experience. Adaptive auto-reveal and progressive reveal run on any
+review; on top of that you get timed **Blitz** sessions (by card count, time, or a
+fraction of what's due) with a progress bar, **Pomodoro** work/break cycles,
+**Focus Lock**, momentum nudges, an in-app **music** player, and whole-config
+**profiles** (Default / Blitz / Relaxed). Controlled from **Tools ▸ AnkiBlitz**.
 
-| Item | Shortcut | What it does |
-|------|----------|--------------|
-| Start Blitz… | `Ctrl+Shift+S` | Launch a focused session (cards / time / fraction). |
-| Blitz all due cards | — | Blitz the whole due queue. |
-| Start Pomodoro… | `Ctrl+Shift+P` | Chain work blocks with breaks. |
-| Blitz stats | — | Daily and all-time totals, personal bests. |
-| Break journal… | — | Review notes written during Pomodoro breaks. |
-| Music player | `Ctrl+Shift+M` | Floating in-app player during reviews. |
-| Profile ▸ | — | Switch the whole-config profile (see below). |
-| Settings… | — | The tabbed settings window. |
-| Enabled | — | Master on/off for everything. |
+### Adaptive Speed Focus (aSFM)
+The auto-reveal timer on its own. `delay = (base + per-word × words) × familiarity
+× difficulty`, clamped to a min/max, with an optional countdown bar and pre-reveal
+warning. Counts only the words you actually see (hidden fields and AnKing tag
+chips don't inflate it), and supports a set-time "picture card" mode. Controlled
+from **Tools ▸ Adaptive Speed Focus**.
 
-Adaptive auto-reveal and progressive reveal also work **outside** a Blitz, on any
-normal review — the Blitz session just adds the progress bar and completion
-screen on top.
-
----
-
-## Profiles
-
-A **profile** is a named snapshot of AnkiBlitz's *feel* — reveal speed,
-auto-reveal timing, anti-pressure, Focus Lock, and your Blitz + Pomodoro launch
-defaults — so one click flips everything at once. Switch from **Settings ▸
-Profiles** or **Tools ▸ AnkiBlitz ▸ Profile**.
-
-Three built-ins ship in code:
-
-- **Morning** — calm daily driver: gentle auto-reveal, anti-pressure on, a light
-  Focus Lock, fraction-of-due blocks.
-- **Exam Mode** — tight reveal timing, lock-to-finish, time-boxed blocks.
-- **Casual** — low friction: no lock, relaxed/long auto-reveal, music on.
-
-On first run your existing settings are captured as a profile named **"My setup"**
-and made active, so adopting profiles never loses your tuning. Applying a profile
-is always an **explicit overwrite** of the other tabs' values — and it only
-touches a whitelist of behavioural keys, deliberately leaving your note-type /
-deck exclusion lists, quick-picks, music URL, and the master switch alone.
-
-The Start Blitz / Start Pomodoro dialogs also have a one-off **"Launch as"**
-picker that pre-fills the mode/target from a profile *without* changing your
-active profile.
+### Progressive Word Reveal
+The word fade on its own. Fades the question in word-by-word (or in chunks) at a
+reading pace you set, optionally locked to the card's native `{{tts}}` voice.
+Click or the reveal key shows everything at once. Controlled from **Tools ▸
+Progressive Word Reveal**.
 
 ---
 
-## Settings reference
+## Credits & licence
 
-Every option is documented in **[config.md](config.md)**, organised by config
-section:
-
-- `speed_focus` — adaptive auto-reveal timing and exclusions.
-- `word_reveal` — progressive reveal speed, mode, TTS matching.
-- `sprint` — Blitz session defaults, progress display, anti-pressure, personal
-  bests. *(Internal key name; the feature is "Blitz" everywhere in the UI.)*
-- `quick_start` — daily auto-launch.
-- `momentum` — near-end "keep going?" intercept.
-- `pomodoro` — work/break cycles and the break screen.
-- `music` — the in-app SoundCloud / YouTube Music player.
-- `focus` — Focus Lock and Focus Score.
-- `home_widget` — on-screen quick-launch panels.
-- `presets` — profiles.
-
-Edit settings from the UI; the raw JSON is optional.
-
----
-
-## Files & data
-
-- `config.json` / `config.py` — shipped defaults; live values live in Anki's
-  `meta.json` (never hand-edit that).
-- `user_files/sprint_stats.json` — your Blitz stats (preserved across updates).
-- `user_files/music_profile/` — the music player's cookies/login.
-- `sounds/` — the auto-reveal warning sound (`alert.mp3`; override by dropping
-  your own `alert.mp3` in `user_files/`).
-- `web/` — the single CSS/JS reviewer bundle.
-- `engine/` — the engine modules (one session of truth, one injection point).
-
----
-
-## Standalone
-
-AnkiBlitz works on its own. It bundles its own copies of the concepts from the
-add-ons it replaces, so you don't need them installed (and shouldn't keep them
-enabled). Any optional bridges to other add-ons are best-effort and fail quietly
-if those add-ons are absent.
-
----
-
-## Credits, references & thanks
-
-### Stands on (AGPL originals)
-AnkiBlitz reimplements and merges three add-ons by **Glutanimate** into one
-engine:
-
-- **Speed Focus Mode (SFM)** — the auto-reveal-timer idea (here: never grades,
-  separate new vs learning timing, a pre-reveal warning).
-- **Progressive Word Reveal** — fading the question in word by word.
-- **Sprint Mode** — timed / counted review sessions (here: the Blitz engine).
-
-Because those originals are licensed under the GNU AGPLv3, AnkiBlitz is too.
-
-### TTS sync
-The progressive reveal can lock to a card's spoken pace by reading the card's
-native **Anki** `{{tts}}` tags (Anki's `MacTTSPlayer` runs `say -r base×speed`)
-and the **AnKing** note-type TTS conventions. No speech engine is bundled —
-AnkiBlitz only *syncs to* the TTS that Anki / AnKing already produce.
-
-### Thanks
-- **Patrick** — for code / feature contributions to AnkiBlitz.
-- The **AnKing** team — for the note types and TTS conventions AnkiBlitz is built
-  to play nicely with (these drove the visible-word-count fix and the picture-card
-  timing mode).
-- **Anki** and its community — the platform this runs on.
-
-### References
-- **[LICENSE](LICENSE)** — the full GNU AGPLv3 text.
-- **[config.md](config.md)** — every setting, per config section.
-- **[AnkiWeb_description.txt](AnkiWeb_description.txt)** — paste-ready listing copy.
-
-## Licence
-
-Distributed under the **GNU Affero General Public License v3.0** (AGPLv3). You may
-use, study, modify and share it; if you distribute a modified version (or run it
-as a network service) you must release your source under the same licence. See
-[LICENSE](LICENSE) for the full terms.
+All three reimagine concepts from **Glutanimate's** add-ons — *Speed Focus Mode*,
+*Progressive Word Reveal*, and *Sprint Mode* — which are licensed under the GNU
+AGPLv3. Accordingly, everything here is distributed under the **GNU AGPLv3**; see
+each add-on's `LICENSE`.

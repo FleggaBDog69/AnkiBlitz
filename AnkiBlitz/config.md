@@ -215,35 +215,38 @@ no record.
   accuracy/streak/again figure (including on the end-of-Blitz summary) regardless
   of the individual toggles.
 
-## `presets` — profiles (whole-config snapshots)
+## `presets` — profiles (feel snapshots)
 
-A **profile** is a named snapshot of AnkiBlitz's *feel* — reveal speed,
-auto-reveal timing, anti-pressure, Focus Lock, and your Blitz + Pomodoro launch
-defaults — so one click flips everything at once. Switch from **Settings ▸
-Profiles** or **Tools ▸ AnkiBlitz ▸ Profile**.
+A **profile** flips the *feel* of reviewing in one click — the adaptive
+auto-reveal pace, Focus Lock, the near-end momentum nudge, and the
+anti-pressure / progress display. Switch from **Settings ▸ Profiles** or
+**Tools ▸ AnkiBlitz ▸ Profile**.
 
-- Five **built-ins** ship in code (not stored here): **Morning** (calm daily
-  driver), **Exam Mode** (tight reveal, lock-to-finish, time blocks), **Casual**
-  (low friction, no lock), **Blitz** (the default fast Blitz feel — brisk
-  auto-reveal, progress + completion, confirm-to-leave lock), and **Standard
-  review** (a plain unpressured review: gentle auto-reveal + word reveal only, no
-  Blitz chrome, no lock, no Quick Start). A saved profile of the same name
-  *shadows* a built-in; delete the copy to restore the original.
+- Three **built-ins** ship in code (not stored here): **Default** (the everyday
+  review feel and the active profile out of the box — relaxed ~7s auto-reveal, a
+  quiet countdown, no lock, a gentle near-end nudge), **Blitz** (a committed run —
+  brisk auto-reveal, countdown + warning, a *penalty* Focus Lock, full HUD with a
+  completion chime), and **Relaxed** (low friction for studying with mates or
+  half-distracted — generous auto-reveal, no countdown/warning pressure, no lock,
+  no nagging). A saved profile of the same name *shadows* a built-in; delete the
+  copy to restore the original.
+- A profile governs **feel only**. It deliberately **does not** touch the
+  **session shape** (Blitz `default_mode` / `default_target` / `count_mode` /
+  time, Quick Start, Pomodoro work blocks — you pick those in the Start dialog
+  each launch), the **word-reveal speed** (one reading pace across all profiles),
+  the **music** player, your note-type / deck exclusion lists, the fixed-time
+  picture lists, all `*_quick_picks`, or the top-level `enabled` master switch.
+  The exact whitelist of keys a profile writes is `engine/presets.py` →
+  `PROFILE_SPEC` (only `speed_focus`, `focus`, `momentum`, and `sprint`'s display
+  toggles).
 - The profile picker (Settings ▸ Profiles, and the Tools ▸ AnkiBlitz ▸ Profile
-  submenu) shows each profile's **key settings** — auto-reveal range, word-reveal
-  speed, Focus Lock level, Quick Start / Pomodoro state — so you can see what a
-  profile does before applying it.
+  submenu) shows each profile's **key settings** — auto-reveal range, Focus Lock
+  level, momentum nudge, anti-pressure — so you can see what it does before
+  applying.
 - On first run your existing settings are captured as a profile named
   **“My setup”** and made active, so adopting profiles never loses your tuning.
-- Applying a profile is always an **explicit overwrite** of the other tabs'
-  values — it is never auto-applied. It only writes a whitelist of behavioural
-  keys (see `engine/presets.py` → `PROFILE_SPEC`); it deliberately **leaves
-  alone** your note-type / deck exclusion lists, all `*_quick_picks`,
-  `card_source`, `music.service` / `music.last_url`, and the top-level `enabled`
-  master switch.
-- One-off launches: the Start Blitz / Start Pomodoro dialogs have a **“Launch
-  as”** picker that pre-fills the mode/target from a profile *without* changing
-  your active profile. Full feel still follows the active profile.
+- Applying a profile is always an **explicit overwrite** of those feel settings —
+  it is never auto-applied.
 
 Keys:
 - `active` — name of the profile last applied (informational).

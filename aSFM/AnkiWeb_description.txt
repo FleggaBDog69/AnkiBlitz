@@ -1,0 +1,33 @@
+Adaptive Speed Focus (aSFM) — an auto-REVEAL timer that never grades
+
+After the question shows, aSFM waits a delay computed from the card's length and
+FSRS difficulty, then reveals the answer automatically. It NEVER grades the card
+for you — you still press the button yourself.
+
+WHAT IT DOES
+• Waits (base + per-word × words) × familiarity × difficulty, clamped between a
+  minimum and maximum, then auto-reveals.
+• Counts only the text you actually SEE — hidden fields and AnKing-style tag chips
+  don't inflate the timer.
+• Gives new and learning/relearning cards more time (tunable).
+• Nudges the delay by the card's FSRS difficulty — harder cards get longer,
+  bounded so it's only a gentle shift.
+• Optional thin countdown bar and a warning sound before the reveal.
+• Picture-card mode: chosen note types / decks use a SET time instead of a word
+  count, since there's nothing to read.
+
+BEFORE YOU START
+If you run Glutanimate's Speed Focus Mode, disable it so the two timers don't
+double up. If you run the full AnkiBlitz suite, this feature is already included —
+don't install both.
+
+USING IT
+Tools ▸ Adaptive Speed Focus ▸ Settings… — all the knobs plus a live preview that
+always matches the runtime.
+
+NOTES
+• Reworks the auto-reveal concept from Glutanimate's Speed Focus Mode; licensed
+  under the GNU AGPLv3.
+• To change the warning sound, drop your own alert.mp3 into the add-on's
+  user_files/ folder.
+• Tested on Anki 2.1.50+ (Qt6).

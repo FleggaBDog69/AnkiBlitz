@@ -44,7 +44,32 @@
     if (node.classList && (node.classList.contains("MathJax") ||
         node.classList.contains("MathJax_Display") ||
         node.classList.contains("mjx-chtml"))) return true;
+    // Skip anything the reviewer can't actually see. AnKing-style note types
+    // render extra material into the question DOM that is hidden by the note's
+    // CSS stylesheet (not inline) — the full {{clickable::Tags}} list in a
+    // display:none #tags-container, hint/Extra buttons, the legacy .timer, etc.
+    // Those nodes stay in the DOM, so without this check wrapAndHide would wrap
+    // their words and count them toward the reveal duration — stretching an
+    // 11-word card's reveal from ~2s to ~9s (and, via the max() with the
+    // auto-reveal delay, pinning the whole wait far longer than intended).
+    // We walk top-down, so skipping a hidden container also skips its subtree.
+    if (isComputedHidden(node)) return true;
     return false;
+  }
+
+  // True when the element is hidden by *any* CSS (stylesheet or inline): the
+  // word-count side of this lives in Python (adaptive._VisibleText), but only
+  // the browser can resolve the note type's stylesheet, so the reveal-duration
+  // side has to be decided here at render time.
+  function isComputedHidden(node) {
+    try {
+      var cs = window.getComputedStyle(node);
+      if (!cs) return false;
+      return cs.display === "none" || cs.visibility === "hidden" ||
+             cs.visibility === "collapse";
+    } catch (e) {
+      return false;
+    }
   }
 
   // Wrap each word AND each whitespace run in a hidden span. Whitespace is

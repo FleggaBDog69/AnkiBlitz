@@ -21,10 +21,12 @@ settings window:
   momentum nudges, an in-app music player, and whole-config Profiles.
 
 PROFILES
-Five built-ins — Blitz, Standard review, Morning, Exam Mode, Casual — flip the
-whole feel in one click. The picker shows each profile's key settings so you can
-see what it does before applying. Save your own, too; your current setup is kept
-as a "My setup" profile so nothing is ever lost.
+Three built-ins — Default (everyday), Blitz (a committed, locked-in run), and
+Relaxed (low friction) — flip the *feel* in one click: auto-reveal pace, Focus
+Lock, the near-end nudge, anti-pressure display. They deliberately leave your
+session shape (you pick mode/target each launch), word-reveal speed and music
+alone. The picker shows each profile's key settings before you apply. Save your
+own, too; your current setup is kept as a "My setup" profile so nothing is lost.
 
 ═══════════════════════════════════════════════════════════
 BEFORE YOU START

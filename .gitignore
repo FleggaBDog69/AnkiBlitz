@@ -1,14 +1,13 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-
-# macOS
-.DS_Store
-
-# Anki add-on runtime / personal data — never publish
+# Anki writes user state here — never commit it.
 meta.json
+**/meta.json
 user_files/
+**/user_files/
 
-# Local build artifact
-*.ankiaddon
+# Python / OS noise
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+**/.DS_Store

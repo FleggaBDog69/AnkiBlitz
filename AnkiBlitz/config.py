@@ -201,10 +201,12 @@ DEFAULTS = {
         "hide_all_accuracy_stats": False,
     },
 
-    # Profiles (presets): named whole-config snapshots of AnkiBlitz's feel. The
-    # three built-ins (Morning / Exam Mode / Casual) live in engine/presets.py as
-    # code constants; only user-saved profiles and a one-time auto-capture of the
-    # current setup ("My setup") are stored here. Applying is always explicit.
+    # Profiles (presets): named snapshots of AnkiBlitz's *feel* (auto-reveal pace,
+    # Focus Lock, momentum, anti-pressure HUD) — never the session shape, word-
+    # reveal speed or music. The three built-ins (Default / Blitz / Relaxed) live
+    # in engine/presets.py as code constants; only user-saved profiles and a one-
+    # time auto-capture of the current setup ("My setup") are stored here. Applying
+    # is always explicit.
     "presets": {
         "active": "",       # name of the profile last applied ("My setup" after seeding)
         "saved": {},        # name -> snapshot overlay (see engine/presets.PROFILE_SPEC)
