@@ -1,0 +1,92 @@
+/* AnkiBlitz — single stylesheet for the reviewer.
+   Owns three things: the progressive-reveal spans, the auto-reveal countdown,
+   and the Blitz progress bar. */
+
+/* Reveal: spans start hidden and fade in. */
+.fs-word {
+  transition: opacity 0.12s ease;
+}
+.fs-hidden {
+  opacity: 0;
+}
+
+/* Auto-reveal countdown: a thin depleting bar pinned to the bottom. */
+#fs-countdown {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  z-index: 99998;
+  pointer-events: none;
+}
+#fs-countdown > .fs-countdown-fill {
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+}
+
+/* Sprint progress bar: fixed strip at the top of the reviewer. */
+#fs-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 99999;
+  background: rgba(20, 22, 28, 0.92);
+  color: #eaeaea;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+}
+#fs-progress .fs-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 9px 16px;
+}
+#fs-progress .fs-counter {
+  font-weight: 600;
+}
+#fs-progress .fs-elapsed {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+#fs-progress .fs-acc {
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+#fs-progress .fs-again {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+#fs-progress .fs-streak {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+#fs-progress .fs-streak.fs-pulse {
+  animation: fs-streak-pulse 0.45s ease;
+}
+@keyframes fs-streak-pulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); color: #fbbf24; }
+  100% { transform: scale(1); }
+}
+/* The progress fill is a broad, solid track that GROWS left→right — deliberately
+   unlike the bottom auto-reveal countdown, which is a thin bar that DEPLETES. */
+#fs-progress .fs-bar-wrap {
+  height: 7px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.10);
+}
+#fs-progress .fs-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4ade80, #22d3ee);
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 3px;
+  transition: width 0.3s ease;
+}

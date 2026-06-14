@@ -1,0 +1,15 @@
+{
+  "name": "AnkiBlitz",
+  "package": "focus_suite",
+  "author": "Fletcher (bundles Glutanimate's Speed Focus Mode, Progressive Word Reveal, Sprint Mode)",
+  "version": "1.0.0",
+  "description": "Review-pacing toolkit: adaptive auto-reveal, progressive word reveal, and timed Blitz sessions — one menu, one settings window.",
+  "min_point_version": 50,
+  "max_point_version": 0,
+  "conflicts": [
+    "1046608507",
+    "speed_focus_mode",
+    "sprint",
+    "progressive_word_reveal"
+  ]
+}

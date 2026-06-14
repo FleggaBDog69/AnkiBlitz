@@ -1,0 +1,139 @@
+{
+  "enabled": true,
+
+  "speed_focus": {
+    "enabled": true,
+    "base_seconds": 2.0,
+    "seconds_per_word": 0.2,
+    "min_delay_seconds": 2.0,
+    "max_delay_seconds": 15.0,
+    "unfamiliar_multiplier": 1.2,
+    "new_multiplier": 1.5,
+    "enable_on_new": true,
+    "difficulty_weight": 0.2,
+    "min_post_seconds": 1.0,
+    "show_countdown": true,
+    "warning_sound": true,
+    "warning_at_percent": 75,
+    "excluded_note_types": [],
+    "excluded_decks": [],
+    "fixed_time_enabled": true,
+    "fixed_time_base_seconds": 6.0,
+    "fixed_time_note_types": [],
+    "fixed_time_decks": []
+  },
+
+  "word_reveal": {
+    "enabled": true,
+    "words_per_second": 6.0,
+    "reveal_mode": "words",
+    "chunk_words": 3,
+    "reveal_on_answer": false,
+    "reveal_key": "p",
+    "tts_auto_match": true,
+    "tts_base_wpm": 170,
+    "excluded_note_types": [],
+    "excluded_decks": []
+  },
+
+  "quick_start": {
+    "enabled": true,
+    "launch_style": "immediate",
+    "countdown_seconds": 3,
+    "mode": "cards",
+    "target": 50,
+    "min_due": 1,
+    "relaunch_on_new_day": true,
+    "relaunch_after_hour": 5
+  },
+
+  "momentum": {
+    "enabled": true,
+    "near_end_cards": 10,
+    "near_end_seconds": 120
+  },
+
+  "pomodoro": {
+    "enabled": true,
+    "work_mode": "fraction",
+    "work_target": 3,
+    "break_minutes": 5,
+    "long_break_enabled": true,
+    "long_break_every": 4,
+    "long_break_minutes": 25,
+    "cycles": 0,
+    "auto_return_level": 2,
+    "break_sound": true,
+    "daily_goal": 0,
+    "end_summary": true,
+    "carry_forward": true,
+    "break_show_timeline": true,
+    "break_show_journal": true,
+    "break_show_focus_rating": true,
+    "break_show_tips": true,
+    "break_show_browser": true,
+    "break_show_add_kg": true,
+    "break_allow_extend": true
+  },
+
+  "music": {
+    "enabled": true,
+    "show_on_break": true,
+    "show_dropdown": true,
+    "show_on_home": true,
+    "service": "youtube",
+    "last_url": "https://music.youtube.com/"
+  },
+
+  "focus": {
+    "enabled": true,
+    "apply_to_reviews": false,
+    "lock_level": 1,
+    "lock_min_cards": 10,
+    "score_enabled": true,
+    "score_include_accuracy": true,
+    "idle_threshold_seconds": 60,
+    "target_seconds_per_card": 8.0
+  },
+
+  "home_widget": {
+    "enabled": true,
+    "show_on_overview": true,
+    "presets": [
+      {"mode": "cards", "value": 50},
+      {"mode": "cards", "value": 80},
+      {"mode": "fraction", "value": 3}
+    ]
+  },
+
+  "sprint": {
+    "enabled": true,
+    "default_mode": "cards",
+    "count_mode": "unique",
+    "default_target": 50,
+    "quick_picks": [25, 50, 100],
+    "default_time_minutes": 15,
+    "time_quick_picks": [10, 15, 25],
+    "fraction_quick_picks": [2, 3],
+    "card_source": "current_queue",
+    "show_progress_bar": true,
+    "show_card_counter": true,
+    "show_elapsed_time": true,
+    "show_live_accuracy": true,
+    "show_again_count": true,
+    "show_streak_counter": true,
+    "streak_animations": false,
+    "show_completion_screen": true,
+    "completion_sound": false,
+    "show_completion_accuracy": true,
+    "track_pb_sprints_today": true,
+    "track_pb_speed": true,
+    "track_pb_total_sprints": true,
+    "hide_all_accuracy_stats": false
+  },
+
+  "presets": {
+    "active": "",
+    "saved": {}
+  }
+}

@@ -1,0 +1,55 @@
+AnkiBlitz — pace your reviews, not your grades
+
+═══════════════════════════════════════════════════════════
+WHAT IT DOES
+═══════════════════════════════════════════════════════════
+
+AnkiBlitz rolls three review-pacing ideas into one engine, one menu and one
+settings window:
+
+• Adaptive auto-reveal — after the question shows, AnkiBlitz waits a delay
+  computed from the card's length and FSRS difficulty, then reveals the answer.
+  It NEVER grades for you — you still press the button. Picture/visual note
+  types or decks can use a SET time instead (no word count), since there's
+  nothing to read.
+
+• Progressive word reveal — the question fades in word by word at a reading pace
+  you set, optionally locked to the card's {{tts}} voice.
+
+• Blitz sessions — focused, timed runs (by card count, time, or a fraction of
+  what's due) with a progress bar, plus Pomodoro work/break cycles, Focus Lock,
+  momentum nudges, an in-app music player, and whole-config Profiles.
+
+PROFILES
+Five built-ins — Blitz, Standard review, Morning, Exam Mode, Casual — flip the
+whole feel in one click. The picker shows each profile's key settings so you can
+see what it does before applying. Save your own, too; your current setup is kept
+as a "My setup" profile so nothing is ever lost.
+
+═══════════════════════════════════════════════════════════
+BEFORE YOU START
+═══════════════════════════════════════════════════════════
+
+AnkiBlitz bundles its own versions of these, so DISABLE them to avoid double
+timers (Tools ▸ Add-ons):
+  • Speed Focus Mode
+  • Progressive Word Reveal
+  • Sprint Mode
+A one-time welcome wizard reminds you on first launch.
+
+═══════════════════════════════════════════════════════════
+SHORTCUTS  (Tools ▸ AnkiBlitz)
+═══════════════════════════════════════════════════════════
+  Start Blitz        Ctrl+Shift+S
+  Start Pomodoro     Ctrl+Shift+P
+  Music player       Ctrl+Shift+M
+
+═══════════════════════════════════════════════════════════
+NOTES
+═══════════════════════════════════════════════════════════
+• Works standalone. Your stats and settings are preserved across updates.
+• Word-count timing counts only the text you actually see — hidden fields and
+  tag chips on AnKing-style notes don't inflate the timer.
+• Bundles concepts from Glutanimate's Speed Focus Mode, Progressive Word Reveal
+  and Sprint Mode; licensed under the GNU AGPLv3.
+• Tested on Anki 2.1.50+ (Qt6).
