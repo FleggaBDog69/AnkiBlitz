@@ -127,13 +127,13 @@ the break screen) are best-effort and fail quietly if those add-ons are absent.
 
 ## Credits & acknowledgements
 
-### Stands on (AGPL original)
-AnkiBlitz Core's Blitz engine builds on the idea of **Sprint Mode** by
-**Glutanimate** — timed / counted review sessions. Because that original is
-licensed under the GNU AGPLv3, AnkiBlitz Core is too.
+### Stands on
+AnkiBlitz Core's Blitz engine builds on the idea of **Sprint Mode** by **Patrick
+Lee** (<https://www.patricklee.com.au/>) — timed / counted review sessions.
 
 ### Thanks
-- **Patrick** — for code / feature contributions.
+- **Patrick Lee** — author of the original *Sprint Mode* this builds on, and for
+  code / feature contributions. (<https://www.patricklee.com.au/>)
 - The **AnKing** team — for the note types and conventions this is built to play
   nicely with.
 - **Anki** and its community — the platform this runs on.

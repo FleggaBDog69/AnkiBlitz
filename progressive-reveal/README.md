@@ -4,8 +4,8 @@ Fades the card's question in **word by word** at a reading pace you set, so long
 questions take proportionally longer to appear. Click or press the reveal key to
 show everything at once.
 
-It's a standalone reworking of Glutanimate's *Progressive Word Reveal*, extracted
-from the **AnkiBlitz** suite so you can use just this piece.
+It's a standalone reworking of **Patrick Lee's** *Progressive Word Reveal*,
+extracted from the **AnkiBlitz** suite so you can use just this piece.
 
 ---
 
@@ -27,9 +27,9 @@ from the **AnkiBlitz** suite so you can use just this piece.
 - **Manually:** drop the `progressive_reveal` folder into your Anki `addons21/`
   directory and restart.
 
-If you also run **Glutanimate's Progressive Word Reveal**, disable it so the two
-don't double up. (If you run the full **AnkiBlitz** suite, you already have this
-feature — don't install both.)
+If you also run **Patrick Lee's original Progressive Word Reveal**, disable it so
+the two don't double up. (If you run the full **AnkiBlitz** suite, you already
+have this feature — don't install both.)
 
 ## Using it
 
@@ -42,8 +42,8 @@ Everything is under **Tools ▸ Progressive Word Reveal**:
 
 ## Credits & acknowledgements
 
-- **Glutanimate's _Progressive Word Reveal_** — the original word-by-word fade-in
-  idea that this add-on reworks.
+- **Patrick Lee's _Progressive Word Reveal_** — the original word-by-word fade-in
+  idea that this add-on reworks. (<https://www.patricklee.com.au/>)
 - **TTS sync** reads the card's native **Anki** `{{tts}}` tags (Anki's
   `MacTTSPlayer` runs `say -r base×speed`) and the **AnKing** note-type TTS
   conventions, so the reveal can lock to the spoken pace. No speech engine is
@@ -53,14 +53,13 @@ Everything is under **Tools ▸ Progressive Word Reveal**:
   actually read).
 - **Anki** and its community — the platform this runs on.
 
-This is one of three add-ons split out of the **AnkiBlitz** suite — the full
+This is one of four add-ons split out of the **AnkiBlitz** suite — the full
 integrated version of this feature and more:
 <https://github.com/FleggaBDog69/AnkiBlitz>
 
 ## Licence
 
-Because it reworks Glutanimate's Progressive Word Reveal (GNU AGPLv3), this add-on
-is distributed under the **GNU Affero General Public License v3.0 (AGPLv3)**. You
-may use, study, modify and share it; if you distribute a modified version (or run
-it as a network service) you must release your source under the same licence. The
-full text is in [LICENSE](LICENSE).
+Distributed under the **GNU Affero General Public License v3.0 (AGPLv3)**, in
+keeping with the rest of the AnkiBlitz suite. You may use, study, modify and share
+it; if you distribute a modified version (or run it as a network service) you must
+release your source under the same licence. The full text is in [LICENSE](LICENSE).

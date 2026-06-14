@@ -6,7 +6,7 @@ Focus Lock, one-click profiles, and an in-app music player. Card-reveal pacing
 (adaptive auto-reveal and progressive word reveal) lives in the companion aSFM
 and Progressive Word Reveal add-ons.
 
-Builds on concepts from Glutanimate's Sprint Mode.
+Builds on concepts from Patrick Lee's Sprint Mode (https://www.patricklee.com.au/).
 """
 
 from aqt import gui_hooks

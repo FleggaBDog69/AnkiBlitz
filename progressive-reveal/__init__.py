@@ -4,8 +4,9 @@ Fades the card's question in at a fixed reading pace (optionally locked to the
 card's {{tts}} voice), so longer questions take proportionally longer. Click or
 the reveal key shows everything at once.
 
-A standalone reworking of Glutanimate's Progressive Word Reveal (AGPL). Extracted
-from the AnkiBlitz suite so it can be used on its own.
+A standalone reworking of Patrick Lee's Progressive Word Reveal
+(https://www.patricklee.com.au/). Extracted from the AnkiBlitz suite so it can be
+used on its own. Distributed under the GNU AGPLv3 (in keeping with the suite).
 """
 
 from aqt import gui_hooks

@@ -75,7 +75,15 @@ Progressive Word Reveal**.
 
 ## Credits & licence
 
-These reimagine concepts from **Glutanimate's** add-ons — *Speed Focus Mode*,
-*Progressive Word Reveal*, and *Sprint Mode* — which are licensed under the GNU
-AGPLv3. Accordingly, everything here is distributed under the **GNU AGPLv3**; see
-each add-on's `LICENSE`.
+These reimagine concepts from three Anki add-ons:
+
+- **Speed Focus Mode** by **Glutanimate** (GNU AGPLv3) — the auto-reveal idea
+  behind aSFM.
+- **Progressive Word Reveal** by **Patrick Lee** (<https://www.patricklee.com.au/>)
+  — the word-by-word fade.
+- **Sprint Mode** by **Patrick Lee** (<https://www.patricklee.com.au/>) — the
+  timed/counted-session idea behind Blitz.
+
+Everything here is distributed under the **GNU AGPLv3** (Glutanimate's Speed Focus
+Mode is AGPLv3, which the bundled/reworked code inherits); see each add-on's
+`LICENSE`.

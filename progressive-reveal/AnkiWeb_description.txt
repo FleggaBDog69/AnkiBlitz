@@ -14,14 +14,15 @@ WHAT IT DOES
 • Per-note-type / per-deck exclusions.
 
 BEFORE YOU START
-If you run Glutanimate's Progressive Word Reveal, disable it so the two don't
-double up. If you run the full AnkiBlitz suite, this feature is already included —
-don't install both.
+If you run Patrick Lee's original Progressive Word Reveal, disable it so the two
+don't double up. If you run the full AnkiBlitz suite, this feature is already
+included — don't install both.
 
 USING IT
 Tools ▸ Progressive Word Reveal ▸ Settings… — speed, mode, chunk size, reveal
 key, TTS sync, exclusions, and a live preview.
 
 NOTES
-• Reworks Glutanimate's Progressive Word Reveal; licensed under the GNU AGPLv3.
+• Reworks Patrick Lee's Progressive Word Reveal (https://www.patricklee.com.au/);
+  licensed under the GNU AGPLv3.
 • Tested on Anki 2.1.50+ (Qt6).

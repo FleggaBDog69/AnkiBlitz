@@ -52,6 +52,7 @@ NOTES
 • Works standalone. Your stats and settings are preserved across updates.
 • Word-count timing counts only the text you actually see — hidden fields and
   tag chips on AnKing-style notes don't inflate the timer.
-• Bundles concepts from Glutanimate's Speed Focus Mode, Progressive Word Reveal
-  and Sprint Mode; licensed under the GNU AGPLv3.
+• Bundles concepts from Glutanimate's Speed Focus Mode and from Patrick Lee's
+  Progressive Word Reveal and Sprint Mode (https://www.patricklee.com.au/);
+  licensed under the GNU AGPLv3.
 • Tested on Anki 2.1.50+ (Qt6).

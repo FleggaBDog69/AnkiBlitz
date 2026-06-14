@@ -1,7 +1,7 @@
 {
   "name": "AnkiBlitz Core",
   "package": "ankiblitz_core",
-  "author": "Fletcher (builds on Glutanimate's Sprint Mode)",
+  "author": "Fletcher (builds on Patrick Lee's Sprint Mode)",
   "version": "1.1.0",
   "description": "Session discipline for Anki: timed Blitz sessions, a Pomodoro work/break cycle, a Focus Lock, one-click profiles, and an in-app music player — one menu, one settings window. Card-reveal pacing lives in the companion aSFM and Progressive Word Reveal add-ons.",
   "min_point_version": 50,

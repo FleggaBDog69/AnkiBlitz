@@ -138,16 +138,18 @@ if those add-ons are absent.
 
 ## Credits, references & thanks
 
-### Stands on (AGPL originals)
-AnkiBlitz reimplements and merges three add-ons by **Glutanimate** into one
-engine:
+### Stands on
+AnkiBlitz reimplements and merges three add-ons into one engine:
 
-- **Speed Focus Mode (SFM)** — the auto-reveal-timer idea (here: never grades,
-  separate new vs learning timing, a pre-reveal warning).
-- **Progressive Word Reveal** — fading the question in word by word.
-- **Sprint Mode** — timed / counted review sessions (here: the Blitz engine).
+- **Speed Focus Mode (SFM)** by **Glutanimate** — the auto-reveal-timer idea
+  (here: never grades, separate new vs learning timing, a pre-reveal warning).
+- **Progressive Word Reveal** by **Patrick Lee**
+  (<https://www.patricklee.com.au/>) — fading the question in word by word.
+- **Sprint Mode** by **Patrick Lee** (<https://www.patricklee.com.au/>) —
+  timed / counted review sessions (here: the Blitz engine).
 
-Because those originals are licensed under the GNU AGPLv3, AnkiBlitz is too.
+Glutanimate's Speed Focus Mode is licensed under the GNU AGPLv3, so AnkiBlitz is
+distributed under the AGPLv3 too.
 
 ### TTS sync
 The progressive reveal can lock to a card's spoken pace by reading the card's
@@ -156,7 +158,9 @@ and the **AnKing** note-type TTS conventions. No speech engine is bundled —
 AnkiBlitz only *syncs to* the TTS that Anki / AnKing already produce.
 
 ### Thanks
-- **Patrick** — for code / feature contributions to AnkiBlitz.
+- **Patrick Lee** — author of the original *Progressive Word Reveal* and *Sprint
+  Mode* this builds on, and for code / feature contributions to AnkiBlitz.
+  (<https://www.patricklee.com.au/>)
 - The **AnKing** team — for the note types and TTS conventions AnkiBlitz is built
   to play nicely with (these drove the visible-word-count fix and the picture-card
   timing mode).

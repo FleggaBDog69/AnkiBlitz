@@ -57,5 +57,6 @@ SHORTCUTS  (Tools ▸ AnkiBlitz Core)
 NOTES
 ═══════════════════════════════════════════════════════════
 • Works standalone. Your stats and settings are preserved across updates.
-• Builds on the idea of Glutanimate's Sprint Mode; licensed under the GNU AGPLv3.
+• Builds on the idea of Patrick Lee's Sprint Mode
+  (https://www.patricklee.com.au/); licensed under the GNU AGPLv3.
 • Tested on Anki 2.1.50+ (Qt6).

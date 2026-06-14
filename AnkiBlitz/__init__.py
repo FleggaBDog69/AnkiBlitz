@@ -4,8 +4,8 @@ One source-of-truth session, one reviewer injection point, one CSS/JS bundle.
 Features: Blitz progress bar, progressive word reveal, and an adaptive
 auto-REVEAL timer (never auto-grades).
 
-Bundles concepts from Glutanimate's Speed Focus Mode (AGPL), Progressive Word
-Reveal, and Sprint Mode.
+Bundles concepts from Glutanimate's Speed Focus Mode (AGPL) and from Patrick Lee's
+Progressive Word Reveal and Sprint Mode (https://www.patricklee.com.au/).
 """
 
 from aqt import gui_hooks
