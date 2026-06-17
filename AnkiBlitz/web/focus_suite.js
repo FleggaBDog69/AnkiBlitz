@@ -336,6 +336,37 @@
     return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r;
   }
 
+  // Give the card its own scroll area BELOW the bar instead of letting the page
+  // scroll under it. The bar keeps a fixed strip at the very top; <body> becomes
+  // a scroll container pinned beneath it, so card content (even a tall histology
+  // image) can never travel up behind the bar — it just scrolls inside its own
+  // area. Reverted by releaseStrip() in clearProgress. (Qt WebEngine = Chromium,
+  // which honours position:fixed on <body>.)
+  function reserveStrip(h) {
+    document.documentElement.style.overflow = "hidden";
+    var s = document.body.style;
+    s.position = "fixed";
+    s.top = h + "px";
+    s.left = "0";
+    s.right = "0";
+    s.bottom = "0";
+    s.overflowY = "auto";
+    s.overflowX = "hidden";
+    s.paddingTop = "0";
+  }
+  function releaseStrip() {
+    document.documentElement.style.overflow = "";
+    var s = document.body.style;
+    s.position = "";
+    s.top = "";
+    s.left = "";
+    s.right = "";
+    s.bottom = "";
+    s.overflowY = "";
+    s.overflowX = "";
+    s.paddingTop = "";
+  }
+
   function renderProgress() {
     var p = progressState;
     if (!p) return;
@@ -399,9 +430,9 @@
       ? '<div class="fs-bar-wrap"><div class="fs-bar" style="width:' + pct.toFixed(2) + '%"></div></div>'
       : "";
     bar.innerHTML = '<div class="fs-row">' + rowParts + "</div>" + barHtml;
-    // Push the card below the bar's ACTUAL height (rows can wrap when live stats
-    // are on), so card text is never hidden under it.
-    document.body.style.paddingTop = bar.offsetHeight + "px";
+    // Reserve a dedicated strip and scroll the card beneath it. Rows can wrap when
+    // live stats are on, so measure the bar's ACTUAL height every render.
+    reserveStrip(bar.offsetHeight);
 
     if (timeRunning && now >= p.deadlineMs && !timeUpSent) {
       timeUpSent = true;
@@ -431,7 +462,7 @@
   FS.clearProgress = function () {
     var bar = document.getElementById("fs-progress");
     if (bar) bar.remove();
-    document.body.style.paddingTop = "";
+    releaseStrip();
     if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
     progressState = null;
   };
