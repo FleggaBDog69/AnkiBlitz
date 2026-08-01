@@ -109,6 +109,12 @@
     });
   }
 
+  function isTypingTarget(el) {
+    if (!el) return false;
+    var tag = (el.tagName || "").toUpperCase();
+    return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+  }
+
   // `reveal` is the per-card config: { wordsPerSecond, mode, chunkWords }.
   function startReveal(reveal) {
     var root = getRoot();
@@ -147,6 +153,11 @@
     // Escape hatch: click or the reveal key shows everything at once.
     clickHandler = function () { revealAllWords(); };
     keyHandler = function (e) {
+      // A bare key match isn't enough: without these two guards, "p" typed into
+      // Anki's type-in-the-answer box reveals the question, and any shortcut
+      // using the key as a modifier combination triggers it too.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isTypingTarget(e.target)) return;
       if ((e.key || "").toLowerCase() === revealKey) revealAllWords();
     };
     document.addEventListener("click", clickHandler, true);

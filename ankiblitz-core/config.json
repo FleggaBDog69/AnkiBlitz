@@ -29,16 +29,20 @@
     "cycles": 0,
     "auto_return_level": 2,
     "break_sound": true,
+    "break_mute_audio": true,
     "daily_goal": 0,
     "end_summary": true,
     "carry_forward": true,
+    "resume_same_day": true,
     "break_show_timeline": true,
     "break_show_journal": true,
     "break_show_focus_rating": true,
     "break_show_tips": true,
     "break_show_browser": true,
     "break_show_add_kg": true,
-    "break_allow_extend": true
+    "break_allow_extend": true,
+    "break_allow_step_away": true,
+    "break_pill": true
   },
 
   "music": {

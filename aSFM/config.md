@@ -24,6 +24,8 @@ delay = clamp(delay, min_delay_seconds, max_delay_seconds)
 | `show_countdown` | Show the thin depleting countdown bar while waiting. |
 | `warning_sound` | Play an alert before the answer auto-shows. |
 | `warning_at_percent` | Warn once this % of the delay has elapsed. |
+| `pause_key_enabled` | A key that freezes the timer on the current card. |
+| `pause_key` | Which key that is (default `p`). Give it a different key from Progressive Word Reveal's if you run both. |
 | `excluded_note_types` / `excluded_decks` | Skip the timer for these (a parent deck covers its subdecks). |
 | `fixed_time_enabled` | Use a set time (no word count) for picture / visual cards. |
 | `fixed_time_base_seconds` | The set time for a picture card (difficulty still applies). |

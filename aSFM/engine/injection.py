@@ -5,6 +5,9 @@ bundle into the reviewer. Python then computes the per-card auto-reveal delay an
 pushes it with a single ``ASFM.onCard(...)`` call; the JS owns the timer, the
 countdown, and the warning. When the timer expires the JS asks Python to show the
 answer (``asfm:reveal``). It NEVER grades the card.
+
+The one message going the other way is ``asfm:autopause:1|0`` — the pause key
+held or released the timer.
 """
 
 import json
@@ -13,11 +16,22 @@ import os
 from aqt import gui_hooks, mw
 from aqt.reviewer import Reviewer
 from aqt.sound import av_player
+from aqt.utils import tooltip
 
 from ..config import PACKAGE, get_config
 from . import adaptive
 
 PYCMD_PREFIX = "asfm:"
+
+# The pause key's sticky state. Held here rather than in the JS so it survives
+# the bundle being re-injected (leaving the reviewer and coming back), and is
+# pushed out with every card payload. Cleared on profile load, not persisted.
+_auto_paused = False
+
+
+def auto_reveal_paused() -> bool:
+    return _auto_paused
+
 
 _CSS_HREF = f"/_addons/{PACKAGE}/web/asfm.css"
 _JS_SRC = f"/_addons/{PACKAGE}/web/asfm.js"
@@ -85,12 +99,28 @@ def _excluded(card, cfg: dict) -> bool:
     return False
 
 
+def _pause_block(cfg: dict) -> dict:
+    """The pause-key half of every payload.
+
+    It rides on the disabled payloads too: the sticky flag has to reach the JS
+    even on a card aSFM isn't timing, or pausing on one card and moving to an
+    excluded one would silently drop the hold.
+    """
+    return {
+        "pauseKey": str(cfg.get("pause_key") or "p").lower(),
+        "pauseEnabled": bool(cfg.get("enabled", True)
+                             and cfg.get("pause_key_enabled", True)),
+        "autoPaused": _auto_paused,
+    }
+
+
 def question_payload(card) -> dict:
     cfg = get_config()
+    off = {"enabled": False, **_pause_block(cfg)}
     if not cfg.get("enabled", True) or _excluded(card, cfg):
-        return {"enabled": False}
+        return off
     if adaptive.is_new_card(card) and not cfg.get("enable_on_new", True):
-        return {"enabled": False}
+        return off
     delay_ms = int(adaptive.reveal_delay_seconds(card, cfg) * 1000)
     return {
         "enabled": True,
@@ -98,6 +128,7 @@ def question_payload(card) -> dict:
         "showCountdown": bool(cfg.get("show_countdown", True)),
         "warn": bool(cfg.get("warning_sound", True)),
         "warnPercent": int(cfg.get("warning_at_percent", 75)),
+        **_pause_block(cfg),
     }
 
 
@@ -118,7 +149,10 @@ def _on_show_question(*args, **kwargs) -> None:
 def _on_show_answer(*args, **kwargs) -> None:
     # Cancel any pending timer/countdown the moment the answer shows (manually or
     # via the timer).
-    _eval("window.ASFM && ASFM.onCard({enabled:false});")
+    # The pause block still rides along: the key has to keep working (and the
+    # sticky flag has to stay true) while the answer is on screen.
+    payload = {"enabled": False, **_pause_block(get_config())}
+    _eval(f"window.ASFM && ASFM.onCard({json.dumps(payload)});")
 
 
 def _on_js_message(handled, message: str, context, *args, **kwargs):
@@ -132,6 +166,16 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
         return (True, None)
     if action == "warn":
         _play_alert()
+        return (True, None)
+    if action.startswith("autopause:"):
+        global _auto_paused
+        _auto_paused = action.endswith("1")
+        key = str(get_config().get("pause_key") or "p").upper()
+        tooltip(
+            f"⏸ Auto-reveal paused — press {key} to resume" if _auto_paused
+            else "▶ Auto-reveal resumed",
+            period=1800,
+        )
         return (True, None)
     return handled
 

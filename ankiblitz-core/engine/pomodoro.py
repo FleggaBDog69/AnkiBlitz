@@ -17,7 +17,12 @@ The cycle is the single source of truth in this module (``_active``); sprint.py
 hands a completed work block to ``on_work_complete`` and reports cancellations to
 ``abort``. There is no active BlitzSession during a break, so the focus-loss
 watcher and state-change cancel paths are dormant — you may leave Anki freely
-while on a break.
+while on a break: "Step away" (or Esc) hides the break screen with its countdown
+still running, and only the explicit End button ends a run.
+
+Every change to a run's progress is mirrored to stats.save_pomodoro_run(), so a
+run you stopped earlier **today** — 2 of 3 blocks done — can be resumed at the
+block it left off rather than restarting from block 1.
 """
 
 import importlib.util
@@ -27,7 +32,8 @@ import random
 from datetime import datetime
 from typing import Optional
 
-from aqt import mw
+from aqt import gui_hooks, mw
+from aqt.sound import av_player
 from aqt.qt import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QPushButton,
     QSpinBox, QComboBox, QDialogButtonBox, QMessageBox, QApplication, QTimer, Qt,
@@ -72,6 +78,45 @@ class PomodoroState:
             self.frac_total = 0
             self.frac_chunk = 0
 
+    # ----- serialisation (for resuming a run later the same day) -----
+
+    def to_dict(self) -> dict:
+        return {k: getattr(self, k) for k in _RUN_FIELDS}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "PomodoroState":
+        """Rebuild a run from its stored record. The fraction split is restored
+        as saved — the pile was divided once, at the original start, and the
+        remaining chunks are still the right size."""
+        state = cls(
+            work_mode=d.get("work_mode", MODE_TIME),
+            work_target=d.get("work_target", 25),
+            break_minutes=d.get("break_minutes", 5),
+            long_break_enabled=d.get("long_break_enabled", True),
+            long_break_every=d.get("long_break_every", 4),
+            long_break_minutes=d.get("long_break_minutes", 15),
+            cycles=d.get("cycles", 0),
+            auto_return_level=d.get("auto_return_level", 2),
+            break_sound=d.get("break_sound", True),
+            deck_id=d.get("deck_id"),
+        )
+        state.completed_blocks = max(0, int(d.get("completed_blocks", 0)))
+        state.run_cards = int(d.get("run_cards", 0))
+        state.run_seconds = float(d.get("run_seconds", 0.0))
+        state.frac_denom = int(d.get("frac_denom", 0))
+        state.frac_total = int(d.get("frac_total", 0))
+        state.frac_chunk = int(d.get("frac_chunk", 0))
+        return state
+
+
+# Everything needed to rebuild a run mid-flight (see PomodoroState.from_dict).
+_RUN_FIELDS = (
+    "work_mode", "work_target", "break_minutes", "long_break_enabled",
+    "long_break_every", "long_break_minutes", "cycles", "auto_return_level",
+    "break_sound", "deck_id", "completed_blocks", "run_cards", "run_seconds",
+    "frac_denom", "frac_total", "frac_chunk",
+)
+
 
 # ----- Single source of truth -----
 
@@ -92,6 +137,47 @@ def _chime() -> None:
             pass
 
 
+# ----- Silence behind the break screen -----
+#
+# A work block ends on an *answer*, so Anki carries straight on and renders the
+# NEXT card behind the break — playing its [sound:] / {{tts}} tags at you while
+# you're meant to be resting. Two halves to shutting that up: stop whatever is
+# already sounding, and drop the tags of anything rendered from here on.
+#
+# The gate is a flag rather than "is the break dialog up?" because that render
+# can land in the gap between start_break() and the deferred _present_break().
+
+_muted = False
+
+
+def _mute_cards(on: bool) -> None:
+    global _muted
+    _muted = bool(on)
+    if not on:
+        return
+    try:
+        av_player.stop_and_clear_queue()
+    except Exception:
+        pass
+
+
+def _on_will_play_tags(tags, side, context) -> None:
+    """Drop a card's audio tags while a break owns the screen.
+
+    Emptying the list is Anki's supported way to suppress playback here, and it
+    leaves Replay Audio (R) working — so the card is still yours to hear when
+    the break is over and the reviewer comes back."""
+    if not _muted or not tags:
+        return
+    if not get_section("pomodoro").get("break_mute_audio", True):
+        return
+    tags.clear()
+
+
+def register() -> None:
+    gui_hooks.av_player_will_play_tags.append(_on_will_play_tags)
+
+
 def _anki_focused() -> bool:
     """True when our app is the foreground app (any AnkiBlitz/Anki window).
 
@@ -102,6 +188,89 @@ def _anki_focused() -> bool:
         return QApplication.applicationState() == Qt.ApplicationState.ApplicationActive
     except Exception:
         return True
+
+
+# ----- Resuming a run from earlier today -----
+
+def _remember_run(state: Optional[PomodoroState]) -> None:
+    """Mirror a run's progress to disk so it survives ending, bailing out, or
+    quitting Anki. Best-effort: never let bookkeeping break a cycle."""
+    if state is None:
+        return
+    try:
+        stats.save_pomodoro_run(state.to_dict())
+    except Exception:
+        pass
+
+
+def _blocks_left(run: dict) -> int:
+    """Work blocks still owed by a run — -1 when it's an unlimited cycle."""
+    done = int(run.get("completed_blocks", 0))
+    if run.get("work_mode") == MODE_FRACTION and int(run.get("frac_denom", 0)) > 0:
+        return max(0, int(run["frac_denom"]) - done)
+    cycles = int(run.get("cycles", 0))
+    if cycles > 0:
+        return max(0, cycles - done)
+    return -1
+
+
+def _forget_run_if_done(state: Optional[PomodoroState]) -> None:
+    """A run that has no blocks left reached its natural end — nothing to resume."""
+    if state is None or _blocks_left(state.to_dict()) != 0:
+        return
+    try:
+        stats.clear_pomodoro_run()
+    except Exception:
+        pass
+
+
+def resumable_run() -> dict:
+    """An unfinished run from earlier today worth picking up, or ``{}``.
+
+    Requires at least one completed block (there's nothing to resume into
+    otherwise) and, for a bounded run, at least one block still owed."""
+    if is_active() or not get_section("pomodoro").get("resume_same_day", True):
+        return {}
+    try:
+        run = stats.load_pomodoro_run()
+    except Exception:
+        return {}
+    if not run or int(run.get("completed_blocks", 0)) <= 0:
+        return {}
+    if _blocks_left(run) == 0:
+        return {}
+    return run
+
+
+def resume_summary(run: dict) -> str:
+    """e.g. "2/3 blocks done" — the label for the resume prompt and the rail."""
+    done = int(run.get("completed_blocks", 0))
+    left = _blocks_left(run)
+    if left > 0:
+        return f"{done}/{done + left} blocks done"
+    return f"{done} block{'s' if done != 1 else ''} done"
+
+
+def _ask_resume(run: dict) -> Optional[bool]:
+    """Resume / start fresh / cancel. None means "cancel, do nothing"."""
+    box = QMessageBox(mw)
+    box.setWindowTitle("Resume Pomodoro?")
+    box.setText(f"You have a Pomodoro from earlier today — {resume_summary(run)}.")
+    at = run.get("saved_at", "")
+    box.setInformativeText(
+        (f"Last block finished at {at}. " if at else "")
+        + f"Pick up at block {int(run.get('completed_blocks', 0)) + 1}?")
+    resume = box.addButton("Resume", QMessageBox.ButtonRole.AcceptRole)
+    fresh = box.addButton("Start fresh", QMessageBox.ButtonRole.DestructiveRole)
+    box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+    box.setDefaultButton(resume)
+    box.exec()
+    clicked = box.clickedButton()
+    if clicked is resume:
+        return True
+    if clicked is fresh:
+        return False
+    return None
 
 
 # ----- Estimates / preview -----
@@ -152,9 +321,14 @@ def _next_preview_text(state: PomodoroState) -> str:
 
 # ----- Lifecycle -----
 
-def start_pomodoro(deck_id=None, use_defaults=False) -> None:
+def start_pomodoro(deck_id=None, use_defaults=False, resume=None) -> None:
     """Start a Pomodoro run. With ``use_defaults`` it skips the start dialog and
-    builds the cycle straight from the saved preset (the widget quick-launch)."""
+    builds the cycle straight from the saved preset (the widget quick-launch).
+
+    ``resume`` forces the choice between picking up an unfinished run from
+    earlier today and starting a fresh one; left as None it asks, except on the
+    one-click widget path, where resuming is what the button already advertises.
+    """
     global _active
     if not (suite_enabled() and get_section("pomodoro").get("enabled", True)):
         tooltip("Pomodoro is turned off in AnkiBlitz settings.")
@@ -177,13 +351,32 @@ def start_pomodoro(deck_id=None, use_defaults=False) -> None:
         return
 
     cfg = get_section("pomodoro")
-    state = _state_from_cfg(cfg, deck_id) if use_defaults else _show_start_dialog(cfg, deck_id)
+
+    run = resumable_run()
+    if run and resume is None:
+        resume = True if use_defaults else _ask_resume(run)
+        if resume is None:          # cancelled
+            return
+    if run and resume:
+        state = PomodoroState.from_dict(run)
+        if deck_id is not None:
+            state.deck_id = deck_id
+    else:
+        state = _state_from_cfg(cfg, deck_id) if use_defaults else _show_start_dialog(cfg, deck_id)
     if state is None:
         return
+
     _active = state
+    _remember_run(state)
     if not _begin_work():
         _active = None
         tooltip("Couldn't start the Pomodoro.")
+        return
+    if run and resume:
+        n = state.completed_blocks + 1
+        left = _blocks_left(state.to_dict())
+        tooltip(f"Resuming — block {n}" + (f" of {n + left - 1}" if left > 0 else ""),
+                period=3000)
 
 
 def _begin_work() -> bool:
@@ -193,7 +386,7 @@ def _begin_work() -> bool:
     # Carry-forward: greet a block that follows a break with the note you just
     # wrote, so your intention rolls into the next session.
     if ok and _active.completed_blocks >= 1 and get_section("pomodoro").get("carry_forward", True):
-        note = _last_entry_text(_read_journal())
+        note = _last_entry_text(_read_journal(), today_only=True)
         if note:
             tooltip("📝 From your break: " + note.replace("\n", " ")[:120], period=5000)
     return ok
@@ -210,6 +403,9 @@ def on_work_complete(snapshot, stats_after, cfg) -> None:
         stats.record_pomodoro_block(snapshot.unique_cards, snapshot.elapsed_seconds())
     except Exception:
         pass
+    # Progress moved — keep the resumable record in step, so stopping here (or
+    # quitting Anki) still leaves this block banked.
+    _remember_run(_active)
     if _active.cycles > 0 and _active.completed_blocks >= _active.cycles:
         finish(summary=True)
         return
@@ -243,6 +439,9 @@ def _last_block_text(snapshot) -> str:
 def start_break(minutes: int, is_long: bool, last_text: str = "") -> None:
     if _active is None:
         return
+    # Cut the card audio first: the answer you just graded may still be talking,
+    # and the next card is about to render behind the break.
+    _mute_cards(True)
     _chime()
     # Defer presentation so we're clear of the just-finished block's answer hook.
     # The break is a fullscreen modal over the *reviewer* (we don't leave the
@@ -254,6 +453,7 @@ def start_break(minutes: int, is_long: bool, last_text: str = "") -> None:
 def _present_break(minutes: int, is_long: bool, last_text: str) -> None:
     global _break_dialog
     if _active is None:
+        _mute_cards(False)  # run ended in the gap — don't leave cards silenced
         return
     # Stop Speed Focus on the card hidden behind the break so it doesn't
     # auto-reveal or chime mid-break.
@@ -335,8 +535,12 @@ def abort(reason: str = "") -> None:
     global _active
     if _active is None:
         return
+    state = _active
     _active = None
     _close_break_dialog()
+    # Bailing out isn't the same as finishing: the blocks you did bank stay
+    # resumable for the rest of the day.
+    _remember_run(state)
 
 
 def finish(summary: bool = False) -> None:
@@ -346,6 +550,9 @@ def finish(summary: bool = False) -> None:
     state = _active
     _active = None
     _close_break_dialog()
+    # Ending early keeps the run resumable; a run that ran out of blocks is done.
+    _remember_run(state)
+    _forget_run_if_done(state)
     if not summary:
         return
     if state.completed_blocks > 0 and get_section("pomodoro").get("end_summary", True):
@@ -398,12 +605,17 @@ def _show_run_summary(state: PomodoroState) -> None:
 def _clear_break_dialog() -> None:
     global _break_dialog
     _break_dialog = None
+    # However the break ended, cards get their voice back. Unmuting here (and in
+    # _close_break_dialog) covers every exit — fire, skip, End, window close —
+    # and lands before the next work block re-renders the card.
+    _mute_cards(False)
 
 
 def _close_break_dialog() -> None:
     global _break_dialog
     dlg = _break_dialog
     _break_dialog = None
+    _mute_cards(False)
     if dlg is not None:
         try:
             dlg.accept()  # accept() so it isn't treated as a window-close "End"
@@ -436,13 +648,48 @@ def _write_journal(text: str) -> None:
         pass
 
 
-def _last_entry_text(journal: str) -> str:
+def _split_entries(journal: str) -> list:
+    """The journal as (header, body) pairs, oldest first. A header is the date
+    line without its "## " marker, e.g. "2026-07-31 09:20 — after block 1"."""
+    out = []
+    for chunk in journal.split("\n## "):
+        chunk = chunk.strip("\n")
+        if not chunk:
+            continue
+        if chunk.startswith("## "):        # the first entry keeps its marker
+            chunk = chunk[3:]
+        lines = chunk.splitlines()
+        out.append((lines[0].strip(), "\n".join(lines[1:]).strip()))
+    return out
+
+
+def _entry_dt(header: str):
+    try:
+        return datetime.strptime(header[:16], "%Y-%m-%d %H:%M")
+    except Exception:
+        return None
+
+
+def _last_entry(journal: str, today_only: bool = False):
+    """The most recent journal entry as (header, body).
+
+    ``today_only`` drops an entry written on an earlier day: a note from last
+    week isn't "your last break", and showing it under that label just makes the
+    break screen lie about where you left off."""
+    entries = _split_entries(journal)
+    if not entries:
+        return ("", "")
+    header, body = entries[-1]
+    if today_only:
+        dt = _entry_dt(header)
+        if dt is None or dt.date() != datetime.now().date():
+            return ("", "")
+    return (header, body)
+
+
+def _last_entry_text(journal: str, today_only: bool = False) -> str:
     """Body of the most recent journal entry (for the 'last break' reminder)."""
-    if not journal.strip():
-        return ""
-    last = journal.split("\n## ")[-1]
-    lines = last.splitlines()
-    return "\n".join(lines[1:]).strip()  # drop the header line
+    return _last_entry(journal, today_only)[1]
 
 
 def open_journal_viewer() -> None:
@@ -542,17 +789,38 @@ def _pill(text: str, style: str) -> QLabel:
     return lbl
 
 
-# Pill styles for the timeline.
-_PILL_DONE = ("background:#2e7d32;color:#fff;border-radius:7px;"
-              "padding:4px 9px;font-size:12px;font-weight:600;")
-_PILL_NOW = ("background:#e0883c;color:#fff;border-radius:7px;"
-             "padding:4px 9px;font-size:12px;font-weight:700;")
-_PILL_NOW_LONG = ("background:#7e57c2;color:#fff;border-radius:7px;"
-                  "padding:4px 9px;font-size:12px;font-weight:700;")
-_PILL_NEXT = ("border:1px dashed rgba(150,150,150,.7);border-radius:7px;"
-              "padding:4px 9px;font-size:12px;")
-_PILL_LONG = ("border:1px solid #7e57c2;color:#b39ddb;border-radius:7px;"
-              "padding:4px 9px;font-size:12px;font-weight:600;")
+# Pill styles for the timeline. Built per call rather than as module constants,
+# so a theme change is picked up without an Anki restart.
+def _pill_done() -> str:
+    c = "#2e7d32"
+    return (f"background:{c};color:#fff;border-radius:7px;"
+            "padding:4px 9px;font-size:12px;font-weight:600;")
+
+
+def _pill_now() -> str:
+    c = "#e0883c"
+    return (f"background:{c};color:#fff;border-radius:7px;"
+            "padding:4px 9px;font-size:12px;font-weight:700;")
+
+
+def _pill_now_long() -> str:
+    # Deliberately a different hue from the short break, not just a shade of it.
+    c = "#7e57c2"
+    return (f"background:{c};color:#fff;border-radius:7px;"
+            "padding:4px 9px;font-size:12px;font-weight:700;")
+
+
+def _pill_next() -> str:
+    c = "rgba(150,150,150,.7)"
+    return (f"border:1px dashed {c};border-radius:7px;"
+            "padding:4px 9px;font-size:12px;")
+
+
+def _pill_long() -> str:
+    c = "#7e57c2"
+    fg = "#b39ddb"
+    return (f"border:1px solid {c};color:{fg};border-radius:7px;"
+            "padding:4px 9px;font-size:12px;font-weight:600;")
 
 
 def _timeline_widget(state: PomodoroState) -> QWidget:
@@ -569,13 +837,13 @@ def _timeline_widget(state: PomodoroState) -> QWidget:
     except Exception:
         blocks = []
     for blk in blocks[-6:]:                        # recent past (capped)
-        h.addWidget(_pill(f"✓ {blk.get('c', 0)}", _PILL_DONE))
+        h.addWidget(_pill(f"✓ {blk.get('c', 0)}", _pill_done()))
 
     n = state.completed_blocks
     every = state.long_break_every if state.long_break_enabled else 0
     is_long_now = every > 0 and n > 0 and n % every == 0
     h.addWidget(_pill("🌙 now" if is_long_now else "☕ now",
-                      _PILL_NOW_LONG if is_long_now else _PILL_NOW))
+                      _pill_now_long() if is_long_now else _pill_now()))
 
     # Future: upcoming work blocks (capped to the cycle limit if set).
     long_block = _next_long_break_block(state)
@@ -584,22 +852,73 @@ def _timeline_widget(state: PomodoroState) -> QWidget:
         upto = min(upto, state.cycles)
     upcoming = [i for i in range(n + 1, upto + 1)]
     for i in upcoming[:4]:
-        h.addWidget(_pill(f"▶ #{i}", _PILL_NEXT))
+        h.addWidget(_pill(f"▶ #{i}", _pill_next()))
     if len(upcoming) > 4:
         h.addWidget(_pill("…", "font-size:12px;opacity:.5;"))
     # Mark the next long break (if it actually falls within this run).
     if long_block is not None and (state.cycles == 0 or long_block <= state.cycles):
         away = long_block - n
-        h.addWidget(_pill(f"🌙 long break in {away}", _PILL_LONG))
+        h.addWidget(_pill(f"🌙 long break in {away}", _pill_long()))
 
     h.addStretch(1)
     return row
 
 
+class _BreakPill(QWidget):
+    """The break countdown as a small always-on-top pill, shown while you've
+    stepped away from the break screen. Click it to come back."""
+
+    def __init__(self, dialog: "BreakDialog"):
+        super().__init__(None, Qt.WindowType.Window
+                         | Qt.WindowType.FramelessWindowHint
+                         | Qt.WindowType.WindowStaysOnTopHint)
+        self._dialog = dialog
+        # Show without stealing focus from whatever you stepped away to.
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        # Same token as the "now" timeline pill — the pill and the floating
+        # countdown are the same idea in two places, so they track together.
+        self.setStyleSheet(
+            f"background:{'#e0883c'};"
+            "border-radius:12px;")
+        col = QVBoxLayout(self)
+        col.setContentsMargins(16, 9, 16, 9)
+        col.setSpacing(0)
+        self.clock = QLabel("")
+        self.clock.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.clock.setStyleSheet("color:#fff;font-size:19px;font-weight:800;")
+        col.addWidget(self.clock)
+        sub = QLabel("break — click to return")
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sub.setStyleSheet("color:rgba(255,255,255,.85);font-size:10px;")
+        col.addWidget(sub)
+
+    def set_time(self, text: str) -> None:
+        self.clock.setText(text)
+
+    def place(self) -> None:
+        """Top-right of the screen, clear of most windows' content."""
+        try:
+            self.adjustSize()
+            geo = QApplication.primaryScreen().availableGeometry()
+            self.move(geo.right() - self.width() - 26, geo.top() + 26)
+        except Exception:
+            pass
+
+    def mousePressEvent(self, event) -> None:
+        self._dialog._come_back()
+
+
 class BreakDialog(QDialog):
     """A fullscreen break page over the reviewer: big mm:ss countdown, a timeline
     of today's blocks, the last block's recap + what's next, and actions
-    (End / Browse in-app / Add KG / Skip). The countdown runs on every page."""
+    (End / Step away / Browse in-app / Add KG / Skip). The countdown runs on
+    every page.
+
+    "Step away" (and Esc) hides the page WITHOUT touching the cycle, leaving a
+    floating countdown pill behind, so ducking out to another app during a break
+    is a normal thing to do rather than the end of your Pomodoro. The page comes
+    back by itself when Anki is next the active app."""
 
     def __init__(self, minutes: int, is_long: bool, state: PomodoroState,
                  last_text: str = "", parent=None):
@@ -610,6 +929,8 @@ class BreakDialog(QDialog):
         self._browser = None
         self._view = None
         self._music = None
+        self._away = False
+        self._pill = None
 
         self.setWindowTitle("Break")
         # Frameless + modal, sized over the Anki window: a distraction-free
@@ -639,8 +960,15 @@ class BreakDialog(QDialog):
         outer.addWidget(self.stack)
         self.stack.addWidget(self._build_break_page(minutes, is_long, last_text))
 
-        # Closing the window (Esc) ends the Pomodoro.
+        # Closing the window ends the Pomodoro — but Esc is intercepted in
+        # keyPressEvent and steps away instead (see _step_away).
         self.rejected.connect(self._on_rejected)
+        self.finished.connect(lambda *_: self._hide_pill())
+        # Coming back to Anki brings the break page back with you.
+        try:
+            QApplication.instance().applicationStateChanged.connect(self._on_app_state)
+        except Exception:
+            pass
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
@@ -727,6 +1055,12 @@ class BreakDialog(QDialog):
             ext = QPushButton("+5 min")
             ext.clicked.connect(self._extend)
             btn_row.addWidget(ext)
+        if po.get("break_allow_step_away", True):
+            away = QPushButton("↗ Step away")
+            away.setToolTip("Hide this screen and duck out — the break keeps "
+                            "running and your Pomodoro is safe (Esc does the same).")
+            away.clicked.connect(self._step_away)
+            btn_row.addWidget(away)
         if po.get("break_show_browser", True):
             browse = QPushButton("🌐 Browse")
             browse.clicked.connect(self._open_browser)
@@ -744,9 +1078,8 @@ class BreakDialog(QDialog):
         lay.addStretch(3)
 
         outer.addWidget(content, 1)
-        # Music docked to the right edge (only when enabled for breaks).
-        mu = get_section("music")
-        if mu.get("enabled", False) and mu.get("show_on_break", True):
+        # Music docked to the right edge, when it's enabled for breaks.
+        if get_section("music").get("show_on_break", True):
             outer.addWidget(self._build_music_panel())
         return page
 
@@ -776,12 +1109,15 @@ class BreakDialog(QDialog):
         notes_lbl.setStyleSheet("font-size: 12px; opacity: 0.6; margin-bottom: 2px;")
         notes_col.addWidget(notes_lbl)
 
-        last = _last_entry_text(self._journal_prior)
+        # Only today's previous entry — an older note under "Last break" would
+        # read as something you wrote minutes ago.
+        head, last = _last_entry(self._journal_prior, today_only=True)
         if last:
             short = last.replace("\n", "  ")
             if len(short) > 150:
                 short = short[:150] + "…"
-            prev = QLabel("Last break: " + short)
+            when = head[11:16] if _entry_dt(head) else ""
+            prev = QLabel((f"Last break ({when}): " if when else "Last break: ") + short)
             prev.setWordWrap(True)
             prev.setFixedWidth(640)
             prev.setStyleSheet("font-size: 11px; opacity: 0.45; margin-bottom: 4px;")
@@ -804,8 +1140,10 @@ class BreakDialog(QDialog):
             stats.set_last_block_focus(n)
         except Exception:
             pass
+        filled = (f"background:{'#3b82f6'};"
+                  "color:#fff;font-weight:700;")
         for i, b in enumerate(self._focus_btns, start=1):
-            b.setStyleSheet("background:#3b82f6;color:#fff;font-weight:700;" if i <= n else "")
+            b.setStyleSheet(filled if i <= n else "")
         tooltip(f"Focus {n}/5 logged", period=1200)
 
     def _extend(self) -> None:
@@ -814,6 +1152,63 @@ class BreakDialog(QDialog):
         self._remaining += 300
         self.clock.setText(self._fmt())
         tooltip("+5 min added to the break", period=1200)
+
+    # ----- stepping away (leave Anki without losing the Pomodoro) -----
+
+    def _step_away(self) -> None:
+        """Hide the break page, keeping the countdown (and the cycle) running.
+
+        Hiding also drops the modal block, so the rest of Anki — and every other
+        app — is yours for the rest of the break."""
+        if self._fired or self._away:
+            return
+        self._away = True
+        self._save_notes_now()
+        self.hide()
+        if get_section("pomodoro").get("break_pill", True):
+            try:
+                self._pill = _BreakPill(self)
+                self._pill.set_time(self._fmt())
+                self._pill.place()
+                self._pill.show()
+            except Exception:
+                self._pill = None
+        tooltip("Break still running — it'll be waiting when you get back.",
+                period=3000)
+
+    def _come_back(self) -> None:
+        if self._fired or not self._away:
+            return
+        self._away = False
+        self._hide_pill()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _hide_pill(self) -> None:
+        pill, self._pill = self._pill, None
+        if pill is not None:
+            try:
+                pill.close()
+            except Exception:
+                pass
+
+    def _on_app_state(self, state) -> None:
+        # Back in Anki mid-break: put the break page back up.
+        try:
+            active = state == Qt.ApplicationState.ApplicationActive
+        except Exception:
+            return
+        if active and self._away and not self._fired:
+            QTimer.singleShot(150, self._come_back)
+
+    def keyPressEvent(self, event) -> None:
+        # Esc must never cost you a Pomodoro: it steps away instead of closing.
+        if (event.key() == Qt.Key.Key_Escape
+                and get_section("pomodoro").get("break_allow_step_away", True)):
+            self._step_away()
+            return
+        super().keyPressEvent(event)
 
     # ----- in-app browser (keeps the break inside Anki) -----
 
@@ -928,13 +1323,17 @@ class BreakDialog(QDialog):
         if self._remaining <= 0:
             self._fire()
         else:
-            self.clock.setText(self._fmt())
+            text = self._fmt()
+            self.clock.setText(text)
+            if self._pill is not None:
+                self._pill.set_time(text)
 
     def _fire(self) -> None:
         if self._fired:
             return
         self._fired = True
         self._timer.stop()
+        self._hide_pill()
         self._save_notes_now()
         on_break_over()
 
@@ -946,14 +1345,17 @@ class BreakDialog(QDialog):
             return
         self._fired = True
         self._timer.stop()
+        self._hide_pill()
         self._save_notes_now()
         finish(summary=True)
 
     def _on_rejected(self) -> None:
-        # accept()-driven programmatic close won't reach here; only X / Esc does.
+        # accept()-driven programmatic close won't reach here, and Esc is handled
+        # in keyPressEvent — so this is a genuine window close.
         if not self._fired:
             self._fired = True
             self._timer.stop()
+            self._hide_pill()
             self._save_notes_now()
             abort("ended during break")
 

@@ -12,7 +12,9 @@ Builds on concepts from Patrick Lee's Sprint Mode (https://www.patricklee.com.au
 from aqt import gui_hooks
 
 from . import config
-from .engine import injection, sprint, quickstart, widgets, music, onboarding
+from .engine import (
+    injection, sprint, quickstart, widgets, music, onboarding, pomodoro,
+)
 from .menu import build_menu
 
 _initialized = False
@@ -33,6 +35,8 @@ def _on_profile_open() -> None:
     quickstart.register()
     widgets.register()
     music.register()
+    # Registers the av_player hook that silences card audio during a break.
+    pomodoro.register()
     build_menu()
     _initialized = True
 

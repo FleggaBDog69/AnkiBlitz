@@ -26,6 +26,8 @@ DEFAULTS = {
     "show_countdown": True,       # show the depleting countdown indicator
     "warning_sound": True,        # play an alert before the answer auto-shows
     "warning_at_percent": 75,     # warn once this % of the delay has elapsed
+    "pause_key_enabled": True,    # a key that holds/releases the auto-reveal timer
+    "pause_key": "p",             # which key that is
     "excluded_note_types": [],    # skip the auto-reveal timer for these note types
     "excluded_decks": [],         # skip the auto-reveal timer for these decks
     # Picture / visual cards: ignore word count and familiarity; give a SET reveal

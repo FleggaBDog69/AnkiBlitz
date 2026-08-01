@@ -521,6 +521,14 @@ class PomodoroPanel(QWidget):
             "is the active window (otherwise leaving focus would cancel it); "
             "Raise + auto-start brings Anki to the front first."))
 
+        self.break_mute_audio = QCheckBox("Silence card audio during a break")
+        self.break_mute_audio.setChecked(bool(po.get("break_mute_audio", True)))
+        pl.addWidget(self.break_mute_audio)
+        pl.addWidget(_hint(
+            "A block ends on an answer, so Anki renders the next card behind the "
+            "break screen and plays its sound / TTS at you. This mutes it until "
+            "the break is over; the card is replayed when the reviewer returns."))
+
         gf = QFormLayout()
         self.daily_goal = QSpinBox()
         self.daily_goal.setRange(0, 99)
@@ -537,6 +545,16 @@ class PomodoroPanel(QWidget):
         self.carry_forward.setChecked(bool(po.get("carry_forward", True)))
         pl.addWidget(self.carry_forward)
 
+        self.resume_same_day = QCheckBox(
+            "Offer to resume an unfinished run from earlier today")
+        self.resume_same_day.setChecked(bool(po.get("resume_same_day", True)))
+        pl.addWidget(self.resume_same_day)
+        pl.addWidget(_hint(
+            "Stopped after 2 of 3 blocks? Starting a Pomodoro later the same day "
+            "offers to pick up at block 3 — same cycle, same fraction split — "
+            "instead of beginning again. The widget button says “Resume” when "
+            "there's one waiting."))
+
         layout.addWidget(pbox)
 
         # --- Break screen elements (hide any to keep the screen calm) ---
@@ -550,6 +568,9 @@ class PomodoroPanel(QWidget):
         self.br_browser = QCheckBox("In-app browser button")
         self.br_addkg = QCheckBox("Add KG button (Ankisstant)")
         self.br_extend = QCheckBox("+5 min extend button")
+        self.br_away = QCheckBox(
+            "“Step away” button (and Esc) — leave without ending the run")
+        self.br_pill = QCheckBox("Floating countdown while you're stepped away")
         self._break_toggles = [
             (self.br_timeline, "break_show_timeline"),
             (self.br_journal, "break_show_journal"),
@@ -558,6 +579,8 @@ class PomodoroPanel(QWidget):
             (self.br_browser, "break_show_browser"),
             (self.br_addkg, "break_show_add_kg"),
             (self.br_extend, "break_allow_extend"),
+            (self.br_away, "break_allow_step_away"),
+            (self.br_pill, "break_pill"),
         ]
         for cb, key in self._break_toggles:
             cb.setChecked(bool(po.get(key, True)))
@@ -599,6 +622,8 @@ class PomodoroPanel(QWidget):
             "daily_goal": self.daily_goal.value(),
             "end_summary": self.end_summary.isChecked(),
             "carry_forward": self.carry_forward.isChecked(),
+            "break_mute_audio": self.break_mute_audio.isChecked(),
+            "resume_same_day": self.resume_same_day.isChecked(),
         })
         for cb, key in self._break_toggles:
             po[key] = cb.isChecked()

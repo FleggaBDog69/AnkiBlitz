@@ -59,6 +59,20 @@ Menu (**Tools ▸ AnkiBlitz Core**):
 | Settings… | — | The tabbed settings window. |
 | Enabled | — | Master on/off for everything. |
 
+### During a Pomodoro break
+
+The break screen is a full-page countdown, but it isn't a trap:
+
+- **Step away** (or `Esc`) hides it and leaves a small floating countdown — go
+  check your calendar, make a coffee, leave the app entirely. The break keeps
+  running and the page comes back when you return to Anki.
+- Only **End Pomodoro** ends a run.
+- The break is **quiet**: the card Anki renders behind the break screen doesn't
+  read itself out at you. Its audio plays when you come back to the reviewer.
+- Stopped part-way through? Starting a Pomodoro later **the same day** offers to
+  **resume** — same cycle, same fraction split, picking up at the block you
+  stopped on. The deck-list widget's button says "Resume" when one is waiting.
+
 ---
 
 ## Profiles

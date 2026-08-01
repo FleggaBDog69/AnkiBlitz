@@ -64,6 +64,26 @@ def _hline():
     return line
 
 
+class _KeyCaptureEdit(QLineEdit):
+    """Read-only field that records the next printable key the user presses."""
+
+    def __init__(self, key, parent=None):
+        super().__init__(parent)
+        self.setReadOnly(True)
+        self.setMaxLength(1)
+        self.setFixedWidth(140)
+        self.setPlaceholderText("click, then press a key")
+        self.setText(str(key or ""))
+
+    def keyPressEvent(self, event):
+        text = event.text()
+        if text and text.strip() and len(text) == 1:
+            self.setText(text)
+
+    def key_value(self):
+        return (self.text() or "p").lower()
+
+
 class _FilterList(QWidget):
     """A labelled, searchable list of checkable items."""
 
@@ -211,6 +231,27 @@ class _Panel(QWidget):
             "the sound.)"))
 
         layout.addWidget(_hline())
+        self.pause_key_enabled = QCheckBox(
+            "Pause key: hold the timer on the current card")
+        self.pause_key_enabled.setChecked(bool(cfg.get("pause_key_enabled", True)))
+        layout.addWidget(self.pause_key_enabled)
+
+        pause_form = QFormLayout()
+        self.pause_key = _KeyCaptureEdit(cfg.get("pause_key", "p"))
+        pause_form.addRow("Pause key:", self.pause_key)
+        layout.addLayout(pause_form)
+        self.pause_key_enabled.toggled.connect(self.pause_key.setEnabled)
+        self.pause_key.setEnabled(self.pause_key_enabled.isChecked())
+        layout.addWidget(_hint(
+            "Press it to freeze the auto-reveal countdown (and its warning) so "
+            "you can sit on a card; press again to pick up where it stopped. The "
+            "pause sticks across cards, and every card it applies to says so on "
+            "screen.\n\n"
+            "If you also run Progressive Word Reveal, give the two different "
+            "keys — they both default to “p”, and as separate add-ons they can't "
+            "take turns on one press the way they do inside AnkiBlitz."))
+
+        layout.addWidget(_hline())
         layout.addWidget(QLabel("Skip the auto-reveal timer for these (review normally):"))
         notetypes, decks = _collect_names()
         self.nt_list = _FilterList("Note types", notetypes, cfg.get("excluded_note_types", []))
@@ -301,6 +342,8 @@ class _Panel(QWidget):
             "show_countdown": self.show_countdown.isChecked(),
             "warning_sound": self.warning_sound.isChecked(),
             "warning_at_percent": self.warn_pct.value(),
+            "pause_key_enabled": self.pause_key_enabled.isChecked(),
+            "pause_key": self.pause_key.key_value(),
             "excluded_note_types": self.nt_list.checked(),
             "excluded_decks": self.deck_list.checked(),
             "fixed_time_enabled": self.fixed_enabled.isChecked(),

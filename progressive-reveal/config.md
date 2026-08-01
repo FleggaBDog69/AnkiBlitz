@@ -10,7 +10,7 @@ this file documents the raw `config.json` keys. Read live per card.
 | `reveal_mode` | `"words"` (one at a time) or `"chunks"` (groups of N). |
 | `chunk_words` | Words revealed together per step in chunk mode. |
 | `reveal_on_answer` | Also fade the answer side in (otherwise it shows at once). |
-| `reveal_key` | A key (besides clicking) that reveals everything instantly. |
+| `reveal_key` | A key (besides clicking) that reveals everything instantly. Ignored while you're typing in an answer box, and ignored with Ctrl/Cmd/Alt held. |
 | `tts_auto_match` | Per card, drive the reveal speed from the card's active `{{tts}}` tag. |
 | `tts_base_wpm` | The `say` base words-per-minute (macOS = 170 × speed). |
 | `excluded_note_types` / `excluded_decks` | Skip the reveal for these (a parent deck covers its subdecks). |

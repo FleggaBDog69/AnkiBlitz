@@ -17,3 +17,23 @@
   transform-origin: left center;
   background: linear-gradient(90deg, #f59e0b, #ef4444);
 }
+
+/* Pause badge. It says "paused" in words rather than relying on the countdown
+   bar having stopped — a frozen bar on its own reads as a bug. */
+#asfm-paused {
+  position: fixed;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 99998;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.92);
+  color: #1b1b1b;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}

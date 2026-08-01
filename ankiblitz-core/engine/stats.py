@@ -5,7 +5,7 @@ Only completed Blitzes count; cancelled/bailed Blitzes leave no trace.
 
 import json
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from aqt import mw
 from aqt.qt import (
@@ -36,6 +36,10 @@ def _defaults() -> dict:
         # Pomodoro day log (Stage 5): per-date list of completed work blocks,
         # each {"c": cards, "s": seconds}. Powers the break-screen timeline.
         "pomodoro_log": {},
+        # The last Pomodoro run's shape + progress, so a run left unfinished
+        # earlier today can be resumed at the block it stopped on. Stamped with
+        # the date it belongs to; anything older is ignored (see below).
+        "pomodoro_run": {},
         # Quick Start metrics (Stage 4).
         "quick_start": {
             "last_launch_date": "",       # gate "once per day" (set even if cancelled)
@@ -137,6 +141,35 @@ def pomodoro_today_summary() -> dict:
         "cards": sum(int(b.get("c", 0)) for b in blocks),
         "avg_focus": (sum(focus) / len(focus)) if focus else 0.0,
     }
+
+
+# ----- Resumable Pomodoro run -----
+
+def save_pomodoro_run(run: dict) -> None:
+    """Remember a run's shape + progress so it can be resumed. Called whenever the
+    progress changes (start, each completed block, end) — one record, overwritten."""
+    data = load_stats()
+    saved = dict(run)
+    saved["date"] = date.today().isoformat()
+    saved["saved_at"] = datetime.now().strftime("%H:%M")
+    data["pomodoro_run"] = saved
+    save_stats(data)
+
+
+def load_pomodoro_run() -> dict:
+    """The stored run, but only if it belongs to today — yesterday's cycle isn't
+    something you resume, and the due pile it was split from is long gone."""
+    run = load_stats().get("pomodoro_run")
+    if not isinstance(run, dict) or run.get("date") != date.today().isoformat():
+        return {}
+    return run
+
+
+def clear_pomodoro_run() -> None:
+    data = load_stats()
+    if data.get("pomodoro_run"):
+        data["pomodoro_run"] = {}
+        save_stats(data)
 
 
 def pomodoro_all_time() -> dict:

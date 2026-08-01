@@ -9,21 +9,35 @@ AnkiBlitz alone and leave the spin-offs on their current release.
 
 ---
 
-## Outstanding as of 2026-07-31
+## Cleared 2026-08-01
 
-Five changes landed in `AnkiBlitz/` and none of them are in the spin-offs.
+Items 1–7 are **ported**. Items 8–9 are AnkiBlitz-only by decision (below).
 
 | # | Change | Core | aSFM | PWR |
 |---|--------|:----:|:----:|:---:|
-| 1 | "Finish all due" button fix | **yes** | — | — |
-| 2 | Break screen: step away / floating pill | **yes** | — | — |
-| 3 | Resume an unfinished run from earlier today | **yes** | — | — |
-| 4 | Break journal: today's entry only | **yes** | — | — |
-| 5 | Silence card audio during a break | **yes** | — | — |
-| 6 | Pause key for the auto-reveal timer | — | **yes** | — |
-| 7 | Key-handler guards (modifiers, typing) | — | (comes with 6) | **yes** |
-| 8 | SynapsePro bridge (`engine/theme_bridge.py`) | — | — | — |
-| 9 | QComboBox escape-hatch fix in `theme_bridge.py` | (with 8) | — | — |
+| 1 | "Finish all due" button fix | ✅ | — | — |
+| 2 | Break screen: step away / floating pill | ✅ | — | — |
+| 3 | Resume an unfinished run from earlier today | ✅ | — | — |
+| 4 | Break journal: today's entry only | ✅ | — | — |
+| 5 | Silence card audio during a break | ✅ | — | — |
+| 6 | Pause key for the auto-reveal timer | — | ✅ | — |
+| 7 | Key-handler guards (modifiers, typing) | — | ✅ | ✅ |
+| 8 | SynapsePro bridge (`engine/theme_bridge.py`) | n/a | n/a | n/a |
+| 9 | QComboBox escape-hatch fix in `theme_bridge.py` | n/a | n/a | n/a |
+
+**One correction to the recipe below, found doing it.** `engine/pomodoro.py` is
+**no longer safe to `cp` into Core** — the SynapsePro bridge is threaded through
+it (`theme_bridge.color(...)` at ~10 sites, `music_available()`, and the
+two-Pomodoro-timers notice). The port stripped all of it: each `color(token,
+fallback)` collapsed to its fallback literal, `music_available()` to `True`
+(Core has its own player and no SynapsePro awareness), and
+`_maybe_warn_synapse_pomodoro` / `_open_synapse_settings` deleted outright.
+`engine/stats.py` is still a clean copy. **Re-check both before trusting either
+next time** — that assumption was true when it was written and isn't now.
+
+The cross-add-on key clash (below) was settled with **option 1**: aSFM's pause-key
+hint tells you to give it a different key from Progressive Word Reveal's if you
+run both.
 
 Item 9 landed in `AnkiBlitz/` on 2026-08-01 while porting the bridge to
 Ankisstant. `QComboBox` was named in the shared `QLineEdit, …` rule, which isn't

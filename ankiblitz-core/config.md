@@ -59,13 +59,32 @@ block ends the whole run; you can leave Anki freely *during* a break.
   `2` auto-start the next block (only when Anki is the active window, else it
   degrades to notify), `3` raise Anki to the front then auto-start.
 - `break_sound` — chime when a break starts and ends.
+- `break_mute_audio` — silence card audio for the length of a break. A work block
+  ends on an *answer*, so Anki carries on and renders the next card behind the
+  break screen — playing its `[sound:]` / `{{tts}}` at you while you're resting.
+  This stops whatever is already sounding and drops the tags of anything rendered
+  during the break; *Replay Audio* (`R`) still works, and the card plays normally
+  once the reviewer comes back.
 - `daily_goal` — a blocks-per-day target shown on the break screen (`0` = off).
 - `end_summary` — show an end-of-run summary screen instead of a tooltip.
-- `carry_forward` — greet the next work block with a tooltip of your last break note.
+- `carry_forward` — greet the next work block with a tooltip of your last break
+  note (today's note only — an older one isn't where you left off).
+- `resume_same_day` — offer to resume an unfinished run from earlier **today**.
+  Stopped after 2 of 3 blocks? The next start offers to pick up at block 3 with
+  the same cycle and the same fraction split, and the deck-list widget's button
+  reads "Resume · 2/3 blocks done". A run that used up all its blocks is done and
+  is never offered.
 - `break_show_timeline` / `break_show_journal` / `break_show_focus_rating` /
   `break_show_tips` / `break_show_browser` / `break_show_add_kg` /
   `break_allow_extend` — toggle each break-screen element so the screen stays as
   calm or as full-featured as you like.
+- `break_allow_step_away` — the **Step away** button, and `Esc`, hide the break
+  screen instead of ending the run: the countdown keeps going, the modal block
+  lifts, and the screen returns by itself when Anki is next the active app. Only
+  the explicit *End Pomodoro* button ends a run. With this `false`, `Esc` ends
+  the Pomodoro (the old behaviour).
+- `break_pill` — while you're stepped away, show a small always-on-top countdown
+  you can click to go straight back to the break screen.
 
 ## `music` — keep study music inside Anki
 A small **in-app player** pointed at a music service — you browse within the

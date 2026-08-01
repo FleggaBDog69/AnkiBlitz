@@ -85,6 +85,14 @@ def _preset_label(p: dict) -> str:
 
 
 def _pomo_label() -> str:
+    # An unfinished run from earlier today takes over the button — one click
+    # picks it up where it stopped rather than starting again at block 1.
+    try:
+        run = pomodoro.resumable_run()
+    except Exception:
+        run = {}
+    if run:
+        return f"🍅 Resume · {pomodoro.resume_summary(run)}"
     po = get_section("pomodoro")
     mode = po.get("work_mode", "time")
     t = int(po.get("work_target", 25))
@@ -159,6 +167,11 @@ def _on_js_message(handled, message, context, *args, **kwargs):
     if not isinstance(message, str) or not message.startswith(PYCMD_PREFIX):
         return handled
     action = message[len(PYCMD_PREFIX):]
+    # Checked before the indexed "blitz-N" buttons: "blitz-all" shares their
+    # prefix, so testing the prefix first would swallow it on the int() parse.
+    if action == "blitz-all":
+        sprint.start_blitz_all_due()
+        return (True, None)
     if action.startswith("blitz-"):
         try:
             idx = int(action.split("-", 1)[1])
@@ -168,9 +181,6 @@ def _on_js_message(handled, message, context, *args, **kwargs):
         if 0 <= idx < len(presets):
             p = presets[idx]
             sprint.start_blitz_now(p["mode"], p["value"])
-        return (True, None)
-    if action == "blitz-all":
-        sprint.start_blitz_all_due()
         return (True, None)
     if action == "pomodoro":
         pomodoro.start_pomodoro(use_defaults=True)

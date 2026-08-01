@@ -64,9 +64,15 @@ DEFAULTS = {
         "cycles": 0,                  # 0 = unlimited; else stop after N work blocks
         "auto_return_level": 2,       # 0 notify | 1 prompt | 2 auto | 3 raise+auto
         "break_sound": True,          # chime when a break starts and ends
+        # Silence the card behind the break: a block ends on an answer, so Anki
+        # renders the next card underneath and reads it out at you mid-break.
+        "break_mute_audio": True,
         "daily_goal": 0,              # blocks/day target shown on the break screen; 0 = off
         "end_summary": True,          # end-of-run summary screen (vs a tooltip)
         "carry_forward": True,        # greet the next block with last break's note
+        # Resume: an unfinished run from earlier TODAY can be picked up where it
+        # left off (block 3 of 3), instead of only ever starting from block 1.
+        "resume_same_day": True,
         # Break-screen elements — each can be hidden so the screen stays calm.
         "break_show_timeline": True,  # the past/now/future strip
         "break_show_journal": True,   # the per-break journal box
@@ -75,6 +81,11 @@ DEFAULTS = {
         "break_show_browser": True,   # the in-app browser button
         "break_show_add_kg": True,    # the Ankisstant "Add KG" button
         "break_allow_extend": True,   # the +5 min extend button
+        # Step away: hide the break screen (Esc, or the button) and duck out to
+        # another app — the countdown keeps running and the cycle survives. Only
+        # the explicit "End Pomodoro" button ends a run.
+        "break_allow_step_away": True,
+        "break_pill": True,           # floating countdown while you're stepped away
     },
 
     # On-screen widgets: AnkiBlitz panels injected into the deck browser (home)
