@@ -86,7 +86,19 @@ def question_payload(card) -> dict:
             "showCountdown": bool(sf.get("show_countdown", True)),
             "warn": bool(sf.get("warning_sound", True)),
             "warnPercent": int(sf.get("warning_at_percent", 60)),
+            **_pause_block(sf, suite_on),
         },
+    }
+
+
+def _pause_block(sf: dict, suite_on: bool) -> dict:
+    """The pause-key half of the autoReveal payload. Deliberately allowed to be
+    the same key as word_reveal's reveal key — the JS gives the reveal first
+    claim while words are still fading in, then the key pauses the timer."""
+    return {
+        "pauseKey": str(sf.get("pause_key") or "p").lower(),
+        "pauseEnabled": bool(suite_on and sf.get("enabled", True)
+                             and sf.get("pause_key_enabled", True)),
     }
 
 
@@ -94,6 +106,7 @@ def answer_payload(card) -> dict:
     """Payload for reviewer_did_show_answer."""
     suite_on = suite_enabled()
     wr = get_section("word_reveal")
+    sf = get_section("speed_focus")
     reveal_on = bool(
         suite_on
         and wr.get("enabled", True)
@@ -103,5 +116,8 @@ def answer_payload(card) -> dict:
     return {
         "side": "answer",
         "reveal": _reveal_block(wr, reveal_on, card, "answer"),
-        "autoReveal": {"enabled": False, "delayMs": 0, "minPostMs": 0, "showCountdown": False},
+        # No timer runs on the answer side, but the pause key stays live so you
+        # can arm/disarm it there too (it applies from the next question).
+        "autoReveal": {"enabled": False, "delayMs": 0, "minPostMs": 0,
+                       "showCountdown": False, **_pause_block(sf, suite_on)},
     }

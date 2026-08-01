@@ -54,7 +54,10 @@ def _build_dialog() -> QDialog:
         "especially:<br>"
         "&nbsp;&nbsp;• <b>Speed Focus Mode (SFM)</b><br>"
         "&nbsp;&nbsp;• Progressive Word Reveal<br>"
-        "&nbsp;&nbsp;• Sprint Mode"
+        "&nbsp;&nbsp;• Sprint Mode<br>"
+        "&nbsp;&nbsp;• <b>SynapsePro</b> — keep it, but turn <i>its</i> Pomodoro "
+        "off in its settings if you want to use AnkiBlitz's. AnkiBlitz already "
+        "steps aside for SynapsePro's music player."
     )
     clash.setWordWrap(True)
     clash.setStyleSheet("font-size: 12px; margin-bottom: 6px;")

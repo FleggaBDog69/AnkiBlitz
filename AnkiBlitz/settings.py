@@ -266,6 +266,24 @@ class SpeedFocusPanel(QWidget):
         self.min_post.setValue(float(cfg.get("min_post_seconds", 1.0)))
         warn_form.addRow("Hold after reveal:", self.min_post)
         layout.addLayout(warn_form)
+
+        self.pause_key_enabled = QCheckBox("Pause key: hold the timer on the current card")
+        self.pause_key_enabled.setChecked(bool(cfg.get("pause_key_enabled", True)))
+        layout.addWidget(self.pause_key_enabled)
+        pause_form = QFormLayout()
+        self.pause_key = _KeyCaptureEdit(cfg.get("pause_key", "p"))
+        pause_form.addRow("Pause key:", self.pause_key)
+        layout.addLayout(pause_form)
+        self.pause_key_enabled.toggled.connect(self.pause_key.setEnabled)
+        self.pause_key.setEnabled(self.pause_key_enabled.isChecked())
+        layout.addWidget(_hint(
+            "Press it to freeze the auto-reveal countdown (and its warning) so "
+            "you can sit on a card; press again to pick up where it stopped. The "
+            "pause sticks across cards, and every card it applies to says so on "
+            "screen.\n\n"
+            "It may be the SAME key as the progressive reveal key (both default "
+            "to “p”): while words are still fading in the key reveals them, and "
+            "once the question is fully shown the same key pauses the timer."))
         layout.addWidget(_hint(
             "The alert plays once this share of the auto-reveal delay has "
             "elapsed — e.g. 60% leaves the final 40% as a heads-up before the "
@@ -376,6 +394,8 @@ class SpeedFocusPanel(QWidget):
             "show_countdown": self.show_countdown.isChecked(),
             "warning_sound": self.warning_sound.isChecked(),
             "warning_at_percent": self.warn_pct.value(),
+            "pause_key_enabled": self.pause_key_enabled.isChecked(),
+            "pause_key": self.pause_key.key_value(),
             "excluded_note_types": self.nt_list.checked(),
             "excluded_decks": self.deck_list.checked(),
             "fixed_time_enabled": self.fixed_enabled.isChecked(),
@@ -936,6 +956,14 @@ class PomodoroPanel(QWidget):
             "is the active window (otherwise leaving focus would cancel it); "
             "Raise + auto-start brings Anki to the front first."))
 
+        self.break_mute_audio = QCheckBox("Silence card audio during a break")
+        self.break_mute_audio.setChecked(bool(po.get("break_mute_audio", True)))
+        pl.addWidget(self.break_mute_audio)
+        pl.addWidget(_hint(
+            "A block ends on an answer, so Anki renders the next card behind the "
+            "break screen and plays its sound / TTS at you. This mutes it until "
+            "the break is over; the card is replayed when the reviewer returns."))
+
         gf = QFormLayout()
         self.daily_goal = QSpinBox()
         self.daily_goal.setRange(0, 99)
@@ -952,6 +980,15 @@ class PomodoroPanel(QWidget):
         self.carry_forward.setChecked(bool(po.get("carry_forward", True)))
         pl.addWidget(self.carry_forward)
 
+        self.resume_same_day = QCheckBox("Offer to resume an unfinished run from earlier today")
+        self.resume_same_day.setChecked(bool(po.get("resume_same_day", True)))
+        pl.addWidget(self.resume_same_day)
+        pl.addWidget(_hint(
+            "Stopped after 2 of 3 blocks? Starting a Pomodoro later the same day "
+            "offers to pick up at block 3 — same cycle, same fraction split — "
+            "instead of beginning again. The widget button says “Resume” when "
+            "there's one waiting."))
+
         layout.addWidget(pbox)
 
         # --- Break screen elements (hide any to keep the screen calm) ---
@@ -965,6 +1002,8 @@ class PomodoroPanel(QWidget):
         self.br_browser = QCheckBox("In-app browser button")
         self.br_addkg = QCheckBox("Add KG button (Ankisstant)")
         self.br_extend = QCheckBox("+5 min extend button")
+        self.br_away = QCheckBox("“Step away” button (and Esc) — leave without ending the run")
+        self.br_pill = QCheckBox("Floating countdown while you're stepped away")
         self._break_toggles = [
             (self.br_timeline, "break_show_timeline"),
             (self.br_journal, "break_show_journal"),
@@ -973,10 +1012,17 @@ class PomodoroPanel(QWidget):
             (self.br_browser, "break_show_browser"),
             (self.br_addkg, "break_show_add_kg"),
             (self.br_extend, "break_allow_extend"),
+            (self.br_away, "break_allow_step_away"),
+            (self.br_pill, "break_pill"),
         ]
         for cb, key in self._break_toggles:
             cb.setChecked(bool(po.get(key, True)))
             bl.addWidget(cb)
+        bl.addWidget(_hint(
+            "Stepping away hides the break screen with its countdown still "
+            "running, so you can check your calendar or step outside — the "
+            "screen comes back when you return to Anki. With it off, Esc ends "
+            "the Pomodoro."))
         layout.addWidget(bbox)
 
         layout.addStretch(1)
@@ -1011,9 +1057,11 @@ class PomodoroPanel(QWidget):
             "cycles": self.cycles.value(),
             "auto_return_level": self.level.currentData(),
             "break_sound": self.break_sound.isChecked(),
+            "break_mute_audio": self.break_mute_audio.isChecked(),
             "daily_goal": self.daily_goal.value(),
             "end_summary": self.end_summary.isChecked(),
             "carry_forward": self.carry_forward.isChecked(),
+            "resume_same_day": self.resume_same_day.isChecked(),
         })
         for cb, key in self._break_toggles:
             po[key] = cb.isChecked()
@@ -1397,6 +1445,122 @@ class MusicPanel(QWidget):
 
 
 # --------------------------------------------------------------------------- #
+#  SynapsePro panel
+# --------------------------------------------------------------------------- #
+
+class SynapsePanel(QWidget):
+    """Living alongside the SynapsePro add-on: share its colours, and don't run
+    two of the things you only need one of."""
+
+    SECTION = "synapse"
+
+    def __init__(self):
+        super().__init__()
+        cfg = get_section(self.SECTION)
+        from .engine import theme_bridge
+        layout = QVBoxLayout(self)
+
+        # Say it in words rather than colouring something green — the whole tab
+        # is meaningless if the add-on isn't there, and that shouldn't be a
+        # guessing game.
+        found = False
+        try:
+            found = theme_bridge.synapse_available()
+        except Exception:
+            pass
+        status = QLabel(
+            "<b>SynapsePro detected.</b> The settings below are active."
+            if found else
+            "<b>SynapsePro not detected.</b> Everything below is inert — "
+            "AnkiBlitz looks and behaves exactly as it does on its own. "
+            "The settings are kept so they take effect if you install it later."
+        )
+        status.setWordWrap(True)
+        status.setStyleSheet("font-size: 12px; margin-bottom: 6px;")
+        layout.addWidget(status)
+
+        layout.addWidget(_hline())
+
+        self.sidebar_buttons = QCheckBox("Put AnkiBlitz in SynapsePro's sidebar")
+        self.sidebar_buttons.setChecked(cfg.get("sidebar_buttons", True))
+        layout.addWidget(self.sidebar_buttons)
+        layout.addWidget(_hint(
+            "Adds three icons to SynapsePro's strip: start/resume a Pomodoro, "
+            "open the AnkiBlitz panel (Blitz presets, stats, journal), and these "
+            "settings. SynapsePro itself isn't modified — if it rebuilds its "
+            "sidebar the buttons are put back automatically."))
+
+        self.hide_rail = QCheckBox("Drop the deck-list rail once it's in the sidebar")
+        self.hide_rail.setChecked(cfg.get("hide_rail", True))
+        layout.addWidget(self.hide_rail)
+        layout.addWidget(_hint(
+            "One AnkiBlitz, one place. Uncheck to keep the floating rail on the "
+            "deck list as well as the sidebar buttons."))
+
+        layout.addWidget(_hline())
+
+        self.theme_bridge = QCheckBox("Match SynapsePro's colours")
+        self.theme_bridge.setChecked(cfg.get("theme_bridge", True))
+        layout.addWidget(self.theme_bridge)
+        layout.addWidget(_hint(
+            "AnkiBlitz's rail, reveal overlay and break screen borrow SynapsePro's "
+            "palette so the two read as one product — and follow along when you "
+            "change its colour theme. Layout and behaviour don't change. Turn this "
+            "off to keep AnkiBlitz's own colours."))
+
+        self.theme_settings = QCheckBox("Match this Settings window too")
+        self.theme_settings.setChecked(cfg.get("theme_settings", True))
+        layout.addWidget(self.theme_settings)
+        layout.addWidget(_hint(
+            "Recolours the tabs, inputs and buttons here from SynapsePro's "
+            "palette. Checkboxes keep Anki's native look on purpose — a "
+            "restyled tick is the easiest thing in a stylesheet to get wrong. "
+            "Takes effect next time you open Settings."))
+
+        self.match_font = QCheckBox("Match SynapsePro's font as well")
+        self.match_font.setChecked(cfg.get("match_font", False))
+        layout.addWidget(self.match_font)
+        layout.addWidget(_hint(
+            "Off by default — colours usually carry the resemblance on their own, "
+            "and Anki's own font is tuned for the reviewer."))
+
+        layout.addWidget(_hline())
+
+        self.defer_music = QCheckBox("Let SynapsePro handle the music")
+        self.defer_music.setChecked(cfg.get("defer_music", True))
+        layout.addWidget(self.defer_music)
+        layout.addWidget(_hint(
+            "SynapsePro ships a background music player, so AnkiBlitz hides its "
+            "own — the rail button, the break-screen box and Ctrl+Shift+M all step "
+            "aside. Nothing is removed: uncheck this (or uninstall SynapsePro) and "
+            "AnkiBlitz's player comes straight back."))
+
+        self.pomodoro_notice = QCheckBox("Warn me if two Pomodoro timers are running")
+        self.pomodoro_notice.setChecked(cfg.get("pomodoro_notice", True))
+        layout.addWidget(self.pomodoro_notice)
+        layout.addWidget(_hint(
+            "SynapsePro has a Pomodoro of its own. AnkiBlitz won't touch another "
+            "add-on's settings, so if both are on it says so once and opens "
+            "SynapsePro's settings for you — turning its timer off there leaves "
+            "AnkiBlitz's in charge."))
+
+        layout.addStretch(1)
+
+    def save(self):
+        cfg = get_section(self.SECTION)
+        cfg.update({
+            "sidebar_buttons": self.sidebar_buttons.isChecked(),
+            "hide_rail": self.hide_rail.isChecked(),
+            "theme_bridge": self.theme_bridge.isChecked(),
+            "theme_settings": self.theme_settings.isChecked(),
+            "match_font": self.match_font.isChecked(),
+            "defer_music": self.defer_music.isChecked(),
+            "pomodoro_notice": self.pomodoro_notice.isChecked(),
+        })
+        save_section(self.SECTION, cfg)
+
+
+# --------------------------------------------------------------------------- #
 #  Presets (profiles) panel
 # --------------------------------------------------------------------------- #
 
@@ -1523,6 +1687,16 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("AnkiBlitz Settings")
         self.setMinimumSize(480, 560)
 
+        # Match SynapsePro's own dialogs when it's installed; empty string
+        # otherwise, which leaves Anki's native styling untouched.
+        try:
+            from .engine import theme_bridge
+            qss = theme_bridge.qt_stylesheet()
+            if qss:
+                self.setStyleSheet(qss)
+        except Exception:
+            pass
+
         layout = QVBoxLayout(self)
 
         master_row = QHBoxLayout()
@@ -1547,6 +1721,7 @@ class SettingsDialog(QDialog):
         self.quick_start = QuickStartPanel()
         self.pomodoro = PomodoroPanel()
         self.music = MusicPanel()
+        self.synapse = SynapsePanel()
         # Profiles front-and-centre, then the per-feature tabs.
         self.tabs.addTab(_scroll(self.presets), "Profiles")
         self.tabs.addTab(_scroll(self.sprint), "Blitz")
@@ -1556,6 +1731,7 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(_scroll(self.quick_start), "Quick Start")
         self.tabs.addTab(_scroll(self.pomodoro), "Pomodoro")
         self.tabs.addTab(_scroll(self.music), "Music")
+        self.tabs.addTab(_scroll(self.synapse), "SynapsePro")
         layout.addWidget(self.tabs)
 
         buttons = QDialogButtonBox(
@@ -1577,10 +1753,19 @@ class SettingsDialog(QDialog):
         self.quick_start.save()
         self.pomodoro.save()
         self.music.save()
+        self.synapse.save()
 
     def _on_save(self):
         self._save_open_panels()
+        # The rail bakes SynapsePro's colours into its HTML at render time, so a
+        # theme-bridge change only shows on the next redraw. Force one.
         self.accept()
+        try:
+            from .engine import widgets, synapse_sidebar
+            widgets.refresh_home()
+            synapse_sidebar.apply_settings_change()
+        except Exception:
+            pass
 
     def _applied_and_close(self, name):
         """A profile was applied from the Profiles tab: close WITHOUT running

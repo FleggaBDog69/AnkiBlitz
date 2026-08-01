@@ -30,6 +30,13 @@ clamped to `[min_delay_seconds, max_delay_seconds]`.
 - `warning_at_percent` — the alert fires once this share of the delay has elapsed
   (e.g. `60` leaves the final 40% as a heads-up). Replace `sounds/alert.mp3`, or
   drop `alert.mp3` in `user_files/`, to change the sound.
+- `pause_key_enabled` — allow a key to pause/resume the auto-reveal countdown.
+- `pause_key` — that key (default `p`). Press it to freeze the countdown and its
+  warning on the card you're on; press again to pick up where it stopped. The
+  pause **sticks across cards** and is labelled on screen until you release it.
+  It may be the *same* key as `word_reveal.reveal_key` (both default to `p`):
+  while words are still fading in the key reveals them, and once the question is
+  fully shown the same key pauses the timer.
 - `excluded_note_types` / `excluded_decks` — skip the auto-reveal timer for these
   (a parent deck also covers its subdecks); those cards review normally.
 - `fixed_time_enabled` — turn the picture-card mode on/off.
@@ -97,7 +104,10 @@ A Pomodoro run chains **work blocks** (each an ordinary Blitz) with **breaks**.
 Start one from **Tools ▸ AnkiBlitz ▸ Start Pomodoro…** (`Ctrl+Shift+P`) or the
 on-screen widget. Each break shows a big countdown plus a preview of the next
 Blitz; a longer break lands every few blocks. Leaving the reviewer during a work
-block ends the whole run; you can leave Anki freely *during* a break.
+block ends the whole run; *during a break* you can leave freely — **Step away**
+(or `Esc`) hides the break screen with its countdown still running, so ducking
+out to another app costs you nothing. A run you stop part-way through can be
+**resumed** later the same day.
 
 - `enabled` — whether Pomodoro is offered (menu + widgets).
 - `work_mode` — the work-block Blitz mode: `time`, `cards`, or `fraction`.
@@ -112,13 +122,32 @@ block ends the whole run; you can leave Anki freely *during* a break.
   `2` auto-start the next block (only when Anki is the active window, else it
   degrades to notify), `3` raise Anki to the front then auto-start.
 - `break_sound` — chime when a break starts and ends.
+- `break_mute_audio` — silence card audio for the length of a break. A work block
+  ends on an *answer*, so Anki carries on and renders the next card behind the
+  break screen — playing its `[sound:]` / `{{tts}}` at you while you're resting.
+  This stops whatever is already sounding and drops the tags of anything rendered
+  during the break; *Replay Audio* (`R`) still works, and the card plays normally
+  once the reviewer comes back.
 - `daily_goal` — a blocks-per-day target shown on the break screen (`0` = off).
 - `end_summary` — show an end-of-run summary screen instead of a tooltip.
-- `carry_forward` — greet the next work block with a tooltip of your last break note.
+- `carry_forward` — greet the next work block with a tooltip of your last break
+  note (today's note only — an older one isn't where you left off).
+- `resume_same_day` — offer to resume an unfinished run from earlier **today**.
+  Stopped after 2 of 3 blocks? The next start offers to pick up at block 3 with
+  the same cycle and the same fraction split, and the deck-list widget's button
+  reads "Resume · 2/3 blocks done". A run that used up all its blocks is done and
+  is never offered.
 - `break_show_timeline` / `break_show_journal` / `break_show_focus_rating` /
   `break_show_tips` / `break_show_browser` / `break_show_add_kg` /
   `break_allow_extend` — toggle each break-screen element so the screen stays as
   calm or as full-featured as you like.
+- `break_allow_step_away` — the **Step away** button, and `Esc`, hide the break
+  screen instead of ending the run: the countdown keeps going, the modal block
+  lifts, and the screen returns by itself when Anki is next the active app. Only
+  the explicit *End Pomodoro* button ends a run. With this `false`, `Esc` ends
+  the Pomodoro (the old behaviour).
+- `break_pill` — while you're stepped away, show a small always-on-top countdown
+  you can click to go straight back to the break screen.
 
 ## `music` — keep study music inside Anki
 A small **in-app player** pointed at a music service — you browse within the
@@ -252,3 +281,53 @@ Keys:
 - `active` — name of the profile last applied (informational).
 - `saved` — `name → snapshot`; holds your saved profiles and the captured
   “My setup”. Built-ins are not stored here. Edit via the UI, not by hand.
+
+---
+
+## `synapse` — living alongside the SynapsePro add-on
+
+If the **SynapsePro** add-on is installed, AnkiBlitz can borrow its colours so
+the two read as one product, and stand down the parts it duplicates. Every key
+here is inert without it: no SynapsePro, no change — AnkiBlitz renders exactly
+as it does standalone.
+
+All of it is a **soft bridge** (`engine/theme_bridge.py`, the only module that
+knows SynapsePro exists). SynapsePro is never a dependency, nothing is imported
+by name (its package is `SynapsePro1`, a checkout is often symlinked as
+`SynapsePro`, and an AnkiWeb install is a numeric folder — it's resolved at
+runtime by manifest name), and AnkiBlitz **never writes into SynapsePro's
+config**.
+
+Keys:
+- `sidebar_buttons` *(default on)* — add AnkiBlitz's three icons to SynapsePro's
+  launcher strip: 🍅 Pomodoro (start, or resume an unfinished run from earlier
+  today), ⚡ the AnkiBlitz panel, ⚙ settings. **SynapsePro is not modified** —
+  the buttons are injected into the live sidebar at runtime, carrying the
+  property its own stylesheet keys off so they pick up its hover and accent
+  colours. It rebuilds that strip whenever its settings are applied, so they're
+  put back automatically on the next screen change.
+- `hide_rail` *(default on)* — drop AnkiBlitz's floating deck-list rail once the
+  sidebar buttons are there. One AnkiBlitz, one place. Off = both.
+- `theme_bridge` *(default on)* — take colours from SynapsePro's palette: the
+  panel, the reveal overlay and the Pomodoro break screen. Follows along live
+  when you change SynapsePro's colour theme (ocean / orchid / forest …) and when
+  Anki flips light↔dark. **Only colours change** — no layout, sizing or
+  behaviour. Off = AnkiBlitz's own colours.
+- `theme_settings` *(default on)* — also recolour AnkiBlitz's Settings window
+  (tabs, inputs, buttons) from that palette, the way SynapsePro styles its own
+  native dialogs. **Checkbox and radio indicators are deliberately left native**:
+  a mis-specified indicator reads as permanently unchecked, and a settings window
+  whose state you can't read is worse than one that doesn't match. Applies next
+  time you open Settings.
+- `match_font` *(default off)* — also adopt SynapsePro's `FONT_FAMILY`. Off by
+  default: the colours usually carry the resemblance on their own.
+- `defer_music` *(default on)* — SynapsePro ships a background music player, so
+  AnkiBlitz hides its own: the rail button, the break-screen box and
+  `Ctrl+Shift+M` all step aside. Nothing is removed — turn this off (or uninstall
+  SynapsePro) and AnkiBlitz's player is back, settings intact.
+- `pomodoro_notice` *(default on)* — SynapsePro has a Pomodoro of its own. If
+  both are switched on, AnkiBlitz says so **once** (on the next Pomodoro you
+  start) and offers to open SynapsePro's settings. It won't flip the switch for
+  you.
+- `_pomodoro_warned` — internal; set once that notice has been shown. Reset it to
+  `false` to see the notice again.

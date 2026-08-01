@@ -29,6 +29,14 @@
   var pendingAuto = null;    // autoReveal config for this card
   var clickHandler = null;
   var keyHandler = null;
+  // Pause key state. autoPaused is sticky across cards (Python mirrors it, so it
+  // also survives the bundle being re-injected) — a held timer stays held until
+  // you press the key again, and every card says so on screen while it is.
+  var autoPaused = false;
+  var autoDeadline = 0;      // when the pending auto-reveal would fire
+  var warnDeadline = 0;      // when the warning sound would play
+  var pauseLeftMs = 0;       // what was left on each when the timer was paused
+  var pauseWarnLeftMs = 0;
 
   function getRoot() {
     return document.getElementById("qa") || document.body;
@@ -178,13 +186,37 @@
     });
     doneTimeout = setTimeout(markRevealDone, durationMs);
 
-    // Escape hatch: click or the reveal key shows everything at once.
+    // Escape hatch: a click shows everything at once. (The reveal KEY is handled
+    // by the shared key listener, which shares it with the pause key.)
     clickHandler = function () { revealAllWords(); };
-    keyHandler = function (e) {
-      if ((e.key || "").toLowerCase() === FS._revealKey) revealAllWords();
-    };
     document.addEventListener("click", clickHandler, true);
-    document.addEventListener("keydown", keyHandler, true);
+  }
+
+  // ----- keys -----
+  //
+  // One listener owns both shortcuts, so the reveal key and the pause key are
+  // allowed to be the same key (they are, by default: "p"). Order of precedence
+  // on a shared key is what you'd do by hand anyway — first press finishes the
+  // word reveal, and once there's nothing left to reveal the key pauses (then
+  // resumes) the auto-reveal timer.
+  function isTypingTarget(el) {
+    if (!el) return false;
+    var tag = (el.tagName || "").toUpperCase();
+    return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+  }
+
+  function onKeyDown(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (isTypingTarget(e.target)) return;   // e.g. Anki's type-in-the-answer box
+    var k = (e.key || "").toLowerCase();
+    if (!revealDone && k === FS._revealKey) {
+      revealAllWords();
+      return;
+    }
+    if (FS._pauseEnabled && k === FS._pauseKey) {
+      e.preventDefault();
+      toggleAutoPause();
+    }
   }
 
   // ----- auto-reveal -----
@@ -220,9 +252,26 @@
     document.addEventListener("keydown", go, true);
   }
 
+  // Start (or restart, after a pause) the reveal + warning timers, remembering
+  // the deadlines so a pause can work out what was left on each.
+  function armAutoTimers(effectiveMs, warnMs) {
+    autoTimer = setTimeout(fireReveal, effectiveMs);
+    autoDeadline = Date.now() + effectiveMs;
+    if (warnMs > 0 && warnMs < effectiveMs) {
+      warnTimer = setTimeout(function () { pycmd("focus:warn"); }, warnMs);
+      warnDeadline = Date.now() + warnMs;
+    } else {
+      warnDeadline = 0;
+    }
+  }
+
   function maybeStartAuto() {
     if (!pendingAuto || autoStarted) return;
     if (pausedHold) return;   // held until the user engages
+    if (autoPaused) {         // held by you, until you press the pause key
+      showPausedBadge();
+      return;
+    }
     autoStarted = true;
     var delay = pendingAuto.delayMs || 0;
     // The answer can't show until at least minPostMs after the reveal has
@@ -234,15 +283,93 @@
       fireReveal();
       return;
     }
-    autoTimer = setTimeout(fireReveal, effective);
     // Heads-up alert once warnPercent% of the wait has elapsed.
     var pct = pendingAuto.warnPercent || 0;
-    if (pendingAuto.warn && pct > 0 && pct < 100) {
-      var wt = effective * (pct / 100);
-      if (wt > 0 && wt < effective) {
-        warnTimer = setTimeout(function () { pycmd("focus:warn"); }, wt);
+    var warnMs = (pendingAuto.warn && pct > 0 && pct < 100) ? effective * (pct / 100) : 0;
+    armAutoTimers(effective, warnMs);
+  }
+
+  // ----- pause / resume the auto-reveal timer -----
+
+  function toggleAutoPause() {
+    if (autoPaused) {
+      autoPaused = false;
+      removePausedBadge();
+      if (autoStarted) {
+        // Mid-card: pick the timer up where it was frozen.
+        var left = Math.max(0, pauseLeftMs);
+        if (left <= 0) {
+          fireReveal();
+        } else {
+          if (pendingAuto && pendingAuto.showCountdown) resumeCountdown(left);
+          armAutoTimers(left, pauseWarnLeftMs);
+        }
+      } else {
+        maybeStartAuto();   // the card started paused — begin its wait now
       }
+      pycmd("focus:autopause:0");
+      return;
     }
+    autoPaused = true;
+    var now = Date.now();
+    pauseLeftMs = autoDeadline ? Math.max(0, autoDeadline - now) : 0;
+    pauseWarnLeftMs = warnDeadline ? Math.max(0, warnDeadline - now) : 0;
+    if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+    if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
+    freezeCountdown();
+    showPausedBadge();
+    pycmd("focus:autopause:1");
+  }
+
+  // The badge is deliberately worded, not just coloured: a paused timer that
+  // only looked different would read as "Speed Focus is broken".
+  function showPausedBadge() {
+    // Nothing to pause on this card (Speed Focus off or excluded) — saying
+    // "paused" here would be a lie; the sticky flag still applies from the next
+    // card that does run a timer.
+    if (!pendingAuto) return;
+    removeCountdown();
+    if (document.getElementById("fs-paused")) return;
+    var b = document.createElement("div");
+    b.id = "fs-paused";
+    b.textContent = "⏸ Speed Focus paused · press "
+      + (FS._pauseKey || "p").toUpperCase() + " to resume";
+    document.body.appendChild(b);
+  }
+
+  function removePausedBadge() {
+    var el = document.getElementById("fs-paused");
+    if (el) el.remove();
+  }
+
+  function countdownFill() {
+    var bar = document.getElementById("fs-countdown");
+    return bar ? bar.querySelector(".fs-countdown-fill") : null;
+  }
+
+  // Stop the depleting bar where it stands by pinning its current transform.
+  function freezeCountdown() {
+    var fill = countdownFill();
+    if (!fill) return;
+    var current = "scaleX(1)";
+    try {
+      var t = window.getComputedStyle(fill).transform;
+      if (t && t !== "none") current = t;
+    } catch (e) {}
+    fill.style.transition = "none";
+    fill.style.transform = current;
+  }
+
+  function resumeCountdown(ms) {
+    var fill = countdownFill();
+    if (!fill) {
+      showCountdown(ms);
+      return;
+    }
+    requestAnimationFrame(function () {
+      fill.style.transition = "transform " + ms + "ms linear";
+      requestAnimationFrame(function () { fill.style.transform = "scaleX(0)"; });
+    });
   }
 
   function showCountdown(ms) {
@@ -271,8 +398,10 @@
     clearRevealTimers();
     if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
     if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
+    autoDeadline = warnDeadline = 0;
     removeListeners();
     removeCountdown();
+    removePausedBadge();
   }
 
   // Public: stop the auto-reveal / warning for the current card without showing
@@ -281,6 +410,7 @@
   FS.pauseAuto = function () {
     if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
     if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
+    autoDeadline = warnDeadline = 0;
     removeCountdown();
     pendingAuto = null;
     autoFired = false;
@@ -298,6 +428,10 @@
     pendingAuto = null;
     pausedHold = !!payload.paused;
     FS._revealKey = (payload.reveal && payload.reveal.revealKey) || "p";
+    FS._pauseKey = (payload.autoReveal && payload.autoReveal.pauseKey) || "p";
+    FS._pauseEnabled = !!(payload.autoReveal && payload.autoReveal.pauseEnabled);
+    // Python owns the sticky pause, so it survives re-injection of this bundle.
+    autoPaused = !!payload.autoPaused;
 
     if (payload.autoReveal && payload.autoReveal.enabled) {
       pendingAuto = payload.autoReveal;
@@ -309,6 +443,10 @@
       // Nothing to fade in — the question is "fully revealed" at once.
       revealDone = true;
     }
+    // One listener for both shortcuts, on every card (the pause key has to work
+    // even when there's no progressive reveal running to hang it off).
+    keyHandler = onKeyDown;
+    document.addEventListener("keydown", keyHandler, true);
     // Start the auto-reveal countdown now, alongside the reveal, so the bar
     // appears immediately and the wait matches the time shown in settings.
     maybeStartAuto();

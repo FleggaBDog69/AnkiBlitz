@@ -15,6 +15,8 @@
     "show_countdown": true,
     "warning_sound": true,
     "warning_at_percent": 75,
+    "pause_key_enabled": true,
+    "pause_key": "p",
     "excluded_note_types": [],
     "excluded_decks": [],
     "fixed_time_enabled": true,
@@ -64,16 +66,20 @@
     "cycles": 0,
     "auto_return_level": 2,
     "break_sound": true,
+    "break_mute_audio": true,
     "daily_goal": 0,
     "end_summary": true,
     "carry_forward": true,
+    "resume_same_day": true,
     "break_show_timeline": true,
     "break_show_journal": true,
     "break_show_focus_rating": true,
     "break_show_tips": true,
     "break_show_browser": true,
     "break_show_add_kg": true,
-    "break_allow_extend": true
+    "break_allow_extend": true,
+    "break_allow_step_away": true,
+    "break_pill": true
   },
 
   "music": {
@@ -135,5 +141,16 @@
   "presets": {
     "active": "",
     "saved": {}
+  },
+
+  "synapse": {
+    "theme_bridge": true,
+    "match_font": false,
+    "sidebar_buttons": true,
+    "hide_rail": true,
+    "theme_settings": true,
+    "defer_music": true,
+    "pomodoro_notice": true,
+    "_pomodoro_warned": false
   }
 }

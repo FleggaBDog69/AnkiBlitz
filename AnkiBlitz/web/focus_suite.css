@@ -1,6 +1,12 @@
 /* AnkiBlitz — single stylesheet for the reviewer.
    Owns three things: the progressive-reveal spans, the auto-reveal countdown,
-   and the Blitz progress bar. */
+   and the Blitz progress bar.
+
+   Every colour is `var(--ab-x, <the value AnkiBlitz has always used>)`. The
+   --ab-* vars come from engine/theme_bridge.py, which emits them only when the
+   SynapsePro add-on is installed and the theme bridge is on. Without it nothing
+   defines them, every fallback applies, and this renders exactly as it did
+   before the bridge existed — so keep the fallbacks honest when you edit. */
 
 /* Reveal: spans start hidden and fade in. */
 .fs-word {
@@ -17,7 +23,7 @@
   bottom: 0;
   height: 3px;
   width: 100%;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--ab-track, rgba(255, 255, 255, 0.08));
   z-index: 99998;
   pointer-events: none;
 }
@@ -25,7 +31,27 @@
   height: 100%;
   width: 100%;
   transform-origin: left center;
-  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  background: linear-gradient(90deg, var(--ab-bar-from, #f59e0b), var(--ab-bar-to, #ef4444));
+}
+
+/* Auto-reveal paused (the pause key). Takes the countdown's place and says so
+   in words — a state you can't read is a state you'll think is a bug. */
+#fs-paused {
+  position: fixed;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 99998;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--ab-warn, rgba(245, 158, 11, 0.92));
+  color: var(--ab-warn-fg, #1b1b1b);
+  font-family: var(--ab-font, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* Sprint progress bar: fixed strip at the top of the reviewer. */
@@ -35,11 +61,11 @@
   left: 0;
   right: 0;
   z-index: 99999;
-  background: rgba(20, 22, 28, 0.92);
-  color: #eaeaea;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--ab-surface, rgba(20, 22, 28, 0.92));
+  color: var(--ab-text, #eaeaea);
+  font-family: var(--ab-font, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
   font-size: 13px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--ab-track, rgba(255, 255, 255, 0.08));
   user-select: none;
 }
 #fs-progress .fs-row {
@@ -73,7 +99,7 @@
 }
 @keyframes fs-streak-pulse {
   0% { transform: scale(1); }
-  40% { transform: scale(1.35); color: #fbbf24; }
+  40% { transform: scale(1.35); color: var(--ab-flash, #fbbf24); }
   100% { transform: scale(1); }
 }
 /* The progress fill is a broad, solid track that GROWS left→right — deliberately
@@ -81,11 +107,11 @@
 #fs-progress .fs-bar-wrap {
   height: 7px;
   width: 100%;
-  background: rgba(255, 255, 255, 0.10);
+  background: var(--ab-track, rgba(255, 255, 255, 0.10));
 }
 #fs-progress .fs-bar {
   height: 100%;
-  background: linear-gradient(90deg, #4ade80, #22d3ee);
+  background: linear-gradient(90deg, var(--ab-acc-from, #4ade80), var(--ab-acc-to, #22d3ee));
   border-top-right-radius: 3px;
   border-bottom-right-radius: 3px;
   transition: width 0.3s ease;

@@ -11,7 +11,10 @@ Progressive Word Reveal and Sprint Mode (https://www.patricklee.com.au/).
 from aqt import gui_hooks
 
 from . import config
-from .engine import injection, sprint, quickstart, widgets, music, onboarding
+from .engine import (
+    injection, sprint, quickstart, widgets, music, onboarding, pomodoro,
+    synapse_sidebar,
+)
 from .menu import build_menu
 
 _initialized = False
@@ -29,9 +32,13 @@ def _on_profile_open() -> None:
     onboarding.maybe_show_first_run_wizard()
     injection.register()
     sprint.register()
+    pomodoro.register()
     quickstart.register()
     widgets.register()
     music.register()
+    # Adds AnkiBlitz's buttons to SynapsePro's icon strip. A no-op without it —
+    # registered unconditionally so installing SynapsePro later just works.
+    synapse_sidebar.register()
     build_menu()
     _initialized = True
 

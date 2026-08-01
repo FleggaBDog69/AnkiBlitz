@@ -13,3 +13,5 @@
 #   music.py      - embedded SoundCloud/YouTube player: break panel + review dock
 #   widgets.py    - deck-browser / overview on-screen launch panels
 #   stats.py      - persistent Blitz stats
+#   theme_bridge.py - the only module that knows the SynapsePro add-on exists:
+#                   borrows its palette, and stands its music player down

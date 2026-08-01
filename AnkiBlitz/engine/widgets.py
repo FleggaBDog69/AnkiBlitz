@@ -14,37 +14,45 @@ handlers are best-effort and never raise into the host screen.
 from aqt import gui_hooks, mw
 
 from ..config import get_section, suite_enabled
-from . import sprint, pomodoro
+from . import sprint, pomodoro, theme_bridge
 
 PYCMD_PREFIX = "focus:"
 
+# Colours go through ``var(--ab-x, <what AnkiBlitz has always used>)``. The
+# ``--ab-*`` vars are only ever defined by theme_bridge.css_vars(), which emits
+# nothing without SynapsePro — so standalone, every fallback applies and this is
+# the stylesheet it always was. Anki's own vars stay as the second link in the
+# chain, ahead of the literal.
 _STYLE = """
 <style>
 .fs-rail{position:fixed;top:64px;right:14px;width:176px;z-index:50;
-  border:1px solid var(--border, rgba(127,127,127,.35));
-  background:var(--canvas-elevated, rgba(48,48,48,.97));
-  border-radius:12px;padding:12px;color:var(--fg, inherit);
+  border:1px solid var(--ab-border, var(--border, rgba(127,127,127,.35)));
+  background:var(--ab-elevated, var(--canvas-elevated, rgba(48,48,48,.97)));
+  border-radius:12px;padding:12px;color:var(--ab-fg, var(--fg, inherit));
   font-size:13px;box-shadow:0 2px 12px rgba(0,0,0,.28);text-align:left;}
 .fs-rail .fs-hd{display:flex;align-items:center;justify-content:space-between;}
 .fs-rail .fs-title{font-weight:600;font-size:13px;}
 .fs-rail .fs-gear{cursor:pointer;opacity:.55;text-decoration:none;
-  color:var(--fg, inherit)!important;font-size:15px;}
+  color:var(--ab-fg, var(--fg, inherit))!important;font-size:15px;}
 .fs-rail .fs-gear:hover{opacity:1;}
 .fs-rail .fs-due{font-size:11px;opacity:.6;margin:1px 0 6px;}
 .fs-rail .fs-lab{font-size:10px;text-transform:uppercase;letter-spacing:.05em;
   opacity:.5;margin:9px 0 2px;}
 .fs-rail .fs-b{display:block;width:100%;box-sizing:border-box;text-align:left;
   padding:7px 10px;margin:4px 0;border-radius:7px;
-  border:1px solid var(--border, rgba(127,127,127,.4));
-  background:var(--button-bg, rgba(127,127,127,.14));
-  color:var(--fg, inherit)!important;text-decoration:none;cursor:pointer;
+  border:1px solid var(--ab-border, var(--border, rgba(127,127,127,.4)));
+  background:var(--ab-button-bg, var(--button-bg, rgba(127,127,127,.14)));
+  color:var(--ab-fg, var(--fg, inherit))!important;text-decoration:none;cursor:pointer;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .fs-rail .fs-b:hover{filter:brightness(1.13);}
-.fs-rail .fs-b.fs-primary{background:#3b82f6;border-color:#3b82f6;color:#fff!important;}
-.fs-rail .fs-b.fs-tom{background:#e0533d;border-color:#e0533d;color:#fff!important;}
+.fs-rail .fs-b.fs-primary{background:var(--ab-primary, #3b82f6);
+  border-color:var(--ab-primary, #3b82f6);color:var(--ab-primary-fg, #fff)!important;}
+.fs-rail .fs-b.fs-tom{background:var(--ab-tomato, #e0533d);
+  border-color:var(--ab-tomato, #e0533d);color:var(--ab-primary-fg, #fff)!important;}
 .fs-rail .fs-toggle{display:block;margin-top:9px;font-size:11px;cursor:pointer;
-  text-align:center;opacity:.85;text-decoration:none;color:var(--fg, inherit)!important;}
-.fs-rail .fs-on{color:#22c55e;font-weight:600;}
+  text-align:center;opacity:.85;text-decoration:none;
+  color:var(--ab-fg, var(--fg, inherit))!important;}
+.fs-rail .fs-on{color:var(--ab-on, #22c55e);font-weight:600;}
 .fs-rail .fs-off{opacity:.6;font-weight:600;}
 </style>
 """
@@ -85,6 +93,14 @@ def _preset_label(p: dict) -> str:
 
 
 def _pomo_label() -> str:
+    # An unfinished run from earlier today takes over the button — one click
+    # picks it up where it stopped rather than starting again at block 1.
+    try:
+        run = pomodoro.resumable_run()
+    except Exception:
+        run = {}
+    if run:
+        return f"🍅 Resume · {pomodoro.resume_summary(run)}"
     po = get_section("pomodoro")
     mode = po.get("work_mode", "time")
     t = int(po.get("work_target", 25))
@@ -109,16 +125,20 @@ def _rail(due: int) -> str:
             _pomo_label(), "pomodoro", "fs-tom")
 
     music_block = ""
-    mu = get_section("music")
-    if mu.get("enabled", False) and mu.get("show_on_home", True):
+    # music_available() is False when SynapsePro is installed — no sense offering
+    # two players. See engine/theme_bridge.py.
+    if theme_bridge.music_available() and get_section("music").get("show_on_home", True):
         music_block = '<div class="fs-lab">Music</div>' + _btn(
             "♪ Music player", "music")
 
     gear = (f'<a class="fs-gear" href="#" '
             f"onclick=\"pycmd('{PYCMD_PREFIX}settings'); return false;\">⚙</a>")
 
+    # SynapsePro's palette first (empty string without it), then AnkiBlitz's own
+    # sheet with its fallbacks. Custom properties resolve at use time, so the
+    # order is for readability rather than cascade correctness.
     return (
-        f'{_STYLE}<div class="fs-rail">'
+        f'{theme_bridge.css_vars()}{_STYLE}<div class="fs-rail">'
         f'<div class="fs-hd"><span class="fs-title">⚡ AnkiBlitz</span>{gear}</div>'
         f'<div class="fs-due">{due} card{"s" if due != 1 else ""} due</div>'
         f'<div class="fs-lab">Blitz</div>{blitz_btns}'
@@ -130,9 +150,25 @@ def _rail(due: int) -> str:
 
 # ----- Render hooks -----
 
+def _rail_wanted() -> bool:
+    """False once AnkiBlitz lives in SynapsePro's sidebar.
+
+    Two entry points to the same features on one screen is worse than one, so the
+    deck-list rail stands down when the sidebar buttons are there. It returns on
+    its own if SynapsePro goes away or the integration is switched off.
+    """
+    try:
+        from . import synapse_sidebar
+        return not synapse_sidebar.active()
+    except Exception:
+        return True
+
+
 def _on_deck_browser(deck_browser, content) -> None:
     try:
         if not suite_enabled() or not get_section("home_widget").get("enabled", True):
+            return
+        if not _rail_wanted():
             return
         content.tree += _rail(sprint._due_total())
     except Exception:
@@ -142,6 +178,8 @@ def _on_deck_browser(deck_browser, content) -> None:
 def _on_overview(overview, content) -> None:
     try:
         if not suite_enabled() or not get_section("home_widget").get("show_on_overview", True):
+            return
+        if not _rail_wanted():
             return
         content.table += _rail(sprint._due_total())
     except Exception:
@@ -159,6 +197,11 @@ def _on_js_message(handled, message, context, *args, **kwargs):
     if not isinstance(message, str) or not message.startswith(PYCMD_PREFIX):
         return handled
     action = message[len(PYCMD_PREFIX):]
+    # Checked before the indexed "blitz-N" buttons: "blitz-all" shares their
+    # prefix, so testing the prefix first would swallow it on the int() parse.
+    if action == "blitz-all":
+        sprint.start_blitz_all_due()
+        return (True, None)
     if action.startswith("blitz-"):
         try:
             idx = int(action.split("-", 1)[1])
@@ -168,9 +211,6 @@ def _on_js_message(handled, message, context, *args, **kwargs):
         if 0 <= idx < len(presets):
             p = presets[idx]
             sprint.start_blitz_now(p["mode"], p["value"])
-        return (True, None)
-    if action == "blitz-all":
-        sprint.start_blitz_all_due()
         return (True, None)
     if action == "pomodoro":
         pomodoro.start_pomodoro(use_defaults=True)
@@ -185,10 +225,11 @@ def _on_js_message(handled, message, context, *args, **kwargs):
     return handled
 
 
-def _refresh_home() -> None:
+def refresh_home() -> None:
     # The deck browser's first render can happen before this hook is registered
     # at profile open, so the rail wouldn't appear until a later re-render. Force
-    # one refresh so it shows on initial load.
+    # one refresh so it shows on initial load. Also called after Settings closes,
+    # since the rail's colours are baked in at render time.
     try:
         if mw.state == "deckBrowser":
             mw.deckBrowser.refresh()
@@ -200,4 +241,10 @@ def register() -> None:
     gui_hooks.deck_browser_will_render_content.append(_on_deck_browser)
     gui_hooks.overview_will_render_content.append(_on_overview)
     gui_hooks.webview_did_receive_js_message.append(_on_js_message)
-    mw.progress.single_shot(150, _refresh_home, False)
+    mw.progress.single_shot(150, refresh_home, False)
+    # Anki's own light/dark flip changes which SynapsePro palette applies, and the
+    # rail's colours are already in the rendered HTML — redraw so it keeps up.
+    try:
+        gui_hooks.theme_did_change.append(refresh_home)
+    except Exception:
+        pass

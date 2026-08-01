@@ -85,6 +85,19 @@ def build_menu() -> None:
     music.triggered.connect(lambda: toggle_dock())
     menu.addAction(music)
 
+    # SynapsePro ships a music player of its own, so AnkiBlitz's entry steps
+    # aside when it's installed. Decided each time the menu opens rather than
+    # once at build time, so toggling the setting takes effect immediately.
+    def _sync_music_visibility() -> None:
+        try:
+            from .engine import theme_bridge
+            music.setVisible(not theme_bridge.music_deferred())
+        except Exception:
+            pass
+
+    menu.aboutToShow.connect(_sync_music_visibility)
+    _sync_music_visibility()
+
     menu.addSeparator()
 
     profile_menu = QMenu("Profile", mw)

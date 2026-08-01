@@ -8,6 +8,7 @@ DOM, timing, and animation live in the JS bundle.
 
 Bridge messages (pycmd) use the ``focus:`` namespace:
   - ``focus:reveal`` — the auto-reveal timer expired; show the answer.
+  - ``focus:autopause:1|0`` — the pause key held / released the auto-reveal timer.
 """
 
 import json
@@ -16,8 +17,9 @@ import os
 from aqt import gui_hooks, mw
 from aqt.reviewer import Reviewer
 from aqt.sound import av_player
+from aqt.utils import tooltip
 
-from ..config import PACKAGE
+from ..config import PACKAGE, get_section
 from . import reveal, session
 
 PYCMD_PREFIX = "focus:"
@@ -29,6 +31,16 @@ _JS_SRC = f"/_addons/{PACKAGE}/web/focus_suite.js"
 _SUITE_DIR = os.path.dirname(os.path.dirname(__file__))
 _DEFAULT_ALERT = os.path.join(_SUITE_DIR, "sounds", "alert.mp3")
 _USER_ALERT = os.path.join(_SUITE_DIR, "user_files", "alert.mp3")
+
+
+# The pause key's sticky state. Held here rather than in the JS so it survives
+# the bundle being re-injected (leaving the reviewer and coming back), and is
+# pushed out with every card payload. Cleared on profile load, not persisted.
+_auto_paused = False
+
+
+def auto_reveal_paused() -> bool:
+    return _auto_paused
 
 
 def _play_alert() -> None:
@@ -54,6 +66,20 @@ _INJECT = (
 )
 
 
+def _inject_html() -> str:
+    """The bundle, with SynapsePro's palette in front of it when it's installed.
+
+    The stylesheet is a static file, so it can't interpolate colours itself — the
+    vars have to arrive as an inline block. It's built per injection rather than
+    at import so switching SynapsePro's theme takes effect on the next card.
+    """
+    from . import theme_bridge
+    try:
+        return theme_bridge.css_vars() + _INJECT
+    except Exception:
+        return _INJECT
+
+
 def _eval(js: str) -> None:
     try:
         web = mw.reviewer.web if mw.reviewer else None
@@ -67,7 +93,7 @@ def _eval(js: str) -> None:
 
 def _on_will_set_content(web_content, context, *args, **kwargs) -> None:
     if isinstance(context, Reviewer):
-        web_content.body += _INJECT
+        web_content.body += _inject_html()
 
 
 # ----- Per-card payload push -----
@@ -77,6 +103,7 @@ def _on_show_question(*args, **kwargs) -> None:
     if not card:
         return
     payload = reveal.question_payload(card)
+    payload["autoPaused"] = _auto_paused
     # Paused launch: hold the auto-reveal and the session clock until the user
     # engages (the JS arms a one-shot click/key listener; see focus:engaged).
     s = session.get_active()
@@ -94,7 +121,9 @@ def _on_show_answer(*args, **kwargs) -> None:
     s = session.get_active()
     if s is not None:
         s.start_clock()
-    _eval(f"window.FocusSuite && FocusSuite.onCard({json.dumps(reveal.answer_payload(card))});")
+    payload = reveal.answer_payload(card)
+    payload["autoPaused"] = _auto_paused
+    _eval(f"window.FocusSuite && FocusSuite.onCard({json.dumps(payload)});")
     push_progress()
 
 
@@ -115,6 +144,16 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
     if action == "timeup":
         from . import sprint  # lazy: sprint imports injection at module load
         sprint.on_time_up()
+        return (True, None)
+    if action.startswith("autopause:"):
+        global _auto_paused
+        _auto_paused = action.endswith("1")
+        key = str(get_section("speed_focus").get("pause_key") or "p").upper()
+        tooltip(
+            f"⏸ Speed Focus paused — press {key} to resume" if _auto_paused
+            else "▶ Speed Focus resumed",
+            period=1800,
+        )
         return (True, None)
     if action == "engaged":
         # First interaction on a paused launch: start the session clock and

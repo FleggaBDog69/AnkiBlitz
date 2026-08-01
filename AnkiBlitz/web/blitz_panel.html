@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnkiBlitz</title>
+<!--
+  The AnkiBlitz panel, opened from the ⚡ button in SynapsePro's sidebar.
+
+  Deliberately built to SynapsePro's settings-page design language (see its
+  settings_web/pomodoro.html): the same token names, the same .group / .row
+  cards, the same switch. --accent and the surface tokens are overwritten at
+  load time from SynapsePro's live palette, so this follows its colour theme.
+  Keep the defaults below in step with SynapsePro's so the page still looks
+  right if the injection ever fails.
+
+  Python talks to this page through window.__blitz_init(payload); the page talks
+  back through console.log("blitz:<action>"), which the QWebEnginePage
+  subclass in engine/panel.py intercepts. Same bridge SynapsePro uses.
+-->
+<style>
+  :root{
+    color-scheme:light;
+    --accent:#0071D3;
+    --bg:#f5f5f7; --card:#ffffff; --border:rgba(0,0,0,0.08);
+    --hairline:rgba(0,0,0,0.07); --text:#1d1d1f; --muted:#8a8a90;
+    --field-bg:#f0f0f2; --switch-off:#d8d8dd;
+  }
+  html.dark, body.dark{
+    color-scheme:dark;
+    --bg:#1c1c1e; --card:#2a2a2c; --border:rgba(255,255,255,0.08);
+    --hairline:rgba(255,255,255,0.09); --text:#f5f5f7; --muted:#9a9aa0;
+    --field-bg:#3a3a3c; --switch-off:#48484a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);font-size:13px;-webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  .content{flex:1;overflow-y:auto;padding:24px 24px 18px;}
+  .content::-webkit-scrollbar{width:5px;}
+  .content::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+  h1{font-size:21px;font-weight:700;letter-spacing:-0.02em;}
+  .due{font-size:12.5px;color:var(--muted);margin:3px 0 18px;}
+  .sec{font-size:10.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;
+    color:var(--muted);margin:20px 2px 8px;}
+
+  .group{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .row{display:flex;align-items:center;gap:12px;padding:11px 15px;border-top:1px solid var(--hairline);}
+  .row:first-child{border-top:none;}
+  .row .rl{flex:1;font-size:13.5px;font-weight:500;letter-spacing:-0.01em;}
+  .row .sub{display:block;font-size:11px;color:var(--muted);font-weight:400;margin-top:2px;}
+  .row.act{cursor:pointer;}
+  .row.act:hover{background:var(--field-bg);}
+  .row.act .chev{color:var(--muted);font-size:15px;}
+  .row.primary .rl{color:var(--accent);font-weight:600;}
+  .row.disabled{opacity:.45;pointer-events:none;}
+
+  /* switch — lifted from SynapsePro's settings page so it reads as one product */
+  .switch{position:relative;display:inline-block;width:40px;height:24px;flex-shrink:0;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;inset:0;background:var(--switch-off);border-radius:24px;transition:background .2s;cursor:pointer;}
+  .slider::before{content:"";position:absolute;height:20px;width:20px;left:2px;top:2px;background:#fff;
+    border-radius:50%;transition:transform .2s cubic-bezier(.4,1.3,.5,1);box-shadow:0 1px 3px rgba(0,0,0,0.3);}
+  .switch input:checked + .slider{background:var(--accent);}
+  .switch input:checked + .slider::before{transform:translateX(16px);}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:12px;
+    padding:13px 6px;text-align:center;}
+  .stat b{display:block;font-size:19px;font-weight:700;letter-spacing:-0.02em;}
+  .stat span{display:block;font-size:10px;color:var(--muted);margin-top:3px;line-height:1.3;}
+
+  .empty{color:var(--muted);font-size:12px;padding:11px 15px;}
+</style>
+</head>
+<body>
+<div class="content">
+  <h1>AnkiBlitz</h1>
+  <div class="due" id="due">—</div>
+
+  <div class="sec">Blitz</div>
+  <div class="group" id="presets"></div>
+
+  <div class="sec">Pomodoro</div>
+  <div class="group" id="pomo"></div>
+
+  <div class="sec">Today</div>
+  <div class="stats" id="stats"></div>
+
+  <div class="sec">More</div>
+  <div class="group" id="tools"></div>
+</div>
+
+<script>
+(function () {
+  var send = function (action) { console.log("blitz:" + action); };
+
+  var esc = function (s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c];
+    });
+  };
+
+  var actionRow = function (label, sub, action, cls) {
+    var d = document.createElement("div");
+    d.className = "row act " + (cls || "");
+    d.innerHTML =
+      '<div class="rl">' + esc(label) +
+      (sub ? '<span class="sub">' + esc(sub) + "</span>" : "") +
+      '</div><div class="chev">›</div>';
+    d.addEventListener("click", function () { send(action); });
+    return d;
+  };
+
+  var switchRow = function (label, sub, action, on) {
+    var d = document.createElement("div");
+    d.className = "row";
+    d.innerHTML =
+      '<div class="rl">' + esc(label) +
+      (sub ? '<span class="sub">' + esc(sub) + "</span>" : "") +
+      '</div><label class="switch"><input type="checkbox"' +
+      (on ? " checked" : "") + '><span class="slider"></span></label>';
+    d.querySelector("input").addEventListener("change", function (e) {
+      send(action + ":" + (e.target.checked ? "1" : "0"));
+    });
+    return d;
+  };
+
+  var fill = function (el, rows, emptyText) {
+    el.innerHTML = "";
+    if (!rows.length) {
+      el.innerHTML = '<div class="empty">' + esc(emptyText) + "</div>";
+      return;
+    }
+    rows.forEach(function (r) { el.appendChild(r); });
+  };
+
+  window.__blitz_init = function (p) {
+    if (p.dark) { document.documentElement.classList.add("dark"); }
+    if (p.tokens) {
+      var root = document.documentElement;
+      Object.keys(p.tokens).forEach(function (k) {
+        root.style.setProperty("--" + k, p.tokens[k]);
+      });
+    }
+
+    document.getElementById("due").textContent =
+      p.due === 1 ? "1 card due" : p.due + " cards due";
+
+    // Blitz: the same quick-launch presets the deck-list rail used to carry.
+    var blitz = p.presets.map(function (preset, i) {
+      return actionRow(preset.label, preset.sub, "blitz-" + i, i === 0 ? "primary" : "");
+    });
+    if (p.due > 0) {
+      blitz.push(actionRow("Finish all " + p.due + " due", "", "blitz-all"));
+    }
+    blitz.push(actionRow("Start Blitz…", "Pick mode and target", "blitz-dialog"));
+    fill(document.getElementById("presets"), blitz, "Nothing due.");
+
+    var pomo = [actionRow(p.pomodoro.label, p.pomodoro.sub, "pomodoro", "primary")];
+    pomo.push(actionRow("Start Pomodoro…", "Pick blocks and breaks", "pomodoro-dialog"));
+    fill(document.getElementById("pomo"), pomo, "");
+
+    var stats = document.getElementById("stats");
+    stats.innerHTML = "";
+    p.stats.forEach(function (s) {
+      var d = document.createElement("div");
+      d.className = "stat";
+      d.innerHTML = "<b>" + esc(s.value) + "</b><span>" + esc(s.label) + "</span>";
+      stats.appendChild(d);
+    });
+
+    var tools = [
+      switchRow("Daily Quick Start", "Launch a Blitz automatically each day",
+                "quickstart", p.quickStart),
+      actionRow("Blitz stats", "Totals and personal bests", "stats"),
+      actionRow("Break journal", "Notes written during breaks", "journal")
+    ];
+    if (p.music) {
+      tools.push(actionRow("Music player", "", "music"));
+    }
+    tools.push(actionRow("Settings…", "Every AnkiBlitz option", "settings"));
+    fill(document.getElementById("tools"), tools, "");
+  };
+
+  send("ready");
+})();
+</script>
+</body>
+</html>

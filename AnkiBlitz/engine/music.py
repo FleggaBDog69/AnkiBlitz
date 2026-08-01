@@ -359,11 +359,29 @@ class _MusicDock(QWidget):
             pass
 
 
+def _deferred_to_synapse() -> bool:
+    """SynapsePro installed and handling the music? Then don't open ours.
+
+    Checked at every entry point, not just where the UI is drawn — the menu item
+    hides itself but Ctrl+Shift+M would still fire, and a box left open from
+    before SynapsePro appeared would linger.
+    """
+    try:
+        from . import theme_bridge
+        return theme_bridge.music_deferred()
+    except Exception:
+        return False
+
+
 def toggle_dock(respect_dropdown: bool = True) -> None:
     """Show/hide the floating review player (menu + Ctrl+Shift+M)."""
     mu = get_section("music")
     if not mu.get("enabled", False):
         tooltip("Turn on the music player in Settings ▸ Music first.")
+        return
+    if _deferred_to_synapse():
+        tooltip("SynapsePro is handling the music — its player is the one to use. "
+                "Settings ▸ AnkiBlitz ▸ SynapsePro to change that.")
         return
     if respect_dropdown and not mu.get("show_dropdown", True):
         tooltip("The review music window is off in Settings ▸ Music.")
@@ -433,6 +451,7 @@ def _update_home_box() -> None:
             _home_visible
             and suite_enabled() and mu.get("enabled", False)
             and mu.get("show_on_home", True)
+            and not _deferred_to_synapse()
             and getattr(mw, "state", None) in HOME_STATES
         )
     except Exception:
@@ -454,6 +473,9 @@ def toggle_home_box() -> None:
     mu = get_section("music")
     if not mu.get("enabled", False):
         tooltip("Turn on the music player in Settings ▸ Music first.")
+        return
+    if _deferred_to_synapse():
+        tooltip("SynapsePro is handling the music — use its player.")
         return
     _home_visible = not _home_visible
     _update_home_box()

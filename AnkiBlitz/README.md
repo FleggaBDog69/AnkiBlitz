@@ -59,6 +59,32 @@ Adaptive auto-reveal and progressive reveal also work **outside** a Blitz, on an
 normal review — the Blitz session just adds the progress bar and completion
 screen on top.
 
+### In the reviewer
+
+| Key | What it does |
+|-----|--------------|
+| reveal key (default `p`) | Show the rest of the question at once, while it's still fading in. |
+| pause key (default `p`) | Pause / resume the auto-reveal countdown on the card you're on. |
+
+The two may be **the same key** — that's the default. While words are still
+fading in the key reveals them; once the question is fully shown, the same key
+pauses the timer (and the next press starts it again where it stopped). A paused
+timer is labelled on screen and stays paused across cards until you release it.
+
+### During a Pomodoro break
+
+The break screen is a full-page countdown, but it isn't a trap:
+
+- **Step away** (or `Esc`) hides it and leaves a small floating countdown — go
+  check your calendar, make a coffee, leave the app entirely. The break keeps
+  running and the page comes back when you return to Anki.
+- Only **End Pomodoro** ends a run.
+- The break is **quiet**: the card Anki renders behind the break screen doesn't
+  read itself out at you. Its audio plays when you come back to the reviewer.
+- Stopped part-way through? Starting a Pomodoro later **the same day** offers to
+  **resume** — same cycle, same fraction split, picking up at the block you
+  stopped on. The deck-list widget's button says "Resume" when one is waiting.
+
 ---
 
 ## Profiles
@@ -109,6 +135,7 @@ section:
 - `focus` — Focus Lock and Focus Score.
 - `home_widget` — on-screen quick-launch panels.
 - `presets` — profiles.
+- `synapse` — sharing a screen with the SynapsePro add-on (see below).
 
 Edit settings from the UI; the raw JSON is optional.
 
@@ -126,6 +153,32 @@ Edit settings from the UI; the raw JSON is optional.
 - `engine/` — the engine modules (one session of truth, one injection point).
 
 ---
+
+## Alongside SynapsePro
+
+If you also run the **SynapsePro** add-on, AnkiBlitz moves in with it rather than
+sitting alongside — controlled from **Settings ▸ SynapsePro**:
+
+- **It lives in SynapsePro's sidebar.** Two icons are added to the strip:
+  🍅 start or resume a Pomodoro (in SynapsePro's accent colour), and ⚡ the
+  AnkiBlitz panel (in plain text colour, so only one of the two asks for your
+  attention). The panel holds everything else — Blitz quick-launches,
+  finish-all-due, today's totals, stats, the break journal, the Quick Start
+  toggle and Settings — as an HTML page built to SynapsePro's own settings-page
+  design.
+- **The deck-list rail goes away**, since the sidebar is now the way in. It
+  returns if you switch the integration off or remove SynapsePro.
+- **It borrows SynapsePro's colours.** The panel, the reveal overlay, the break
+  screen and the Settings window use its palette, and follow along when you
+  switch its colour theme. Only colours change; nothing moves.
+- **It stands its music player down.** SynapsePro has one, so AnkiBlitz's rail
+  button, break-screen box and `Ctrl+Shift+M` step aside. Nothing is deleted —
+  they come back if you turn the setting off or remove SynapsePro.
+- **Its Pomodoro doesn't.** AnkiBlitz's Pomodoro stays in charge. Both add-ons
+  have one, so if SynapsePro's is also switched on you'll be told once and
+  offered its settings — AnkiBlitz won't change another add-on's config for you.
+
+Without SynapsePro installed, none of this does anything.
 
 ## Standalone
 
