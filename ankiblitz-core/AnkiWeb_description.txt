@@ -9,13 +9,17 @@ structure, but WITHOUT the card-reveal timers. One engine, one menu, one
 settings window:
 
 • Blitz sessions — focused, timed runs (by card count, time, or a fraction of
-  what's due) with a progress bar and a completion screen.
+  what's due) with a progress bar and a completion screen. The bar stays up
+  outside a Blitz too, dimmed, filling against everything you have due — so
+  plain reviewing isn't a blank screen.
 
 • Pomodoro — chain work blocks with short and long breaks, a break screen with
-  journaling and focus ratings, and configurable auto-return.
+  journaling, focus ratings and a guided breathing pacer, and configurable
+  auto-return.
 
 • Focus Lock — make leaving a session progressively harder (confirm → min-cards
-  → finish), with an optional Focus Score.
+  → finish), with an optional Focus Score. Pick the level per Blitz in the Start
+  dialog without changing your saved default.
 
 • In-app music — a SoundCloud / YouTube Music player on the break screen, as a
   floating review dock, and on the deck list.
@@ -33,9 +37,10 @@ WANT REVEAL PACING TOO?
 
 Core leaves out the card-reveal timers on purpose. Two companion add-ons add
 them and run alongside Core:
-  • Adaptive Speed Focus (aSFM) — adaptive auto-reveal timer.
-  • Progressive Word Reveal — fades the answer in word by word.
-Or install the all-in-one AnkiBlitz add-on, which bundles everything.
+  • Adaptive Speed Focus (aSFM) — adaptive auto-reveal timer, with a "More time"
+    button: https://ankiweb.net/shared/info/1148593203
+  • Progressive Word Reveal — fades the question in word by word: https://ankiweb.net/shared/info/972193513
+Or install the all-in-one AnkiBlitz, which bundles everything: https://ankiweb.net/shared/info/178722601
 
 ═══════════════════════════════════════════════════════════
 BEFORE YOU START
@@ -43,7 +48,7 @@ BEFORE YOU START
 
 DISABLE these to avoid double timers/counters (Tools ▸ Add-ons):
   • Sprint Mode
-  • the full AnkiBlitz add-on (it already includes Core)
+  • the full AnkiBlitz add-on (it already includes Core): https://ankiweb.net/shared/info/178722601
 A one-time welcome wizard reminds you on first launch.
 
 ═══════════════════════════════════════════════════════════
@@ -52,6 +57,25 @@ SHORTCUTS  (Tools ▸ AnkiBlitz Core)
   Start Blitz        Ctrl+Shift+S
   Start Pomodoro     Ctrl+Shift+P
   Music player       Ctrl+Shift+M
+
+═══════════════════════════════════════════════════════════
+CHANGES IN 1.2.0
+═══════════════════════════════════════════════════════════
+• NEW: the progress bar now stays up outside a Blitz, dimmed and labelled "All
+  due", filling against your whole due pile. Its target is live, so a card that
+  comes back in learning pushes it out by one — it fills exactly as your queue
+  empties, never before. No accuracy, Again count or streak on it, ever.
+• NEW: Start Blitz… lets you pick a Focus Lock level for that one session —
+  commit hard to a session you need to finish, or let yourself off for a tired
+  one, without changing your saved default.
+• NEW: a guided breathing pacer on the break screen. Collapsed as a "Breathe"
+  button until you press it; Box 4-4-4-4, Simple 4-4, Coherent 5-5 or Calming
+  4-7-8.
+• NEW: the break screen's "Step away" button and floating countdown, break audio
+  muting, and resuming an unfinished run from earlier the same day.
+• FIX: Focus Lock level 3 now keeps a Blitz alive on focus loss based on the
+  level that Blitz was started with, not whatever is currently configured.
+• FIX: "Finish all due" on the deck-list panel no longer swallows the click.
 
 ═══════════════════════════════════════════════════════════
 NOTES

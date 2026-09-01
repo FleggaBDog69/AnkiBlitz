@@ -22,6 +22,9 @@ extracted from the **AnkiBlitz** suite so you can use just this piece.
 
 ## Install
 
+- **From AnkiWeb (recommended — you get updates):** Anki ▸ Tools ▸ Add-ons ▸
+  Get Add-ons… ▸ paste the code **`972193513`**, then restart.
+  <https://ankiweb.net/shared/info/972193513>
 - **From file:** Anki ▸ Tools ▸ Add-ons ▸ Install from file… ▸ pick
   `ProgressiveWordReveal.ankiaddon`, then restart.
 - **Manually:** drop the `progressive_reveal` folder into your Anki `addons21/`

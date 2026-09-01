@@ -31,6 +31,9 @@ Everything is controlled from **Tools ▸ AnkiBlitz Core**.
 
 This is a folder add-on. The package folder is `ankiblitz_core`.
 
+- **From AnkiWeb (recommended — you get updates):** Anki ▸ Tools ▸ Add-ons ▸
+  Get Add-ons… ▸ paste the code **`1174429600`**, then restart.
+  <https://ankiweb.net/shared/info/1174429600>
 - **From the packaged file:** Anki ▸ Tools ▸ Add-ons ▸ Install from file… ▸ pick
   `AnkiBlitzCore.ankiaddon`, then restart Anki.
 - **Manually:** drop the `ankiblitz_core` folder into your Anki `addons21/`

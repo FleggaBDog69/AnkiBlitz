@@ -1,6 +1,16 @@
 {
-  "package": "progressive_reveal",
   "name": "Progressive Word Reveal",
+  "package": "progressive_reveal",
   "author": "Fletcher (reworks Patrick Lee's Progressive Word Reveal)",
-  "mod": 0
+  "version": "1.2.0",
+  "human_version": "1.2.0",
+  "description": "Fades the question in word by word at a reading pace you set, optionally locked to the card's own {{tts}} voice. Click or a key shows everything at once.",
+  "homepage": "https://github.com/FleggaBDog69/AnkiBlitz",
+  "min_point_version": 50,
+  "max_point_version": 0,
+  "conflicts": [
+    "178722601",
+    "focus_suite",
+    "progressive_word_reveal"
+  ]
 }

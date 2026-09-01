@@ -23,6 +23,9 @@ This is a folder add-on. The package folder is `focus_suite` (the historical
 internal name — kept so existing settings and stats are preserved; the add-on
 presents itself everywhere as **AnkiBlitz**).
 
+- **From AnkiWeb (recommended — you get updates):** Anki ▸ Tools ▸ Add-ons ▸
+  Get Add-ons… ▸ paste the code **`178722601`**, then restart.
+  <https://ankiweb.net/shared/info/178722601>
 - **From the packaged file:** Anki ▸ Tools ▸ Add-ons ▸ Install from file… ▸ pick
   `AnkiBlitz.ankiaddon`, then restart Anki.
 - **Manually:** drop the `focus_suite` folder into your Anki

@@ -8,13 +8,16 @@ people who only want one piece.
 > Don't run a standalone spin-off *and* the full AnkiBlitz at the same time — the
 > timers/counters would double up. AnkiBlitz already includes all of them, and
 > AnkiBlitz Core already includes the Blitz/Pomodoro/Focus/profiles/music stack.
+> Each `manifest.json` declares this in `conflicts` (by both the source folder
+> name and the AnkiWeb code, since an AnkiWeb install lands in a numeric folder),
+> so Anki warns you rather than leaving you to notice a doubled countdown.
 
-| Add-on | What it does | Install |
-|--------|--------------|---------|
-| **[AnkiBlitz](AnkiBlitz/)** | The whole suite: timed Blitz sessions, Pomodoro, Focus Lock, profiles, in-app music, **plus** adaptive auto-reveal and progressive word reveal. | [`dist/AnkiBlitz.ankiaddon`](dist/AnkiBlitz.ankiaddon) |
-| **[AnkiBlitz Core](ankiblitz-core/)** | The session-discipline stack **without** the reveal timers: timed Blitz sessions, Pomodoro, Focus Lock, profiles, in-app music. | [`dist/AnkiBlitzCore.ankiaddon`](dist/AnkiBlitzCore.ankiaddon) |
-| **[Adaptive Speed Focus (aSFM)](aSFM/)** | Just the auto-**reveal** timer: waits a delay computed from the card's length and FSRS difficulty, then shows the answer. Never grades. | [`dist/aSFM.ankiaddon`](dist/aSFM.ankiaddon) |
-| **[Progressive Word Reveal](progressive-reveal/)** | Just the word-by-word fade-in of the question, at a set reading pace (optionally TTS-synced). | [`dist/ProgressiveWordReveal.ankiaddon`](dist/ProgressiveWordReveal.ankiaddon) |
+| Add-on | What it does | AnkiWeb | Code |
+|--------|--------------|---------|------|
+| **[AnkiBlitz](AnkiBlitz/)** | The whole suite: timed Blitz sessions, Pomodoro, Focus Lock, profiles, in-app music, **plus** adaptive auto-reveal and progressive word reveal. | [`178722601`](https://ankiweb.net/shared/info/178722601) | [`dist/AnkiBlitz.ankiaddon`](dist/AnkiBlitz.ankiaddon) |
+| **[AnkiBlitz Core](ankiblitz-core/)** | The session-discipline stack **without** the reveal timers: timed Blitz sessions, Pomodoro, Focus Lock, profiles, in-app music. | [`1174429600`](https://ankiweb.net/shared/info/1174429600) | [`dist/AnkiBlitzCore.ankiaddon`](dist/AnkiBlitzCore.ankiaddon) |
+| **[Adaptive Speed Focus (aSFM)](aSFM/)** | Just the auto-**reveal** timer: waits a delay computed from the card's length and FSRS difficulty, then shows the answer. Never grades. | [`1148593203`](https://ankiweb.net/shared/info/1148593203) | [`dist/aSFM.ankiaddon`](dist/aSFM.ankiaddon) |
+| **[Progressive Word Reveal](progressive-reveal/)** | Just the word-by-word fade-in of the question, at a set reading pace (optionally TTS-synced). | [`972193513`](https://ankiweb.net/shared/info/972193513) | [`dist/ProgressiveWordReveal.ankiaddon`](dist/ProgressiveWordReveal.ankiaddon) |
 
 Mix and match: **AnkiBlitz Core + aSFM + Progressive Word Reveal** together equal
 the full **AnkiBlitz** — install Core plus whichever reveal feature(s) you want,
@@ -24,8 +27,12 @@ or just grab the all-in-one AnkiBlitz.
 
 ## Install
 
-**Easiest — packaged file:** in Anki, **Tools ▸ Add-ons ▸ Install from file…** and
-pick the matching `.ankiaddon` from [`dist/`](dist/), then restart Anki.
+**Easiest — AnkiWeb:** in Anki, **Tools ▸ Add-ons ▸ Get Add-ons…** and paste the
+add-on's code from the table above, then restart Anki. That way you also get
+updates.
+
+**From a packaged file:** **Tools ▸ Add-ons ▸ Install from file…** and pick the
+matching `.ankiaddon` from [`dist/`](dist/), then restart Anki.
 
 **Manual — from source:** copy the add-on's source folder into your Anki
 `addons21/` directory and restart. The folder must be named so Anki can import it:

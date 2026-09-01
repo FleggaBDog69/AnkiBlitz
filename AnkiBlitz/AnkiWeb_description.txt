@@ -14,11 +14,19 @@ settings window:
   nothing to read.
 
 • Progressive word reveal — the question fades in word by word at a reading pace
-  you set, optionally locked to the card's {{tts}} voice.
+  you set, optionally locked to the card's {{tts}} voice. Skipping ahead stops
+  the card's audio too — you've read it, so the voice reading it to you is just
+  noise.
 
 • Blitz sessions — focused, timed runs (by card count, time, or a fraction of
   what's due) with a progress bar, plus Pomodoro work/break cycles, Focus Lock,
-  momentum nudges, an in-app music player, and whole-config Profiles.
+  momentum nudges, an in-app music player, and whole-config Profiles. The
+  progress bar stays up outside a Blitz too, dimmed, filling against everything
+  you have due — so plain reviewing isn't a blank screen.
+
+• Hold the timer whenever you like — a "More time" button on the card, or a
+  pause key (default P). Either stops the countdown where it stands and picks it
+  up where it stopped.
 
 PROFILES
 Three built-ins — Default (everyday), Blitz (a committed, locked-in run), and
@@ -40,11 +48,48 @@ timers (Tools ▸ Add-ons):
 A one-time welcome wizard reminds you on first launch.
 
 ═══════════════════════════════════════════════════════════
+THE ANKIBLITZ SUITE
+═══════════════════════════════════════════════════════════
+
+Want only one piece? Each half ships on its own:
+  • AnkiBlitz Core — sessions, Pomodoro, Focus Lock, profiles, music, WITHOUT
+    the two reveal timers: https://ankiweb.net/shared/info/1174429600
+  • Adaptive Speed Focus (aSFM) — the auto-reveal timer alone: https://ankiweb.net/shared/info/1148593203
+  • Progressive Word Reveal — the word-by-word fade alone: https://ankiweb.net/shared/info/972193513
+
+Core + aSFM + Progressive Word Reveal together equal this add-on. Don't run any
+of them alongside AnkiBlitz — it already contains all three, and the timers
+would double up.
+
+═══════════════════════════════════════════════════════════
 SHORTCUTS  (Tools ▸ AnkiBlitz)
 ═══════════════════════════════════════════════════════════
   Start Blitz        Ctrl+Shift+S
   Start Pomodoro     Ctrl+Shift+P
   Music player       Ctrl+Shift+M
+
+═══════════════════════════════════════════════════════════
+CHANGES IN 1.2.0
+═══════════════════════════════════════════════════════════
+• NEW: a "More time" button on the card, by request — the same hold the pause
+  key applies, but you can see that it's there. Click to stop the countdown,
+  click again (or the "paused" badge) to carry on.
+• NEW: a pause key (default P) for the same hold, from the keyboard.
+• NEW: the progress bar now stays up outside a Blitz, dimmed and labelled "All
+  due", filling against your whole due pile. Its target is live, so a card that
+  comes back in learning pushes it out by one — it fills exactly as your queue
+  empties, never before. No accuracy, Again count or streak on it, ever.
+• NEW: Start Blitz… lets you pick a Focus Lock level for that one session —
+  commit hard to a session you need to finish, or let yourself off for a tired
+  one, without changing your saved default.
+• NEW: a guided breathing pacer on the Pomodoro break screen. Collapsed as a
+  "Breathe" button until you press it; Box 4-4-4-4, Simple 4-4, Coherent 5-5 or
+  Calming 4-7-8.
+• NEW: skipping the word reveal also stops the card's TTS / [sound:] playback.
+• NEW: matches SynapsePro's theme when that add-on is installed.
+• FIX: the reveal key no longer fires while you're typing in Anki's type-in-the-
+  answer box, or with Ctrl/Cmd/Alt held.
+• FIX: "Finish all due" on the deck-list panel no longer swallows the click.
 
 ═══════════════════════════════════════════════════════════
 NOTES

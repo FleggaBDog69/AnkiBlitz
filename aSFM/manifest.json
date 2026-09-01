@@ -1,6 +1,17 @@
 {
-  "package": "asfm",
   "name": "Adaptive Speed Focus (aSFM)",
+  "package": "asfm",
   "author": "Fletcher (reworks Glutanimate's Speed Focus Mode)",
-  "mod": 0
+  "version": "1.2.0",
+  "human_version": "1.2.0",
+  "description": "Adaptive auto-reveal: waits a delay computed from the card's visible length and FSRS difficulty, then shows the answer. Never grades. Includes a “More time” button and a pause key.",
+  "homepage": "https://github.com/FleggaBDog69/AnkiBlitz",
+  "min_point_version": 50,
+  "max_point_version": 0,
+  "conflicts": [
+    "178722601",
+    "focus_suite",
+    "1046608507",
+    "speed_focus_mode"
+  ]
 }

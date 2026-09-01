@@ -28,6 +28,9 @@ Focus Mode*, extracted from the **AnkiBlitz** suite so you can use just this pie
 
 ## Install
 
+- **From AnkiWeb (recommended — you get updates):** Anki ▸ Tools ▸ Add-ons ▸
+  Get Add-ons… ▸ paste the code **`1148593203`**, then restart.
+  <https://ankiweb.net/shared/info/1148593203>
 - **From file:** Anki ▸ Tools ▸ Add-ons ▸ Install from file… ▸ pick
   `aSFM.ankiaddon`, then restart.
 - **Manually:** drop the `asfm` folder into your Anki `addons21/` directory and
