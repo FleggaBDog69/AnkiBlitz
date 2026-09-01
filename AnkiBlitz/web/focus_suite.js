@@ -135,7 +135,20 @@
     Array.prototype.forEach.call(hidden, function (el) {
       el.classList.remove("fs-hidden");
     });
+    stopCardAudio();
     markRevealDone();
+  }
+
+  // Skipping the reveal means you've read it — the voice reading it to you is
+  // now just noise. Anki's own audio ([sound:] / {{tts}}) lives in mpv, so
+  // Python has to cut it; media embedded in the card is paused here.
+  function stopCardAudio() {
+    if (!FS._stopAudioOnReveal) return;
+    var media = document.querySelectorAll("audio, video");
+    Array.prototype.forEach.call(media, function (el) {
+      try { el.pause(); } catch (e) {}
+    });
+    pycmd("focus:stopaudio");
   }
 
   function markRevealDone() {
@@ -428,6 +441,7 @@
     pendingAuto = null;
     pausedHold = !!payload.paused;
     FS._revealKey = (payload.reveal && payload.reveal.revealKey) || "p";
+    FS._stopAudioOnReveal = !!(payload.reveal && payload.reveal.stopAudio);
     FS._pauseKey = (payload.autoReveal && payload.autoReveal.pauseKey) || "p";
     FS._pauseEnabled = !!(payload.autoReveal && payload.autoReveal.pauseEnabled);
     // Python owns the sticky pause, so it survives re-injection of this bundle.

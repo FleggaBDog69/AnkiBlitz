@@ -15,6 +15,9 @@ DEFAULTS = {
     "chunk_words": 3,             # words revealed together per chunk in chunk mode
     "reveal_on_answer": False,    # also fade in the answer side
     "reveal_key": "p",            # key (besides click) to reveal instantly
+    # Revealing everything means you're done listening: cut the card's audio
+    # (TTS / [sound:] and any embedded HTML media) when the reveal is skipped.
+    "stop_audio_on_reveal": True,
     # TTS sync: keep the reveal in step with native Anki/AnKing {{tts}} playback.
     # macOS `say` runs at (base_wpm × speed) words/min, so the matching reveal rate
     # is (base_wpm × speed / 60) words/sec.

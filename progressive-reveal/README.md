@@ -37,7 +37,7 @@ Everything is under **Tools ▸ Progressive Word Reveal**:
 
 | Item | What it does |
 |------|--------------|
-| Settings… | Speed, mode, chunk size, reveal key, TTS sync, exclusions, live preview. |
+| Settings… | Speed, mode, chunk size, reveal key, stop-audio-on-reveal, TTS sync, exclusions, live preview. |
 | Enabled | Master on/off. |
 
 ## Credits & acknowledgements

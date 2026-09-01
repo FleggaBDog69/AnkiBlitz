@@ -454,6 +454,9 @@ class WordRevealPanel(QWidget):
         self.reveal_key = _KeyCaptureEdit(cfg.get("reveal_key", "p"))
         form.addRow("Reveal-all key:", self.reveal_key)
 
+        self.stop_audio = QCheckBox("Stop the card's audio when you reveal early")
+        self.stop_audio.setChecked(bool(cfg.get("stop_audio_on_reveal", True)))
+
         # Chunk size only matters in chunk mode.
         def _toggle_chunk():
             self.chunk_words.setEnabled(self.mode.currentData() == "chunks")
@@ -472,6 +475,13 @@ class WordRevealPanel(QWidget):
         side.addStretch(1)
         speed_row.addLayout(side, 1)
         layout.addLayout(speed_row)
+
+        layout.addWidget(self.stop_audio)
+        layout.addWidget(_hint(
+            "Revealing everything (key or click) also cuts the card's TTS / "
+            "[sound:] playback — you've read it, so the voice reading it to you "
+            "is just noise. The audio stops rather than pausing; the next card "
+            "plays normally."))
 
         self.wps.valueChanged.connect(self._update_preview)
         self._update_preview()
@@ -561,6 +571,7 @@ class WordRevealPanel(QWidget):
             "chunk_words": self.chunk_words.value(),
             "words_per_second": round(self.wps.value(), 2),
             "reveal_key": self.reveal_key.key_value(),
+            "stop_audio_on_reveal": self.stop_audio.isChecked(),
             "tts_auto_match": self.tts_auto_match.isChecked(),
             "excluded_note_types": self.nt_list.checked(),
             "excluded_decks": self.deck_list.checked(),

@@ -61,6 +61,9 @@ clamped to `[min_delay_seconds, max_delay_seconds]`.
 - `chunk_words` — how many words appear together per chunk in `chunks` mode.
 - `reveal_on_answer` — also fade in the answer side.
 - `reveal_key` — key (besides clicking) that reveals everything instantly.
+- `stop_audio_on_reveal` — revealing everything early also stops the card's audio
+  (TTS / `[sound:]` and any embedded HTML media). The audio stops rather than
+  pausing; the next card plays normally.
 - `tts_auto_match` — when on, a card with active `{{tts}}` overrides
   `words_per_second` so the reveal finishes in step with the voice. macOS `say`
   runs at `tts_base_wpm × speed` words/min, so the matching reveal rate is

@@ -3,14 +3,18 @@
 A single ``webview_will_set_content`` handler injects one CSS file and one JS
 bundle. Python decides, per card, whether the reveal should run and with what
 parameters, and pushes that with a single ``PWReveal.onCard(...)`` call. The JS
-owns all DOM, timing and animation. No callback into Python is needed — the
-reveal is purely visual.
+owns all DOM, timing and animation.
+
+One message comes back the other way (pycmd, ``pwr:`` namespace):
+  - ``pwr:stopaudio`` — the reveal was skipped; stop the card's audio. Anki's
+    own playback lives in mpv, so only Python can cut it.
 """
 
 import json
 
 from aqt import gui_hooks, mw
 from aqt.reviewer import Reviewer
+from aqt.sound import av_player
 
 from ..config import PACKAGE, get_config
 from . import tts_sync
@@ -80,6 +84,7 @@ def _reveal_block(cfg: dict, enabled: bool, card, side: str) -> dict:
         "mode": str(cfg.get("reveal_mode", "words")),
         "chunkWords": max(1, int(cfg.get("chunk_words", 3))),
         "revealKey": str(cfg.get("reveal_key") or "p").lower(),
+        "stopAudio": bool(cfg.get("stop_audio_on_reveal", True)),
     }
 
 
@@ -119,8 +124,21 @@ def _on_show_answer(*args, **kwargs) -> None:
     _eval(f"window.PWReveal && PWReveal.onCard({json.dumps(answer_payload(card))});")
 
 
+def _on_js_message(handled, message: str, context, *args, **kwargs):
+    if message == "pwr:stopaudio":
+        # The reveal was skipped: cut whatever the card is still saying (and
+        # drop the rest of its queue, so the next tag doesn't start up).
+        try:
+            av_player.stop_and_clear_queue()
+        except Exception:
+            pass
+        return (True, None)
+    return handled
+
+
 def register() -> None:
     mw.addonManager.setWebExports(PACKAGE, r"web.*")
     gui_hooks.webview_will_set_content.append(_on_will_set_content)
     gui_hooks.reviewer_did_show_question.append(_on_show_question)
     gui_hooks.reviewer_did_show_answer.append(_on_show_answer)
+    gui_hooks.webview_did_receive_js_message.append(_on_js_message)

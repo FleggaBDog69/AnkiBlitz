@@ -58,6 +58,7 @@ def _reveal_block(wr: dict, enabled: bool, card=None, side: str = "question") ->
         "mode": str(wr.get("reveal_mode", "words")),
         "chunkWords": max(1, int(wr.get("chunk_words", 3))),
         "revealKey": str(wr.get("reveal_key") or "p").lower(),
+        "stopAudio": bool(wr.get("stop_audio_on_reveal", True)),
     }
 
 

@@ -9,6 +9,7 @@ DOM, timing, and animation live in the JS bundle.
 Bridge messages (pycmd) use the ``focus:`` namespace:
   - ``focus:reveal`` — the auto-reveal timer expired; show the answer.
   - ``focus:autopause:1|0`` — the pause key held / released the auto-reveal timer.
+  - ``focus:stopaudio`` — the word reveal was skipped; stop the card's audio.
 """
 
 import json
@@ -137,6 +138,14 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
         rv = mw.reviewer
         if rv and rv.card and rv.state == "question":
             rv._showAnswer()
+        return (True, None)
+    if action == "stopaudio":
+        # The word reveal was skipped: cut whatever the card is still saying
+        # (and drop the rest of its queue, so the next tag doesn't start up).
+        try:
+            av_player.stop_and_clear_queue()
+        except Exception:
+            pass
         return (True, None)
     if action == "warn":
         _play_alert()

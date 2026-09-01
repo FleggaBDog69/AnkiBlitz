@@ -16,6 +16,7 @@
   var clickHandler = null;
   var keyHandler = null;
   var revealKey = "p";
+  var stopAudioOnReveal = true;
 
   function getRoot() {
     return document.getElementById("qa") || document.body;
@@ -107,6 +108,19 @@
     Array.prototype.forEach.call(hidden, function (el) {
       el.classList.remove("pwr-hidden");
     });
+    stopCardAudio();
+  }
+
+  // Skipping the reveal means you've read it — the voice reading it to you is
+  // now just noise. Anki's own audio ([sound:] / {{tts}}) lives in mpv, so
+  // Python has to cut it; media embedded in the card is paused here.
+  function stopCardAudio() {
+    if (!stopAudioOnReveal) return;
+    var media = document.querySelectorAll("audio, video");
+    Array.prototype.forEach.call(media, function (el) {
+      try { el.pause(); } catch (e) {}
+    });
+    pycmd("pwr:stopaudio");
   }
 
   function isTypingTarget(el) {
@@ -170,6 +184,7 @@
     removeListeners();
     var reveal = payload && payload.reveal;
     revealKey = (reveal && reveal.revealKey) || "p";
+    stopAudioOnReveal = !!(reveal && reveal.stopAudio);
     if (reveal && reveal.enabled) {
       startReveal(reveal);
     }
