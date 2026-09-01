@@ -76,6 +76,8 @@
     "break_show_journal": true,
     "break_show_focus_rating": true,
     "break_show_tips": true,
+    "break_show_breathing": true,
+    "break_breathing_pattern": "box",
     "break_show_browser": true,
     "break_show_add_kg": true,
     "break_allow_extend": true,

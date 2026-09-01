@@ -42,7 +42,7 @@ from aqt.qt import (
 from aqt.utils import tooltip
 
 from ..config import get_section, suite_enabled
-from . import sprint, stats, injection, theme_bridge
+from . import sprint, stats, injection, theme_bridge, breathing
 from .session import MODE_CARDS, MODE_TIME, MODE_FRACTION
 
 
@@ -996,6 +996,7 @@ class BreakDialog(QDialog):
         self._music = None
         self._away = False
         self._pill = None
+        self._breathing = None
 
         self.setWindowTitle("Break")
         # Frameless + modal, sized over the Anki window: a distraction-free
@@ -1029,6 +1030,8 @@ class BreakDialog(QDialog):
         # keyPressEvent and steps away instead (see _step_away).
         self.rejected.connect(self._on_rejected)
         self.finished.connect(lambda *_: self._hide_pill())
+        # Don't leave a pacer repainting behind a closed break screen.
+        self.finished.connect(lambda *_: self._stop_breathing())
         # Coming back to Anki brings the break page back with you.
         try:
             QApplication.instance().applicationStateChanged.connect(self._on_app_state)
@@ -1073,6 +1076,14 @@ class BreakDialog(QDialog):
             tip.setAlignment(Qt.AlignmentFlag.AlignCenter)
             tip.setStyleSheet("font-size: 13px; opacity: 0.65; margin-bottom: 2px;")
             lay.addWidget(tip)
+
+        # Guided breathing, collapsed until asked for: the tip suggests, the
+        # pacer paces. Sits under the tip so the screen is unchanged until you
+        # press it.
+        if po.get("break_show_breathing", True):
+            self._breathing = breathing.BreathingPanel(
+                po.get("break_breathing_pattern", breathing.DEFAULT_PATTERN))
+            lay.addWidget(self._breathing)
 
         if po.get("break_show_timeline", True):
             lay.addWidget(_timeline_widget(self._state))
@@ -1257,6 +1268,13 @@ class BreakDialog(QDialog):
         if pill is not None:
             try:
                 pill.close()
+            except Exception:
+                pass
+
+    def _stop_breathing(self) -> None:
+        if self._breathing is not None:
+            try:
+                self._breathing.stop()
             except Exception:
                 pass
 

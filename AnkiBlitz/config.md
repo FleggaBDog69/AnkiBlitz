@@ -141,9 +141,21 @@ out to another app costs you nothing. A run you stop part-way through can be
   reads "Resume · 2/3 blocks done". A run that used up all its blocks is done and
   is never offered.
 - `break_show_timeline` / `break_show_journal` / `break_show_focus_rating` /
-  `break_show_tips` / `break_show_browser` / `break_show_add_kg` /
-  `break_allow_extend` — toggle each break-screen element so the screen stays as
-  calm or as full-featured as you like.
+  `break_show_tips` / `break_show_breathing` / `break_show_browser` /
+  `break_show_add_kg` / `break_allow_extend` — toggle each break-screen element
+  so the screen stays as calm or as full-featured as you like.
+- `break_show_breathing` — a **guided breathing pacer** under the micro-break
+  tip: a circle that expands and contracts with the phase named and counted
+  underneath, so there's something to actually follow while you rest. It sits
+  collapsed as a *🫁 Breathe* button and only animates once you press it, so the
+  break screen looks exactly as it did until you want it.
+- `break_breathing_pattern` — which rhythm the pacer opens on. You can switch it
+  on the break screen itself (for that break only); this is the default.
+  - `box` — Box, 4-4-4-4. Even square breathing; steadies without sedating.
+  - `44` — Simple, 4-4. Nothing to hold, nothing to count wrong.
+  - `coherent` — Coherent, 5-5. Six breaths a minute, the classic slow pace.
+  - `478` — Calming, 4-7-8. Long exhale; it *will* make you drowsy, so it suits
+    a long break rather than a five-minute one.
 - `break_allow_step_away` — the **Step away** button, and `Esc`, hide the break
   screen instead of ending the run: the countdown keeps going, the modal block
   lifts, and the screen returns by itself when Anki is next the active app. Only
