@@ -180,7 +180,14 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
 def push_progress() -> None:
     s = session.get_active()
     if s is None:
-        clear_progress()
+        # No Blitz — fall back to the ambient "whole due pile" bar, if one is
+        # armed for this ordinary review session.
+        from . import sprint  # lazy: sprint imports injection at module load
+        ambient = sprint.ambient_payload()
+        if ambient:
+            _eval(f"window.FocusSuite && FocusSuite.setProgress({json.dumps(ambient)});")
+        else:
+            clear_progress()
         return
     from ..config import get_section
     cfg = get_section("sprint")
@@ -209,6 +216,7 @@ def push_progress() -> None:
         "showStreak": bool(cfg.get("show_streak_counter", False)) and not hide_acc,
         "streak": s.current_streak,
         "streakAnim": bool(cfg.get("streak_animations", False)),
+        "ambient": False,
     }
     _eval(f"window.FocusSuite && FocusSuite.setProgress({json.dumps(payload)});")
 

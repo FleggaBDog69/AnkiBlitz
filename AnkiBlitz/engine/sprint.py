@@ -10,6 +10,11 @@ A Blitz ends three ways:
   - the queue empties before the target                          -> completed
   - the user leaves the reviewer or Anki loses focus             -> cancelled
 Cancelled sessions keep no record.
+
+With no Blitz running this module also keeps the *ambient* tracker alive (see
+session.AmbientSession) so an ordinary review session still gets a progress bar,
+filling against the whole due pile. It is armed on entering the reviewer and
+dropped on leaving; it records nothing and never completes.
 """
 
 import math
@@ -181,6 +186,31 @@ def start_blitz_dialog():
     count_hint.setStyleSheet("color: gray; font-size: 11px; margin-top: 6px;")
     lay.addWidget(count_hint)
 
+    # Focus Lock for THIS Blitz. Pre-filled from the saved level; changing it
+    # here rides on the session only (session.lock_level_override) and never
+    # rewrites the configured default.
+    fcfg = get_section("focus")
+    lock_combo = None
+    if fcfg.get("enabled", True):
+        lay.addWidget(QLabel("Focus lock:"))
+        lock_combo = QComboBox()
+        n_extra = max(1, int(fcfg.get("lock_min_cards", 10)))
+        for level, text in (
+            (focus.LOCK_NONE, "Off — leaving is free"),
+            (focus.LOCK_CONFIRM, "Confirm before leaving"),
+            (focus.LOCK_MIN_CARDS, f"Clear {n_extra} more, then confirm"),
+            (focus.LOCK_FINISH, "Can't leave until the Blitz is finished"),
+        ):
+            lock_combo.addItem(text, level)
+        li = lock_combo.findData(focus.lock_level(fcfg))
+        if li >= 0:
+            lock_combo.setCurrentIndex(li)
+        lay.addWidget(lock_combo)
+        lock_hint = QLabel("Applies to this Blitz only — your saved default is untouched.")
+        lock_hint.setWordWrap(True)
+        lock_hint.setStyleSheet("color: gray; font-size: 11px; margin-bottom: 4px;")
+        lay.addWidget(lock_hint)
+
     deck_combo = None
     if cfg.get("card_source") == "pick_deck":
         lay.addWidget(QLabel("Deck:"))
@@ -216,11 +246,12 @@ def start_blitz_dialog():
     else:
         value = card_spin.value()
     deck_id = deck_combo.currentData() if deck_combo else None
-    _begin_blitz(mode, value, deck_id, cfg)
+    lock_level = lock_combo.currentData() if lock_combo else None
+    _begin_blitz(mode, value, deck_id, cfg, lock_level=lock_level)
 
 
 def _begin_blitz(mode, value, deck_id, cfg, is_quick_start=False, is_pomodoro=False,
-                 paused=False, label_override=None):
+                 paused=False, label_override=None, lock_level=None):
     if session.is_running():
         ok = QMessageBox.question(
             mw, "Blitz already active",
@@ -272,10 +303,13 @@ def _begin_blitz(mode, value, deck_id, cfg, is_quick_start=False, is_pomodoro=Fa
         is_pomodoro=is_pomodoro,
         idle_threshold=float(get_section("focus").get("idle_threshold_seconds", 60)),
         paused=paused,
+        lock_level=lock_level,
     )
-    # A Blitz takes over from any normal-review Focus Lock guard.
+    # A Blitz takes over from any normal-review Focus Lock guard, and from the
+    # ambient due-pile bar.
     global _review_guard
     _review_guard = None
+    session.clear_ambient()
     # An "armed" Pomodoro (break over at notify-level) resumes on any Blitz the
     # user starts manually — flag this one as the next work block if so.
     if not is_pomodoro:
@@ -406,9 +440,14 @@ def on_review_did_answer(reviewer, card, ease):
     """ease: 1=Again, 2=Hard, 3=Good, 4=Easy"""
     s = session.get_active()
     if s is None or s.completed:
-        # No Blitz: feed the normal-review Focus Lock counter if one is armed.
+        # No Blitz: feed the normal-review Focus Lock counter if one is armed,
+        # and advance the ambient due-pile bar.
         if _review_guard is not None:
             _review_guard.cards_done += 1
+        amb = session.get_ambient()
+        if amb is not None:
+            amb.record_answer(getattr(card, "id", None))
+            injection.push_progress()
         return
     s.record_answer(getattr(card, "id", None), ease)
     if s.is_quick_start and s.answers == 1:
@@ -440,6 +479,7 @@ def on_state_change(new_state: str, old_state: str):
 
     if entering:
         _maybe_arm_review_guard()
+        _maybe_arm_ambient()
         return
     if not leaving:
         return
@@ -474,11 +514,13 @@ def on_state_change(new_state: str, old_state: str):
         decision, msg = focus.leave_decision(_review_guard, get_section("focus"))
         if decision == "block":
             _bounce_back(msg)
-            return
+            return          # bouncing straight back — keep the ambient bar
         if decision == "confirm":
             _confirm_review_leave()
-            return
+            return          # may still bounce back — ditto
         _review_guard = None  # free to go
+    # Genuinely leaving the reviewer: end this ambient stretch.
+    session.clear_ambient()
 
 
 # ----- Focus Lock -----
@@ -514,6 +556,82 @@ def _maybe_arm_review_guard():
             _review_guard = _ReviewGuard()
     else:
         _review_guard = None
+
+
+# ----- Ambient bar (ordinary review, no Blitz) -----
+
+def _maybe_arm_ambient() -> None:
+    """Start tracking the due pile so the progress bar has something to draw when
+    no Blitz is running. Idempotent: a bounce-back (or a Blitz that just ended
+    while you carry on reviewing) finds the tracker already armed and keeps it,
+    so its count and clock survive."""
+    if session.is_running() or not _ambient_wanted():
+        session.clear_ambient()
+        return
+    if session.get_ambient() is None:
+        session.start_ambient(get_section("sprint").get("count_mode", "unique"))
+
+
+def _ambient_wanted() -> bool:
+    cfg = get_section("sprint")
+    return bool(suite_enabled()
+                and cfg.get("enabled", True)
+                and cfg.get("show_bar_outside_blitz", True))
+
+
+def ambient_payload() -> dict:
+    """The progress payload for an ordinary review session, or {} when there
+    isn't one. Refreshes the live due count first — the bar's target is
+    ``done + still due``, so it can only reach 100% by emptying the queue.
+
+    Arms the tracker if one isn't already up: a Blitz that ends while you keep
+    reviewing hands straight back to the ambient bar, with no trip out to the
+    deck list needed. Re-checks the toggles on every push too, so switching the
+    bar off in Settings takes it off the next card rather than at the end of the
+    session.
+    """
+    _maybe_arm_ambient()
+    amb = session.get_ambient()
+    if amb is None:
+        return {}
+    amb.set_remaining(_due_total())
+    if amb.target <= 0:
+        return {}
+    cfg = get_section("sprint")
+    show_bar = bool(cfg.get("show_progress_bar", True))
+    show_counter = bool(cfg.get("show_card_counter", True))
+    show_elapsed = bool(cfg.get("show_elapsed_time", True))
+    # With every element switched off there is nothing to draw, and an empty
+    # strip on top of every ordinary review would be worse than no bar at all.
+    # (A Blitz you deliberately started may still show a bare strip — that's
+    # your choice; this one you never asked for.)
+    if not (show_bar or show_counter or show_elapsed):
+        return {}
+    return {
+        "mode": MODE_CARDS,
+        "ambient": True,
+        "label": "All due",
+        "cardsDone": amb.cards_done,
+        "target": amb.target,
+        "unit": amb.unit,
+        "paused": False,
+        "startedAtMs": amb.started_at_ms(),
+        "deadlineMs": 0,
+        "targetMs": 0,
+        "running": True,
+        "showBar": show_bar,
+        "showCounter": show_counter,
+        "showElapsed": show_elapsed,
+        # No accuracy / again / streak outside a Blitz: an ambient bar you never
+        # opted into is the last place to put grading pressure.
+        "showAccuracy": False,
+        "showAgain": False,
+        "showStreak": False,
+        "accuracy": 100,
+        "again": 0,
+        "streak": 0,
+        "streakAnim": False,
+    }
 
 
 def _locked() -> bool:
@@ -851,7 +969,7 @@ class _FocusWatcher(QObject):
         if event.type() == QEvent.Type.ApplicationDeactivate and not _intercepting:
             fcfg = get_section("focus")
             if session.is_running():
-                if focus.keeps_session_on_focus_loss(fcfg):
+                if focus.keeps_session_on_focus_loss(fcfg, session.get_active()):
                     # Focus Lock level 3: don't lose the Blitz — pull Anki back.
                     _reraise_anki()
                 else:
@@ -886,7 +1004,10 @@ _focus_watcher = _FocusWatcher()
 # (level 0–1) leave them alone.
 
 def _hard_locked() -> bool:
-    return _locked() and focus.lock_level(get_section("focus")) >= focus.LOCK_MIN_CARDS
+    # A Blitz started with its own level is judged by that level, not the config.
+    return (_locked()
+            and focus.effective_level(session.get_active(), get_section("focus"))
+            >= focus.LOCK_MIN_CARDS)
 
 
 def _block_escape_window(win, what: str):

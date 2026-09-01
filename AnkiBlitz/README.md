@@ -56,14 +56,26 @@ Menu (**Tools ▸ AnkiBlitz**):
 | Enabled | — | Master on/off for everything. |
 
 Adaptive auto-reveal and progressive reveal also work **outside** a Blitz, on any
-normal review — the Blitz session just adds the progress bar and completion
-screen on top.
+normal review — the Blitz session just adds the target and the completion screen
+on top.
+
+The **progress bar** stays up outside a Blitz too, dimmed and labelled *All due*,
+filling against everything you have due rather than a session target. Its target
+is live rather than fixed at the start — a card that comes back in learning
+pushes it out by one — so it reaches the end exactly when your queue empties,
+never before. It shows nothing but the count and the clock: no accuracy, no
+Again count, no streak. Turn it off under **Settings ▸ Blitz ▸ Show during
+Blitz**.
+
+Starting a Blitz from **Start Blitz…** also lets you pick a **Focus lock** level
+for that one session — commit hard to a session you need to finish, or let
+yourself off for a tired one, without changing your saved default.
 
 ### In the reviewer
 
 | Key | What it does |
 |-----|--------------|
-| reveal key (default `p`) | Show the rest of the question at once, while it's still fading in. |
+| reveal key (default `p`) | Show the rest of the question at once, while it's still fading in. Also stops the card's audio (you've read it — the voice is just noise); turn that off in settings. |
 | pause key (default `p`) | Pause / resume the auto-reveal countdown on the card you're on. |
 
 The two may be **the same key** — that's the default. While words are still

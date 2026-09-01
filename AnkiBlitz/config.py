@@ -206,6 +206,12 @@ DEFAULTS = {
         "time_quick_picks": [10, 15, 25],
         "fraction_quick_picks": [2, 3],  # denominators -> 1/2, 1/3
         "card_source": "current_queue",
+        # The ambient bar: outside a Blitz, keep showing the progress bar with
+        # the whole due pile as its target, so an ordinary review session isn't
+        # a blank screen. Target is live (done + still due), never snapshotted,
+        # so it hits 100% exactly when the queue empties. Uses the three
+        # show_* toggles below; never shows accuracy / again / streak.
+        "show_bar_outside_blitz": True,
         "show_progress_bar": True,
         "show_card_counter": True,
         "show_elapsed_time": True,

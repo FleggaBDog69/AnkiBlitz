@@ -1179,6 +1179,15 @@ class SprintPanel(QWidget):
         self.show_elapsed.setChecked(bool(cfg.get("show_elapsed_time", True)))
         for w in (self.show_bar, self.show_counter, self.show_elapsed):
             dnl.addWidget(w)
+        self.bar_outside = QCheckBox("Keep the bar up outside a Blitz (all due cards)")
+        self.bar_outside.setChecked(bool(cfg.get("show_bar_outside_blitz", True)))
+        dnl.addWidget(self.bar_outside)
+        dnl.addWidget(_hint(
+            "During an ordinary review session the same bar stays up, dimmed, "
+            "filling against everything you have due rather than a Blitz target. "
+            "It counts down live — a card that comes back in learning pushes the "
+            "target out by one — so it reaches the end exactly when your queue "
+            "empties. Accuracy, Again and streak are never shown on it."))
         layout.addWidget(dn)
 
         # --- During Blitz (pressure) ---
@@ -1253,6 +1262,7 @@ class SprintPanel(QWidget):
             "fraction_quick_picks": frac_picks,
             "card_source": self.source.currentData(),
             "show_progress_bar": self.show_bar.isChecked(),
+            "show_bar_outside_blitz": self.bar_outside.isChecked(),
             "show_card_counter": self.show_counter.isChecked(),
             "show_elapsed_time": self.show_elapsed.isChecked(),
             "show_live_accuracy": self.show_acc.isChecked(),

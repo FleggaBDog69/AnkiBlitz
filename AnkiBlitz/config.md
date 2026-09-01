@@ -201,6 +201,12 @@ Focus Score is shown for finished Blitzes.
   (in a normal review, level 3 likewise pulls Anki back). At the hard levels
   (2–3) the Browse, Add and Stats windows are also blocked — they'd otherwise be
   a side door out of the reviewer — and you're pulled back to the cards.
+  This is the **default**, not a fixed setting: the **Start Blitz** dialog has a
+  *Focus lock* picker pre-filled from it, so you can commit hard to one Blitz —
+  or let yourself off for a tired one — without changing your saved level.
+  Choosing there applies to that Blitz only and never writes back to config.
+  Blitzes started without the dialog (Quick Start, *Finish all due*, the widget
+  buttons, Pomodoro work blocks) use the configured level as before.
 - `lock_min_cards` — the number of extra cards a level-2 leave attempt forces.
 - `score_enabled` — compute and show the Focus Score (completion screen + stats).
 - `score_include_accuracy` — count accuracy as one of the score components.
@@ -242,6 +248,18 @@ no record.
   the card target = `ceil(due ÷ n)` computed when the Blitz starts.
 - `card_source` — `current_queue` | `pick_deck`.
 - `show_*` — what to display during a Blitz and on the completion screen.
+- `show_bar_outside_blitz` — keep the progress bar up during an **ordinary
+  review session**, with everything you have due as its target, so plain
+  reviewing isn't a blank screen. It's the same bar wearing a dimmer skin and
+  labelled *All due*. Its target is **live**, not snapshotted at the start: it
+  is always `cards done + cards still due`, so a card that comes back in
+  learning pushes the target out by one rather than letting the bar claim
+  ground it hasn't taken — and the bar reaches the end exactly when your queue
+  empties. It follows `show_progress_bar` / `show_card_counter` /
+  `show_elapsed_time`, and never shows accuracy, Again or streak: a bar you
+  didn't opt into is the last place to put grading pressure. Nothing about it is
+  recorded — it is not a Blitz, there is no Focus Lock on it, and leaving is
+  free.
 - `track_pb_*` — which personal bests to record.
 - `hide_all_accuracy_stats` — master anti-pressure switch; hides every
   accuracy/streak/again figure (including on the end-of-Blitz summary) regardless
