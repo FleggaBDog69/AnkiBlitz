@@ -284,6 +284,15 @@ class SpeedFocusPanel(QWidget):
             "It may be the SAME key as the progressive reveal key (both default "
             "to “p”): while words are still fading in the key reveals them, and "
             "once the question is fully shown the same key pauses the timer."))
+
+        self.more_time_button = QCheckBox("Show a “More time” button on the card")
+        self.more_time_button.setChecked(bool(cfg.get("more_time_button", True)))
+        layout.addWidget(self.more_time_button)
+        layout.addWidget(_hint(
+            "A small button above the countdown that holds the timer — the same "
+            "hold as the pause key, but you can see that it's there. It stays "
+            "faint until you hover it. While the timer is held, the “paused” "
+            "badge is clickable too, so whatever you paused with can resume."))
         layout.addWidget(_hint(
             "The alert plays once this share of the auto-reveal delay has "
             "elapsed — e.g. 60% leaves the final 40% as a heads-up before the "
@@ -396,6 +405,7 @@ class SpeedFocusPanel(QWidget):
             "warning_at_percent": self.warn_pct.value(),
             "pause_key_enabled": self.pause_key_enabled.isChecked(),
             "pause_key": self.pause_key.key_value(),
+            "more_time_button": self.more_time_button.isChecked(),
             "excluded_note_types": self.nt_list.checked(),
             "excluded_decks": self.deck_list.checked(),
             "fixed_time_enabled": self.fixed_enabled.isChecked(),

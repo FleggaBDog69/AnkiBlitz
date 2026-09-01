@@ -105,11 +105,26 @@ def _pause_block(cfg: dict) -> dict:
     It rides on the disabled payloads too: the sticky flag has to reach the JS
     even on a card aSFM isn't timing, or pausing on one card and moving to an
     excluded one would silently drop the hold.
+
+    The key and the "More time" button are gated separately — they apply the
+    same hold, but you may well want the button without knowing a key exists,
+    or the key without a control sitting over your cards.
     """
+    global _auto_paused
+    on = bool(cfg.get("enabled", True))
+    key_on = on and bool(cfg.get("pause_key_enabled", True))
+    button_on = on and bool(cfg.get("more_time_button", True))
+    # A hold with nothing left to release it is a stuck card: if both the key and
+    # the button have been switched off since you paused, drop the hold rather
+    # than showing a badge that names an input you no longer have. Cleared for
+    # good, not just hidden — a pause resurrected by re-enabling the key weeks
+    # later would be its own surprise.
+    if _auto_paused and not (key_on or button_on):
+        _auto_paused = False
     return {
         "pauseKey": str(cfg.get("pause_key") or "p").lower(),
-        "pauseEnabled": bool(cfg.get("enabled", True)
-                             and cfg.get("pause_key_enabled", True)),
+        "pauseEnabled": key_on,
+        "moreTimeButton": button_on,
         "autoPaused": _auto_paused,
     }
 

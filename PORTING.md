@@ -236,6 +236,50 @@ instead of a circle twitching at the corners.
 
 ---
 
+## Cleared 2026-09-01 — 14: the "More time" button
+
+| #  | Change | Core | aSFM | PWR |
+|----|--------|:----:|:----:|:---:|
+| 14 | Visible "More time" button for the auto-reveal hold | n/a | ✅ | n/a |
+
+Built in AnkiBlitz and aSFM together, so nothing is outstanding. Core has no
+auto-reveal timer and PWR has no hold, so neither has anywhere to put it.
+
+Asked for on aSFM's AnkiWeb listing, against Glutanimate's Speed Focus Mode,
+which has one. Reading his source (`1046608507/reviewer.py`) settles what it
+should do: SFM's "More Time!" **stops the automated events for that card** and
+its default hotkey is `p` — which is exactly the pause key we already had. The
+feature that was missing was never the behaviour, only the **affordance**: a
+keypress nobody can discover without reading the settings.
+
+So this adds no second mechanism. `#fs-moretime` / `#asfm-moretime` is a quiet
+pill above the countdown whose click calls the same `toggleAutoPause()`; the
+paused badge becomes clickable in turn, and its wording is now built by
+`resumeHint()` from whichever inputs are actually on.
+
+Three decisions worth keeping:
+
+- **It holds indefinitely; it does not add N seconds.** "Give me a moment" almost
+  never means "give me exactly five more seconds", and an indefinite hold has one
+  obvious way out. It also keeps one hold and one state rather than two.
+- **The key and the button are gated separately** (`speed_focus.more_time_button`;
+  top-level in aSFM) — the button is for people who don't know a key exists, and
+  the key is for people who don't want a control over their cards.
+- **A hold has to keep an input that can release it.** Turning both off while
+  paused would strand the card behind a badge naming a key that no longer works,
+  so the sticky flag is now dropped (permanently, not hidden) when neither is on.
+  aSFM does this in `_pause_block`; AnkiBlitz in `injection._sticky_pause`,
+  because that's where `_auto_paused` lives.
+
+**The AnkiBlitz-only half of the port**: its reveal click handler sits on
+`document` in the **capture** phase, so the button's own `stopPropagation` can't
+stop it — clicking "More time" would have skipped the word reveal on the way
+past. `clickHandler` now bails via a new `isOwnUi(target)`, which walks up
+looking for an `fs-`-prefixed id. aSFM needs none of this: it has no click
+handler of its own.
+
+---
+
 ## The cross-add-on trap (decide before shipping 6)
 
 In the full AnkiBlitz the reveal key and the pause key can be **the same key**

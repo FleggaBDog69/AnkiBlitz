@@ -7,6 +7,10 @@
  * Standalone: it does not depend on any word-reveal add-on. The delay is whatever
  * Python computed; the answer shows when it elapses.
  *
+ * The wait can be held indefinitely — by the pause key, or by the "More time"
+ * button that sits above the countdown while it runs. Both call the same
+ * toggleAutoPause(), so there is one hold and one state, not two.
+ *
  * Injected once per webview; guarded so re-injection keeps one instance.
  */
 (function () {
@@ -61,6 +65,7 @@
         } else {
           if (pending && pending.showCountdown) resumeCountdown(left);
           armAutoTimers(left, pauseWarnLeftMs);
+          showMoreTime();
         }
       } else {
         start();          // the card started paused — begin its wait now
@@ -75,6 +80,7 @@
     if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
     if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
     freezeCountdown();
+    removeMoreTime();     // the paused badge takes its place
     showPausedBadge();
     pycmd("asfm:autopause:1");
   }
@@ -87,17 +93,70 @@
     // that does run a timer.
     if (!pending) return;
     removeCountdown();
+    removeMoreTime();
     if (document.getElementById("asfm-paused")) return;
     var b = document.createElement("div");
     b.id = "asfm-paused";
-    b.textContent = "⏸ Auto-reveal paused · press "
-      + (A._pauseKey || "p").toUpperCase() + " to resume";
+    b.textContent = "⏸ Auto-reveal paused · " + resumeHint();
+    if (A._moreTime) {
+      // Resuming has to be possible with the same input that paused it: a
+      // mouse user who pressed the button and can't press the key would
+      // otherwise be stuck on the card.
+      b.className = "asfm-clickable";
+      b.addEventListener("click", onControlClick, false);
+    }
     document.body.appendChild(b);
   }
 
   function removePausedBadge() {
     var el = document.getElementById("asfm-paused");
     if (el) el.remove();
+  }
+
+  // ----- the "More time" button -----
+  //
+  // The pause key is invisible: you only find it if you read the settings. This
+  // is the same hold with a control you can see, which is what Glutanimate's
+  // Speed Focus Mode offered. It holds indefinitely rather than adding a fixed
+  // number of seconds — "give me a moment" almost never means "give me exactly
+  // five more seconds", and an indefinite hold has one obvious way out.
+
+  function onControlClick(e) {
+    // The click must not also reach the card: with Progressive Word Reveal
+    // installed, a bare click reveals the question.
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    toggleAutoPause();
+  }
+
+  function showMoreTime() {
+    if (!A._moreTime || !pending || autoPaused) return;
+    if (document.getElementById("asfm-moretime")) return;
+    var b = document.createElement("div");
+    b.id = "asfm-moretime";
+    b.textContent = "⏸ More time";
+    b.title = A._pauseEnabled
+      ? "Hold the auto-reveal (or press "
+        + (A._pauseKey || "p").toUpperCase() + ")"
+      : "Hold the auto-reveal";
+    b.addEventListener("click", onControlClick, false);
+    document.body.appendChild(b);
+  }
+
+  function removeMoreTime() {
+    var el = document.getElementById("asfm-moretime");
+    if (el) el.remove();
+  }
+
+  // What the paused badge tells you to do to get going again — only ever
+  // offering something that is actually switched on.
+  function resumeHint() {
+    var key = (A._pauseKey || "p").toUpperCase();
+    if (A._moreTime && A._pauseEnabled) return "click or press " + key + " to resume";
+    if (A._moreTime) return "click to resume";
+    return "press " + key + " to resume";
   }
 
   function countdownFill() {
@@ -158,6 +217,7 @@
     autoDeadline = warnDeadline = 0;
     removeCountdown();
     removePausedBadge();
+    removeMoreTime();
   }
 
   // Start (or restart, after a pause) the reveal + warning timers, remembering
@@ -186,6 +246,9 @@
       fire();
       return;
     }
+    // Only once there is a wait to hold: on a zero-delay card the answer is
+    // already up, and a button offering to pause it would do nothing.
+    showMoreTime();
     // Heads-up alert once warnPercent% of the wait has elapsed.
     var pct = pending.warnPercent || 0;
     var warnMs = (pending.warn && pct > 0 && pct < 100) ? delay * (pct / 100) : 0;
@@ -207,6 +270,7 @@
     payload = payload || {};
     A._pauseKey = (payload.pauseKey || "p").toLowerCase();
     A._pauseEnabled = !!payload.pauseEnabled;
+    A._moreTime = !!payload.moreTimeButton;
     // Python owns the sticky pause, so it survives re-injection of this bundle.
     autoPaused = !!payload.autoPaused;
     if (payload.enabled) {

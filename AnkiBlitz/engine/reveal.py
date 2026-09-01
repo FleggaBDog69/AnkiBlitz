@@ -95,11 +95,17 @@ def question_payload(card) -> dict:
 def _pause_block(sf: dict, suite_on: bool) -> dict:
     """The pause-key half of the autoReveal payload. Deliberately allowed to be
     the same key as word_reveal's reveal key — the JS gives the reveal first
-    claim while words are still fading in, then the key pauses the timer."""
+    claim while words are still fading in, then the key pauses the timer.
+
+    The key and the "More time" button are gated separately: they apply the same
+    hold, but you may well want the button without knowing a key exists, or the
+    key without a control sitting over your cards."""
     return {
         "pauseKey": str(sf.get("pause_key") or "p").lower(),
         "pauseEnabled": bool(suite_on and sf.get("enabled", True)
                              and sf.get("pause_key_enabled", True)),
+        "moreTimeButton": bool(suite_on and sf.get("enabled", True)
+                               and sf.get("more_time_button", True)),
     }
 
 

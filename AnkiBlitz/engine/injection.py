@@ -44,6 +44,24 @@ def auto_reveal_paused() -> bool:
     return _auto_paused
 
 
+def _sticky_pause(payload: dict) -> bool:
+    """The sticky pause flag for this card, dropping a hold that can no longer be
+    released.
+
+    A hold needs an input to lift it: the pause key or the "More time" button. If
+    both have been switched off since you paused, keeping the flag would strand
+    the card behind a badge naming an input you no longer have. Cleared for good
+    rather than hidden — a pause resurrected by re-enabling the key weeks later
+    would be its own surprise.
+    """
+    global _auto_paused
+    if _auto_paused:
+        ar = payload.get("autoReveal") or {}
+        if not (ar.get("pauseEnabled") or ar.get("moreTimeButton")):
+            _auto_paused = False
+    return _auto_paused
+
+
 def _play_alert() -> None:
     path = _USER_ALERT if os.path.exists(_USER_ALERT) else _DEFAULT_ALERT
     try:
@@ -104,7 +122,7 @@ def _on_show_question(*args, **kwargs) -> None:
     if not card:
         return
     payload = reveal.question_payload(card)
-    payload["autoPaused"] = _auto_paused
+    payload["autoPaused"] = _sticky_pause(payload)
     # Paused launch: hold the auto-reveal and the session clock until the user
     # engages (the JS arms a one-shot click/key listener; see focus:engaged).
     s = session.get_active()
@@ -123,7 +141,7 @@ def _on_show_answer(*args, **kwargs) -> None:
     if s is not None:
         s.start_clock()
     payload = reveal.answer_payload(card)
-    payload["autoPaused"] = _auto_paused
+    payload["autoPaused"] = _sticky_pause(payload)
     _eval(f"window.FocusSuite && FocusSuite.onCard({json.dumps(payload)});")
     push_progress()
 

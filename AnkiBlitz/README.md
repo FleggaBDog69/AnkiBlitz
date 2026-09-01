@@ -77,8 +77,9 @@ yourself off for a tired one, without changing your saved default.
 |-----|--------------|
 | reveal key (default `p`) | Show the rest of the question at once, while it's still fading in. Also stops the card's audio (you've read it — the voice is just noise); turn that off in settings. |
 | pause key (default `p`) | Pause / resume the auto-reveal countdown on the card you're on. |
+| **More time** button | The same hold, as a control you can see: it sits above the countdown, faint until hovered. Click it and the timer stops; click it (or the *paused* badge) again to carry on. Turn it off in settings. |
 
-The two may be **the same key** — that's the default. While words are still
+The two keys may be **the same key** — that's the default. While words are still
 fading in the key reveals them; once the question is fully shown, the same key
 pauses the timer (and the next press starts it again where it stopped). A paused
 timer is labelled on screen and stays paused across cards until you release it.

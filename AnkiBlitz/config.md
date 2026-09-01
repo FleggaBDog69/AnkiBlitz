@@ -37,6 +37,12 @@ clamped to `[min_delay_seconds, max_delay_seconds]`.
   It may be the *same* key as `word_reveal.reveal_key` (both default to `p`):
   while words are still fading in the key reveals them, and once the question is
   fully shown the same key pauses the timer.
+- `more_time_button` — show a small **More time** button above the countdown.
+  It's the same hold as the pause key, but visible: click it and the timer stops
+  until you click (or press the key) again. Faint until you hover it, and gated
+  separately from the key, so you can have either, both or neither. While the
+  timer is held the *paused* badge is clickable too — whatever you paused with
+  can start you again.
 - `excluded_note_types` / `excluded_decks` — skip the auto-reveal timer for these
   (a parent deck also covers its subdecks); those cards review normally.
 - `fixed_time_enabled` — turn the picture-card mode on/off.

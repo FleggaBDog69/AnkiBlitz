@@ -17,6 +17,7 @@
     "warning_at_percent": 75,
     "pause_key_enabled": true,
     "pause_key": "p",
+    "more_time_button": true,
     "excluded_note_types": [],
     "excluded_decks": [],
     "fixed_time_enabled": true,

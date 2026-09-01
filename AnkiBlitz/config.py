@@ -46,6 +46,10 @@ DEFAULTS = {
         # reveal the same key pauses/resumes the timer.
         "pause_key_enabled": True,
         "pause_key": "p",
+        # The visible "More time" button — the same hold the pause key applies,
+        # but discoverable without knowing the key exists. Glutanimate's Speed
+        # Focus Mode had one; this is the equivalent.
+        "more_time_button": True,
         "excluded_note_types": [],    # skip the auto-reveal timer for these note types
         "excluded_decks": [],         # skip the auto-reveal timer for these decks
         # Picture / visual cards: ignore word count and familiarity; give a SET

@@ -18,9 +18,11 @@ Focus Mode*, extracted from the **AnkiBlitz** suite so you can use just this pie
 - Treats new and learning/relearning cards as needing more time (tunable).
 - Nudges the delay by the card's **FSRS difficulty** (harder = longer), bounded.
 - Optional thin **countdown bar** and a **warning sound** before the reveal.
-- A **pause key** (default `p`) that freezes the countdown on the card you're on
-  and picks it up where it stopped. The hold sticks across cards, and every card
-  it applies to says so on screen.
+- A **“More time” button** on the card, and a **pause key** (default `p`) — both
+  freeze the countdown on the card you're on and pick it up where it stopped. The
+  hold sticks across cards, and every card it applies to says so on screen. The
+  button stays faint until you hover it; the “paused” badge is clickable to
+  resume, so whatever you paused with can start you again.
 - **Picture-card mode:** chosen note types / decks use a set time instead of a
   word count (there's nothing to read).
 
@@ -51,9 +53,9 @@ the delay the same way.
 
 - **Glutanimate's _Speed Focus Mode_** — Copyright (C) 2017-2021 Aristotelis P.
   (Glutanimate), <https://glutanimate.com/> — the original auto-reveal-timer idea
-  that aSFM reworks. aSFM deliberately differs: it **never grades**, computes the
-  delay from question length **and FSRS difficulty**, and times new vs learning
-  cards separately.
+  that aSFM reworks, and the source of the **More time** button. aSFM
+  deliberately differs: it **never grades**, computes the delay from question
+  length **and FSRS difficulty**, and times new vs learning cards separately.
 - **The AnKing team** — their note types and `{{tts}}` conventions drove the
   visible-word-count handling (hidden tag chips and hint/Extra chrome don't
   inflate the timer) and the set-time picture-card mode.

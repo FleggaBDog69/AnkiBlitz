@@ -135,3 +135,41 @@
   border-bottom-right-radius: 3px;
   transition: width 0.3s ease;
 }
+
+/* "More time" button: the pause key made visible. Sits in the same slot as the
+   paused badge — pressing this is what swaps one for the other, so they are
+   never both on screen and the card never has to make room for two.
+
+   Deliberately quiet. It is up for the whole wait on every card, so it has to be
+   findable without being something you keep noticing; it comes to full strength
+   on hover, when you're already looking for it. */
+#fs-moretime {
+  position: fixed;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 99998;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--ab-button-bg, rgba(120, 120, 120, 0.22));
+  color: inherit;
+  opacity: 0.55;
+  font-family: var(--ab-font, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.15s ease;
+}
+#fs-moretime:hover {
+  opacity: 1;
+}
+
+/* The paused badge is clickable whenever the button is on, so whatever paused
+   the timer can also resume it. Without the button it stays inert (the base
+   rule sets pointer-events: none). */
+#fs-paused.fs-clickable {
+  pointer-events: auto;
+  cursor: pointer;
+}

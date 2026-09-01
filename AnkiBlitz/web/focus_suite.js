@@ -4,7 +4,9 @@
  * owns all DOM + timing. Three jobs:
  *   1. Progressive reveal: fade the card's words in at a fixed reading rate.
  *   2. Adaptive auto-reveal: after the reveal finishes, wait delayMs (computed
- *      in Python) then ask Python to show the answer. NEVER grades.
+ *      in Python) then ask Python to show the answer. NEVER grades. The wait can
+ *      be held indefinitely by the pause key or the visible "More time" button;
+ *      both call one toggleAutoPause(), so there is one hold and one state.
  *   3. Blitz progress bar bound to the session counter.
  *
  * Injected once per webview; guarded so re-injection keeps one instance.
@@ -40,6 +42,15 @@
 
   function getRoot() {
     return document.getElementById("qa") || document.body;
+  }
+
+  // Is this node part of AnkiBlitz's own reviewer UI (progress strip, countdown,
+  // paused badge, More time button)? Everything we add is id'd "fs-*".
+  function isOwnUi(node) {
+    for (var el = node; el; el = el.parentElement) {
+      if (el.id && el.id.indexOf("fs-") === 0) return true;
+    }
+    return false;
   }
 
   function isSkippable(node) {
@@ -201,7 +212,13 @@
 
     // Escape hatch: a click shows everything at once. (The reveal KEY is handled
     // by the shared key listener, which shares it with the pause key.)
-    clickHandler = function () { revealAllWords(); };
+    clickHandler = function (e) {
+      // Our own on-card controls are not the card: clicking "More time" must
+      // not also skip the reveal on its way past. This listener is on document
+      // in the capture phase, so the button's own stopPropagation can't help.
+      if (e && isOwnUi(e.target)) return;
+      revealAllWords();
+    };
     document.addEventListener("click", clickHandler, true);
   }
 
@@ -296,6 +313,9 @@
       fireReveal();
       return;
     }
+    // Only once there is a wait to hold: on a zero-delay card the answer is
+    // already up, and a button offering to pause it would do nothing.
+    showMoreTime();
     // Heads-up alert once warnPercent% of the wait has elapsed.
     var pct = pendingAuto.warnPercent || 0;
     var warnMs = (pendingAuto.warn && pct > 0 && pct < 100) ? effective * (pct / 100) : 0;
@@ -316,6 +336,7 @@
         } else {
           if (pendingAuto && pendingAuto.showCountdown) resumeCountdown(left);
           armAutoTimers(left, pauseWarnLeftMs);
+          showMoreTime();
         }
       } else {
         maybeStartAuto();   // the card started paused — begin its wait now
@@ -330,6 +351,7 @@
     if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
     if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
     freezeCountdown();
+    removeMoreTime();     // the paused badge takes its place
     showPausedBadge();
     pycmd("focus:autopause:1");
   }
@@ -342,17 +364,70 @@
     // card that does run a timer.
     if (!pendingAuto) return;
     removeCountdown();
+    removeMoreTime();
     if (document.getElementById("fs-paused")) return;
     var b = document.createElement("div");
     b.id = "fs-paused";
-    b.textContent = "⏸ Speed Focus paused · press "
-      + (FS._pauseKey || "p").toUpperCase() + " to resume";
+    b.textContent = "⏸ Speed Focus paused · " + resumeHint();
+    if (FS._moreTime) {
+      // Resuming has to be possible with the same input that paused it: a mouse
+      // user who pressed the button and can't press the key would otherwise be
+      // stuck on the card.
+      b.className = "fs-clickable";
+      b.addEventListener("click", onControlClick, false);
+    }
     document.body.appendChild(b);
   }
 
   function removePausedBadge() {
     var el = document.getElementById("fs-paused");
     if (el) el.remove();
+  }
+
+  // ----- the "More time" button -----
+  //
+  // The pause key is invisible: you only find it if you read the settings. This
+  // is the same hold with a control you can see, which is what Glutanimate's
+  // Speed Focus Mode offered. It holds indefinitely rather than adding a fixed
+  // number of seconds — "give me a moment" almost never means "give me exactly
+  // five more seconds", and an indefinite hold has one obvious way out.
+
+  function onControlClick(e) {
+    // The click must not also reach the card: while words are still fading in,
+    // a bare click reveals the question.
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    toggleAutoPause();
+  }
+
+  function showMoreTime() {
+    if (!FS._moreTime || !pendingAuto || autoPaused) return;
+    if (document.getElementById("fs-moretime")) return;
+    var b = document.createElement("div");
+    b.id = "fs-moretime";
+    b.textContent = "⏸ More time";
+    b.title = FS._pauseEnabled
+      ? "Hold the auto-reveal (or press "
+        + (FS._pauseKey || "p").toUpperCase() + ")"
+      : "Hold the auto-reveal";
+    b.addEventListener("click", onControlClick, false);
+    document.body.appendChild(b);
+  }
+
+  function removeMoreTime() {
+    var el = document.getElementById("fs-moretime");
+    if (el) el.remove();
+  }
+
+  // What the paused badge tells you to do to get going again — only ever
+  // offering something that is actually switched on.
+  function resumeHint() {
+    var key = (FS._pauseKey || "p").toUpperCase();
+    if (FS._moreTime && FS._pauseEnabled) return "click or press " + key + " to resume";
+    if (FS._moreTime) return "click to resume";
+    return "press " + key + " to resume";
   }
 
   function countdownFill() {
@@ -415,6 +490,7 @@
     removeListeners();
     removeCountdown();
     removePausedBadge();
+    removeMoreTime();
   }
 
   // Public: stop the auto-reveal / warning for the current card without showing
@@ -444,6 +520,7 @@
     FS._stopAudioOnReveal = !!(payload.reveal && payload.reveal.stopAudio);
     FS._pauseKey = (payload.autoReveal && payload.autoReveal.pauseKey) || "p";
     FS._pauseEnabled = !!(payload.autoReveal && payload.autoReveal.pauseEnabled);
+    FS._moreTime = !!(payload.autoReveal && payload.autoReveal.moreTimeButton);
     // Python owns the sticky pause, so it survives re-injection of this bundle.
     autoPaused = !!payload.autoPaused;
 

@@ -27,7 +27,11 @@ DEFAULTS = {
     "warning_sound": True,        # play an alert before the answer auto-shows
     "warning_at_percent": 75,     # warn once this % of the delay has elapsed
     "pause_key_enabled": True,    # a key that holds/releases the auto-reveal timer
-    "pause_key": "p",             # which key that is
+    "pause_key": "p",
+    # The visible "More time" button — the same hold the pause key applies, but
+    # discoverable without knowing the key exists. Glutanimate's Speed Focus Mode
+    # had one; this is the equivalent.
+    "more_time_button": True,             # which key that is
     "excluded_note_types": [],    # skip the auto-reveal timer for these note types
     "excluded_decks": [],         # skip the auto-reveal timer for these decks
     # Picture / visual cards: ignore word count and familiarity; give a SET reveal
