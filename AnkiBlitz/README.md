@@ -244,7 +244,8 @@ AnkiBlitz only *syncs to* the TTS that Anki / AnKing already produce.
 ### References
 - **[LICENSE](LICENSE)** — the full GNU AGPLv3 text.
 - **[config.md](config.md)** — every setting, per config section.
-- **[AnkiWeb_description.txt](AnkiWeb_description.txt)** — paste-ready listing copy.
+- **[AnkiWeb_description.md](AnkiWeb_description.md)** — paste-ready listing copy;
+  the AnkiWeb description box renders Markdown.
 
 ## Licence
 

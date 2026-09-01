@@ -315,11 +315,13 @@ Option 1 unless you want to spend time on it.
    stats, music profile) out of the package. A file that isn't committed doesn't
    ship.
 5. Bump `version` **and `human_version`** in each add-on's manifest, and update
-   its `README.md` and `AnkiWeb_description.txt`. Anki displays
+   its `README.md` and `AnkiWeb_description.md`. Anki displays
    `human_version`; it never reads `version`, so bumping only that one changes
    nothing anybody can see.
 6. Upload each `dist/*.ankiaddon` to its AnkiWeb listing and paste the matching
-   `AnkiWeb_description.txt`:
+   `AnkiWeb_description.md`. The description box takes **Markdown** (it says
+   so under the field) — paste the file as-is, headings and all; don't
+   convert it to HTML first:
 
    | Add-on | Code |
    |--------|------|
