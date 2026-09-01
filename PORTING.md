@@ -306,5 +306,24 @@ Option 1 unless you want to spend time on it.
 1. Port the above.
 2. `python3 -m py_compile` every changed `.py`; `node --check` every changed
    `.js`; `json.load` every `config.json`.
-3. Rebuild `dist/*.ankiaddon`.
-4. Bump the version in each add-on's manifest and update its `README.md`.
+3. Check the four `config.json` files still match their `config.py` DEFAULTS,
+   key for key — a key in one and not the other is a setting that silently
+   can't be saved.
+4. Rebuild with **`python3 build.py`**. Don't zip the folders by hand: it takes
+   its file list from `git ls-files`, which is what keeps `meta.json` (the
+   builder's own live config) and `user_files/` (real user data — break journal,
+   stats, music profile) out of the package. A file that isn't committed doesn't
+   ship.
+5. Bump `version` **and `human_version`** in each add-on's manifest, and update
+   its `README.md` and `AnkiWeb_description.txt`. Anki displays
+   `human_version`; it never reads `version`, so bumping only that one changes
+   nothing anybody can see.
+6. Upload each `dist/*.ankiaddon` to its AnkiWeb listing and paste the matching
+   `AnkiWeb_description.txt`:
+
+   | Add-on | Code |
+   |--------|------|
+   | AnkiBlitz | `178722601` |
+   | AnkiBlitz Core | `1174429600` |
+   | Adaptive Speed Focus (aSFM) | `1148593203` |
+   | Progressive Word Reveal | `972193513` |
