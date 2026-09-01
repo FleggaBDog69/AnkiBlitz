@@ -75,9 +75,21 @@ block ends the whole run; you can leave Anki freely *during* a break.
   reads "Resume · 2/3 blocks done". A run that used up all its blocks is done and
   is never offered.
 - `break_show_timeline` / `break_show_journal` / `break_show_focus_rating` /
-  `break_show_tips` / `break_show_browser` / `break_show_add_kg` /
-  `break_allow_extend` — toggle each break-screen element so the screen stays as
-  calm or as full-featured as you like.
+  `break_show_tips` / `break_show_breathing` / `break_show_browser` /
+  `break_show_add_kg` / `break_allow_extend` — toggle each break-screen element
+  so the screen stays as calm or as full-featured as you like.
+- `break_show_breathing` — a **guided breathing pacer** under the micro-break
+  tip: a circle that expands and contracts with the phase named and counted
+  underneath, so there's something to actually follow while you rest. It sits
+  collapsed as a *🫁 Breathe* button and only animates once you press it, so the
+  break screen looks exactly as it did until you want it.
+- `break_breathing_pattern` — which rhythm the pacer opens on. You can switch it
+  on the break screen itself (for that break only); this is the default.
+  - `box` — Box, 4-4-4-4. Even square breathing; steadies without sedating.
+  - `44` — Simple, 4-4. Nothing to hold, nothing to count wrong.
+  - `coherent` — Coherent, 5-5. Six breaths a minute, the classic slow pace.
+  - `478` — Calming, 4-7-8. Long exhale; it *will* make you drowsy, so it suits
+    a long break rather than a five-minute one.
 - `break_allow_step_away` — the **Step away** button, and `Esc`, hide the break
   screen instead of ending the run: the countdown keeps going, the modal block
   lifts, and the screen returns by itself when Anki is next the active app. Only
@@ -135,6 +147,12 @@ Focus Score is shown for finished Blitzes.
   (in a normal review, level 3 likewise pulls Anki back). At the hard levels
   (2–3) the Browse, Add and Stats windows are also blocked — they'd otherwise be
   a side door out of the reviewer — and you're pulled back to the cards.
+  This is the **default**, not a fixed setting: the **Start Blitz** dialog has a
+  *Focus lock* picker pre-filled from it, so you can commit hard to one Blitz —
+  or let yourself off for a tired one — without changing your saved level.
+  Choosing there applies to that Blitz only and never writes back to config.
+  Blitzes started without the dialog (Quick Start, *Finish all due*, the widget
+  buttons, Pomodoro work blocks) use the configured level as before.
 - `lock_min_cards` — the number of extra cards a level-2 leave attempt forces.
 - `score_enabled` — compute and show the Focus Score (completion screen + stats).
 - `score_include_accuracy` — count accuracy as one of the score components.
@@ -175,6 +193,16 @@ no record.
 - `fraction_quick_picks` — denominators for fraction-of-due (e.g. `[2, 3]` → ½, ⅓);
   the card target = `ceil(due ÷ n)` computed when the Blitz starts.
 - `card_source` — `current_queue` | `pick_deck`.
+- `show_bar_outside_blitz` — keep the progress bar up during an **ordinary
+  review session**, with everything you have due as its target, so plain
+  reviewing isn't a blank screen. It's the same bar wearing a dimmer skin and
+  labelled *All due*. Its target is **live**, not snapshotted at the start: it
+  is always `cards done + cards still due`, so a card that comes back in
+  learning pushes the target out by one rather than letting the bar claim
+  progress it hasn't made, and the bar fills exactly as your queue empties. It
+  follows `show_progress_bar` / `show_card_counter` / `show_elapsed_time` and
+  **never** shows accuracy, Again or streak — a bar you didn't opt into is the
+  worst place to put grading pressure.
 - `show_*` — what to display during a Blitz and on the completion screen.
 - `track_pb_*` — which personal bests to record.
 - `hide_all_accuracy_stats` — master anti-pressure switch; hides every

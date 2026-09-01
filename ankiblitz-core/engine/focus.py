@@ -5,6 +5,9 @@ Two independent pieces, both keyed off the ``focus`` config section:
   - **Focus Lock** — how hard it is to leave (0 none → 3 finish). Governs a
     running Blitz always, and ordinary review sessions when ``apply_to_reviews``
     is on. The leave decision lives in ``leave_decision``; sprint.py acts on it.
+    A single Blitz may carry its own level (picked in the Start dialog) in
+    ``lock_level_override``; ``effective_level`` prefers it over the config, so
+    choosing a level for one Blitz never rewrites the saved default.
   - **Focus Score** — a 0–100 blend of completion, speed, engagement (idle), and
     optionally accuracy, computed by ``compute_score`` (Blitz sessions only).
 
@@ -47,6 +50,24 @@ def lock_level(cfg: dict) -> int:
         return LOCK_NONE
 
 
+def effective_level(s, cfg: dict) -> int:
+    """The lock level in force for ``s`` — its per-session override if it has
+    one, otherwise the configured level. ``s`` may be None (falls back to cfg).
+
+    The override still respects the Focus master switch: with Focus off, nothing
+    locks, whatever a session was started with.
+    """
+    if not cfg.get("enabled", True):
+        return LOCK_NONE
+    override = getattr(s, "lock_level_override", None)
+    if override is None:
+        return lock_level(cfg)
+    try:
+        return max(0, min(3, int(override)))
+    except (TypeError, ValueError):
+        return lock_level(cfg)
+
+
 def applies_to_reviews(cfg: dict) -> bool:
     """Whether Focus Lock also governs ordinary (non-Blitz) review sessions."""
     return bool(cfg.get("enabled", True)) and bool(cfg.get("apply_to_reviews", True))
@@ -63,7 +84,7 @@ def leave_decision(s, cfg: dict):
       - ``("confirm", "")``    — ask before leaving.
       - ``("block", msg)``     — refuse: bounce back to review, show ``msg``.
     """
-    level = lock_level(cfg)
+    level = effective_level(s, cfg)
     if level == LOCK_CONFIRM:
         return ("confirm", "")
     if level == LOCK_MIN_CARDS:
@@ -83,10 +104,10 @@ def leave_decision(s, cfg: dict):
     return ("free", "")
 
 
-def keeps_session_on_focus_loss(cfg: dict) -> bool:
+def keeps_session_on_focus_loss(cfg: dict, s=None) -> bool:
     """Level 3 keeps the session alive (and re-raises Anki) when focus is lost to
     another app; lower levels let the focus-loss cancel stand."""
-    return lock_level(cfg) == LOCK_FINISH
+    return effective_level(s, cfg) == LOCK_FINISH
 
 
 def compute_score(s, cfg: dict) -> dict:

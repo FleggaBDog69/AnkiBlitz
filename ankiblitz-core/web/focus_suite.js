@@ -50,6 +50,10 @@
   // Card/fraction modes fill the bar by cardsDone/target; time mode fills by
   // elapsed/deadline and, when the deadline passes, tells Python once via
   // focus:timeup. A single ticker keeps the clock and the time-mode bar live.
+  //
+  // The same renderer draws the ambient bar for an ordinary review session
+  // (payload.ambient): it arrives as a cards-mode payload whose target is the
+  // whole due pile, wears the dimmer .fs-ambient skin, and carries a label.
 
   var progressState = null;
   var progressTimer = null;
@@ -73,6 +77,9 @@
       bar.id = "fs-progress";
       document.body.appendChild(bar);
     }
+    // The ambient (no-Blitz) bar wears a dimmer skin so it reads as background
+    // information rather than a session you committed to.
+    bar.className = p.ambient ? "fs-ambient" : "";
     var now = Date.now();
     var isTime = p.mode === "time";
     // The countdown only runs once Python says so (first card flipped); until
@@ -93,6 +100,9 @@
     }
 
     var rowParts = "";
+    if (p.ambient && p.label) {
+      rowParts += '<span class="fs-label">' + p.label + "</span>";
+    }
     if (p.showCounter) {
       var counter = isTime
         ? p.cardsDone + " " + unit

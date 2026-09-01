@@ -127,6 +127,115 @@ bail on `ctrl/meta/alt`, and bail when `e.target` is an `INPUT` / `TEXTAREA` /
 
 ---
 
+## Cleared 2026-08-04 — 10: stop card audio on an early reveal
+
+| # | Change | Core | aSFM | PWR |
+|---|--------|:----:|:----:|:---:|
+| 10 | Reveal-all also stops the card's audio | n/a | n/a | ✅ |
+
+Ported to PWR **the same day it was built**, so nothing is outstanding.
+
+Skipping the reveal (key or click) now calls `stopCardAudio()`, which pauses any
+`<audio>`/`<video>` in the card and pycmds Python to
+`av_player.stop_and_clear_queue()`. Anki's own `[sound:]` / `{{tts}}` playback
+lives in **mpv**, so JS can't touch it — it has to be a bridge call. New config
+key `word_reveal.stop_audio_on_reveal` (PWR: top-level `stop_audio_on_reveal`),
+default on, with a checkbox under the reveal-speed row.
+
+Two decisions worth keeping:
+
+- It **stops**, it doesn't pause. `av_player.toggle_pause()` exists, but mpv's
+  pause is a persistent property — pause it and every later file loads paused
+  too, so a missed un-pause leaves cards silently mute. Stopping has no state to
+  get stuck in, and there's nothing to resume to anyway (you skipped ahead
+  because you'd already read it).
+- `stop_and_clear_queue()`, not just stop: a card with several audio tags would
+  otherwise start the next one the moment the current one is cut.
+
+PWR had **no JS→Python bridge at all** before this (its header said so). It now
+registers `webview_did_receive_js_message` with the **`pwr:`** prefix — note the
+prefix differs per add-on (`focus:` / `asfm:` / `pwr:`).
+
+---
+
+## Cleared 2026-09-01 — 11–13
+
+| #  | Change | Core | aSFM | PWR |
+|----|--------|:----:|:----:|:---:|
+| 11 | Ambient progress bar outside a Blitz | ✅ | n/a | n/a |
+| 12 | Focus-lock picker in the Start Blitz dialog | ✅ | n/a | n/a |
+| 13 | Guided breathing pacer on the break screen | ✅ | n/a | n/a |
+
+**Correction to the recipe, found doing the port.** `engine/focus.py`,
+`engine/session.py` and — contrary to what you'd expect — `engine/sprint.py`
+were all **byte-identical to AnkiBlitz apart from items 11–12**, so all three
+were copied wholesale. sprint.py in particular carries nothing reveal-specific;
+the assumption that it needed hand-merging was wrong. `engine/pomodoro.py` still
+does need hand-porting (the theme bridge is threaded through it), and so does
+`engine/breathing.py` — its one `theme_bridge.color("blue", "#3b82f6")` call
+collapses to the literal. **Re-check all of this before trusting it next time:
+it was true on 2026-09-01 and these files drift.**
+
+Hand-merged, not copied: `engine/injection.py` (the `push_progress` ambient
+fallback + `"ambient": False` — Core already imports `get_section` at module
+level, so AnkiBlitz's local re-import isn't needed), `web/focus_suite.css` and
+`web/focus_suite.js` (Core's are trimmed and use literal colours, not the
+`var(--ab-*)` bridge vars — the ambient `.fs-bar` becomes a plain
+`rgba(255,255,255,0.45)`), `config.py` / `config.json`, `settings.py`,
+`config.md`, `README.md` and the `engine/__init__.py` module map.
+
+Core's `focus.keeps_session_on_focus_loss` picked up the optional `s` argument
+with the file copy, so the two call sites in its `sprint.py` are now correct too.
+
+All three were Core-relevant only — aSFM and PWR have no session, no Focus Lock
+and no Pomodoro. What each one touches, and why:
+
+**11 — ambient bar.** With no Blitz running, an ordinary review session now gets
+the same top strip, dimmed (`.fs-ambient`), labelled *All due*, filling against
+the whole due pile. Touches: `session.py` (new `AmbientSession` + `_ambient` and
+its three module functions), `sprint.py` (`_maybe_arm_ambient` /
+`_ambient_wanted` / `ambient_payload`, plus the arm-on-enter, count-on-answer and
+clear-on-leave hooks), `injection.py` (`push_progress` falls through to it),
+`focus_suite.js` (the `p.ambient` class + `fs-label` span), `focus_suite.css`,
+and the config key `sprint.show_bar_outside_blitz`.
+
+The one decision worth keeping: the target is **live, not snapshotted** —
+`cards_done + still_due`, recomputed on every push. A snapshot looks right until
+a learning card requeues, at which point the bar is claiming ground it hasn't
+taken; the live target instead pushes out by one and reaches 100% exactly when
+the queue empties. That's the same "the bar must not lie" rule `count_mode`
+already follows. It also deliberately shows **no** accuracy / Again / streak
+regardless of the `sprint` toggles: a bar you never opted into is the worst place
+to put grading pressure.
+
+**12 — per-Blitz focus lock.** The Start dialog has a *Focus lock* combo
+pre-filled from `focus.lock_level`. The choice rides on the session
+(`BlitzSession.lock_level_override`) and is **never written back to config** —
+`focus.effective_level(s, cfg)` is the new single resolver, and
+`leave_decision` / `keeps_session_on_focus_loss` / `sprint._hard_locked` all go
+through it. `keeps_session_on_focus_loss(cfg, s=None)` gained an optional second
+arg and stays back-compatible with a cfg-only call. The override still bows to
+`focus.enabled`. Blitzes started without the dialog (Quick Start, *Finish all
+due*, widget buttons, Pomodoro blocks) pass `lock_level=None` and behave exactly
+as before.
+
+**13 — breathing pacer.** New self-contained `engine/breathing.py`:
+`BreathingPacer` (a `QWidget` with a `paintEvent` and a ~30fps timer — no QML, no
+web view, no assets) and `BreathingPanel` (the collapsed *🫁 Breathe* button that
+expands into it). `pomodoro.py` embeds the panel under the micro-break tip and
+stops it on `finished`. Config: `pomodoro.break_show_breathing` (in the existing
+`_break_toggles` list, so settings load/save came free) and
+`break_breathing_pattern`.
+
+Notes for the port: the module imports `theme_bridge` for its accent colour, so
+Core needs that one call collapsed to its fallback literal (`#3b82f6`) the same
+way `pomodoro.py` was. `_tick` uses `while`, not `if`, to drain a stalled event
+loop that hands it a jump longer than a whole phase; holds are drawn at the size
+the preceding phase ended on, which is what makes box breathing read as a square
+instead of a circle twitching at the corners.
+
+---
+
 ## The cross-add-on trap (decide before shipping 6)
 
 In the full AnkiBlitz the reveal key and the pause key can be **the same key**

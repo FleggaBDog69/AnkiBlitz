@@ -5,6 +5,10 @@ bundle into the reviewer webview. Python then pushes the per-card payload — on
 the paused-launch flag — with ``FocusSuite.onCard(...)`` and drives the Blitz
 progress bar with ``setProgress``. All DOM, timing and animation live in the JS.
 
+``push_progress`` falls through to ``sprint.ambient_payload()`` when no Blitz is
+running, so an ordinary review session still gets a (dimmed) bar filling against
+the whole due pile.
+
 This is the Core build: it has no auto-reveal timer and no progressive reveal
 (those ship as the separate aSFM and Progressive Word Reveal add-ons), so the JS
 owns just the progress bar and the paused-launch engagement hold.
@@ -111,7 +115,14 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
 def push_progress() -> None:
     s = session.get_active()
     if s is None:
-        clear_progress()
+        # No Blitz — fall back to the ambient "whole due pile" bar, if one is
+        # armed for this ordinary review session.
+        from . import sprint  # lazy: sprint imports injection at module load
+        ambient = sprint.ambient_payload()
+        if ambient:
+            _eval(f"window.FocusSuite && FocusSuite.setProgress({json.dumps(ambient)});")
+        else:
+            clear_progress()
         return
     cfg = get_section("sprint")
     # The anti-pressure master switch hides every accuracy / streak / again figure.
@@ -139,6 +150,7 @@ def push_progress() -> None:
         "showStreak": bool(cfg.get("show_streak_counter", False)) and not hide_acc,
         "streak": s.current_streak,
         "streakAnim": bool(cfg.get("streak_animations", False)),
+        "ambient": False,
     }
     _eval(f"window.FocusSuite && FocusSuite.setProgress({json.dumps(payload)});")
 

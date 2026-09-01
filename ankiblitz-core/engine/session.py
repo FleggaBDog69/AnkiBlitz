@@ -22,6 +22,11 @@ back within the session. ``count_mode`` decides what the bar counts:
   - ``answers`` — every grade press (re-reviews included).
 The progress bar is always labelled with the matching unit so the number on
 screen can never be misread.
+
+Alongside the Blitz there is an ``AmbientSession`` (``_ambient``): the tracker
+for an ordinary review session with no Blitz running, so the bar can still show
+how far through the due pile you are. It records nothing and completes nothing —
+see the class docstring.
 """
 
 import time
@@ -37,7 +42,7 @@ class BlitzSession:
                  count_mode: str = "unique", deck_id: Optional[int] = None,
                  label: str = "", is_quick_start: bool = False,
                  is_pomodoro: bool = False, idle_threshold: float = 60.0,
-                 paused: bool = False):
+                 paused: bool = False, lock_level: Optional[int] = None):
         self.mode = mode
         self.target_cards = int(target_cards)        # cards / fraction modes
         self.target_seconds = float(target_seconds)  # time mode
@@ -76,6 +81,11 @@ class BlitzSession:
         # confirm/keep-going. None means no leave attempt is pending.
         self.leave_target: Optional[int] = None
         self.finish_msg = "Finish the Blitz before you can leave."
+        # Focus Lock level chosen for THIS Blitz in the Start dialog. None means
+        # "use the configured level"; focus.effective_level reads it. Never
+        # written back to config — one Blitz's choice is not a new default.
+        self.lock_level_override: Optional[int] = (
+            None if lock_level is None else max(0, min(3, int(lock_level))))
 
     # ----- counting -----
 
@@ -197,9 +207,60 @@ class BlitzSession:
         return self.target_cards > 0 and self.cards_done >= self.target_cards
 
 
+class AmbientSession:
+    """The whole-pile tracker for an ordinary review session — no Blitz running.
+
+    This is deliberately NOT a Blitz: nothing is recorded, nothing completes,
+    no Focus Lock hangs off it, and it never reaches stats. It exists so that
+    just working through your dues still gets an honest progress bar instead of
+    a blank screen.
+
+    The target is live rather than snapshotted: ``cards_done + remaining_due``,
+    with ``remaining_due`` refreshed from the scheduler on every push. A
+    learning card that Again-requeues therefore pushes the target out by one
+    instead of letting the bar claim progress it hasn't made — the same "the bar
+    must not lie" rule the Blitz bar follows. The bar reaches 100% exactly when
+    the queue empties.
+    """
+
+    def __init__(self, count_mode: str = "unique"):
+        self.count_mode = count_mode if count_mode in ("unique", "answers") else "unique"
+        self.started_at = time.time()
+        self.answers = 0
+        self.remaining_due = 0
+        self._seen_ids: Set[int] = set()
+
+    def record_answer(self, card_id) -> None:
+        self.answers += 1
+        if card_id is not None:
+            self._seen_ids.add(int(card_id))
+
+    def set_remaining(self, n: int) -> None:
+        self.remaining_due = max(0, int(n))
+
+    @property
+    def cards_done(self) -> int:
+        return len(self._seen_ids) if self.count_mode == "unique" else self.answers
+
+    @property
+    def target(self) -> int:
+        return self.cards_done + self.remaining_due
+
+    @property
+    def unit(self) -> str:
+        return "cards" if self.count_mode == "unique" else "answers"
+
+    def elapsed_seconds(self) -> float:
+        return time.time() - self.started_at
+
+    def started_at_ms(self) -> int:
+        return int(self.started_at * 1000)
+
+
 # ----- Module-level single source of truth -----
 
 _active: Optional[BlitzSession] = None
+_ambient: Optional[AmbientSession] = None
 
 
 def get_active() -> Optional[BlitzSession]:
@@ -219,3 +280,20 @@ def start(mode: str, **kwargs) -> BlitzSession:
 def clear() -> None:
     global _active
     _active = None
+
+
+# ----- Ambient (non-Blitz) review tracker -----
+
+def get_ambient() -> Optional[AmbientSession]:
+    return _ambient
+
+
+def start_ambient(count_mode: str = "unique") -> AmbientSession:
+    global _ambient
+    _ambient = AmbientSession(count_mode)
+    return _ambient
+
+
+def clear_ambient() -> None:
+    global _ambient
+    _ambient = None

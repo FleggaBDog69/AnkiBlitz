@@ -78,6 +78,11 @@ DEFAULTS = {
         "break_show_journal": True,   # the per-break journal box
         "break_show_focus_rating": True,  # the 1-5 focus rating
         "break_show_tips": True,      # rotating micro-break suggestions
+        # Guided breathing pacer — an animated circle you breathe along with.
+        # Collapsed to a "Breathe" button until pressed, so the break screen is
+        # unchanged unless you want it. Patterns live in engine/breathing.py.
+        "break_show_breathing": True,
+        "break_breathing_pattern": "box",  # "box" | "44" | "coherent" | "478"
         "break_show_browser": True,   # the in-app browser button
         "break_show_add_kg": True,    # the Ankisstant "Add KG" button
         "break_allow_extend": True,   # the +5 min extend button
@@ -152,6 +157,12 @@ DEFAULTS = {
         "time_quick_picks": [10, 15, 25],
         "fraction_quick_picks": [2, 3],  # denominators -> 1/2, 1/3
         "card_source": "current_queue",
+        # The ambient bar: outside a Blitz, keep showing the progress bar with
+        # the whole due pile as its target, so an ordinary review session isn't
+        # a blank screen. Target is live (done + still due), never snapshotted,
+        # so it hits 100% exactly when the queue empties. Uses the three
+        # show_* toggles below; never shows accuracy / again / streak.
+        "show_bar_outside_blitz": True,
         "show_progress_bar": True,
         "show_card_counter": True,
         "show_elapsed_time": True,

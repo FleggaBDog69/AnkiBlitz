@@ -34,7 +34,7 @@ from aqt.qt import (
 from aqt.utils import tooltip
 
 from .config import get_section, save_section, suite_enabled, set_suite_enabled
-from .engine import presets
+from .engine import breathing, presets
 
 _CHECKED = Qt.CheckState.Checked
 _UNCHECKED = Qt.CheckState.Unchecked
@@ -565,6 +565,7 @@ class PomodoroPanel(QWidget):
         self.br_journal = QCheckBox("Break journal")
         self.br_focus = QCheckBox("Focus rating (1–5)")
         self.br_tips = QCheckBox("Micro-break suggestions")
+        self.br_breathing = QCheckBox("Guided breathing pacer")
         self.br_browser = QCheckBox("In-app browser button")
         self.br_addkg = QCheckBox("Add KG button (Ankisstant)")
         self.br_extend = QCheckBox("+5 min extend button")
@@ -576,6 +577,7 @@ class PomodoroPanel(QWidget):
             (self.br_journal, "break_show_journal"),
             (self.br_focus, "break_show_focus_rating"),
             (self.br_tips, "break_show_tips"),
+            (self.br_breathing, "break_show_breathing"),
             (self.br_browser, "break_show_browser"),
             (self.br_addkg, "break_show_add_kg"),
             (self.br_extend, "break_allow_extend"),
@@ -585,6 +587,26 @@ class PomodoroPanel(QWidget):
         for cb, key in self._break_toggles:
             cb.setChecked(bool(po.get(key, True)))
             bl.addWidget(cb)
+
+        # Which rhythm the pacer opens on (you can still switch it on the break
+        # screen itself, for that break only).
+        bf = QFormLayout()
+        self.br_pattern = QComboBox()
+        for key in breathing.PATTERN_ORDER:
+            self.br_pattern.addItem(breathing.PATTERNS[key]["label"], key)
+        bi = self.br_pattern.findData(
+            po.get("break_breathing_pattern", breathing.DEFAULT_PATTERN))
+        if bi >= 0:
+            self.br_pattern.setCurrentIndex(bi)
+        bf.addRow("Breathing pattern:", self.br_pattern)
+        bl.addLayout(bf)
+        self.br_breathing.toggled.connect(self.br_pattern.setEnabled)
+        self.br_pattern.setEnabled(self.br_breathing.isChecked())
+        bl.addWidget(_hint(
+            "The pacer sits collapsed as a “Breathe” button next to the tip — "
+            "press it and a circle expands and contracts for you to breathe "
+            "along with. 4-7-8 is the drowsy one; save it for long breaks."))
+
         layout.addWidget(bbox)
 
         layout.addStretch(1)
@@ -627,6 +649,7 @@ class PomodoroPanel(QWidget):
         })
         for cb, key in self._break_toggles:
             po[key] = cb.isChecked()
+        po["break_breathing_pattern"] = self.br_pattern.currentData()
         save_section(self.SECTION, po)
 
 
@@ -730,6 +753,15 @@ class SprintPanel(QWidget):
         self.show_elapsed.setChecked(bool(cfg.get("show_elapsed_time", True)))
         for w in (self.show_bar, self.show_counter, self.show_elapsed):
             dnl.addWidget(w)
+        self.bar_outside = QCheckBox("Keep the bar up outside a Blitz (all due cards)")
+        self.bar_outside.setChecked(bool(cfg.get("show_bar_outside_blitz", True)))
+        dnl.addWidget(self.bar_outside)
+        dnl.addWidget(_hint(
+            "During an ordinary review session the same bar stays up, dimmed, "
+            "filling against everything you have due rather than a Blitz target. "
+            "It counts down live — a card that comes back in learning pushes the "
+            "target out by one — so it reaches the end exactly when your queue "
+            "empties. Accuracy, Again and streak are never shown on it."))
         layout.addWidget(dn)
 
         # --- During Blitz (pressure) ---
@@ -803,6 +835,7 @@ class SprintPanel(QWidget):
             "time_quick_picks": time_picks,
             "fraction_quick_picks": frac_picks,
             "card_source": self.source.currentData(),
+            "show_bar_outside_blitz": self.bar_outside.isChecked(),
             "show_progress_bar": self.show_bar.isChecked(),
             "show_card_counter": self.show_counter.isChecked(),
             "show_elapsed_time": self.show_elapsed.isChecked(),

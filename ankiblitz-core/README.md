@@ -59,6 +59,18 @@ Menu (**Tools ▸ AnkiBlitz Core**):
 | Settings… | — | The tabbed settings window. |
 | Enabled | — | Master on/off for everything. |
 
+The **progress bar** stays up outside a Blitz too, dimmed and labelled *All due*,
+filling against everything you have due rather than a session target. Its target
+is live rather than fixed at the start — a card that comes back in learning
+pushes it out by one — so it reaches the end exactly when your queue empties,
+never before. It shows nothing but the count and the clock: no accuracy, no
+Again count, no streak. Turn it off under **Settings ▸ Blitz ▸ Show during
+Blitz**.
+
+Starting a Blitz from **Start Blitz…** also lets you pick a **Focus lock** level
+for that one session — commit hard to a session you need to finish, or let
+yourself off for a tired one, without changing your saved default.
+
 ### During a Pomodoro break
 
 The break screen is a full-page countdown, but it isn't a trap:
@@ -67,6 +79,12 @@ The break screen is a full-page countdown, but it isn't a trap:
   check your calendar, make a coffee, leave the app entirely. The break keeps
   running and the page comes back when you return to Anki.
 - Only **End Pomodoro** ends a run.
+- **🫁 Breathe** opens a guided breathing pacer: a circle that expands and
+  contracts with the phase named and counted underneath, so there's something to
+  follow rather than just being told to relax. It sits collapsed as a button
+  until you press it, and you can switch rhythm on the spot — Box 4-4-4-4,
+  Simple 4-4, Coherent 5-5, or Calming 4-7-8 (that last one will make you
+  drowsy, so keep it for long breaks).
 - The break is **quiet**: the card Anki renders behind the break screen doesn't
   read itself out at you. Its audio plays when you come back to the reviewer.
 - Stopped part-way through? Starting a Pomodoro later **the same day** offers to
