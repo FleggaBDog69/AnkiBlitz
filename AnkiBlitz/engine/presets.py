@@ -48,6 +48,7 @@ PROFILE_SPEC = {
     # chosen per launch and left alone by profiles).
     "sprint": [
         "show_progress_bar", "show_card_counter", "show_elapsed_time",
+        "overlay_stats_on_bar", "split_bar_by_grade", "show_eta", "show_pace",
         "show_live_accuracy", "show_again_count", "show_streak_counter",
         "streak_animations", "show_completion_screen", "completion_sound",
         "show_completion_accuracy", "hide_all_accuracy_stats",
@@ -129,6 +130,7 @@ BUILTINS = {
         "sprint": {
             "hide_all_accuracy_stats": True, "show_progress_bar": False,
             "show_card_counter": True, "show_elapsed_time": False,
+            "show_eta": False, "show_pace": False,
             "show_completion_screen": True, "completion_sound": False,
         },
         "focus": {

@@ -70,6 +70,13 @@ never before. It shows nothing but the count and the clock: no accuracy, no
 Again count, no streak. Turn it off under **Settings ▸ Blitz ▸ Show during
 Blitz**.
 
+The bar sits **flush with the top of the window**. Anki's *hide top bar during
+review* doesn't remove the toolbar — it only fades it out, and the empty band it
+leaves behind is what otherwise makes the bar look like it's floating below the
+top of the screen. AnkiBlitz Core closes that band up while the bar is showing
+and gives it back the moment you move the mouse to the top of the window, or
+leave the reviewer. With the top bar kept visible it changes nothing.
+
 Starting a Blitz from **Start Blitz…** also lets you pick a **Focus lock** level
 for that one session — commit hard to a session you need to finish, or let
 yourself off for a tired one, without changing your saved default.

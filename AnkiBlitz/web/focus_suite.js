@@ -569,6 +569,44 @@
     return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r;
   }
 
+  // The estimate is rendered coarse on purpose. It is a forecast off a rolling
+  // pace, so "~14 min" is the whole of what it knows; a seconds digit ticking
+  // down would claim a precision it doesn't have, and would pull the eye off
+  // the card every second to do it.
+  function fmtEta(sec) {
+    if (sec < 90) return "~1 min left";
+    var m = Math.round(sec / 60);
+    if (m < 60) return "~" + m + " min left";
+    var h = Math.floor(m / 60);
+    return "~" + h + " h " + (m % 60) + " m left";
+  }
+
+  // One linear-gradient with hard stops, not one div per card: a 200-card
+  // session would otherwise rebuild 200 nodes on every answer and every tick of
+  // the clock, on a machine where the reviewer's memory is already the thing
+  // that bites.
+  //
+  // The bands butt straight up against each other. A divider between them was
+  // tried and cut: it only ever separates two bands of the SAME colour (a
+  // colour change already separates itself), and paying for that with a gap in
+  // every band on the bar is a bad trade — the run of green is the thing you're
+  // meant to see, not the cards it's made of.
+  function segGradient(segs) {
+    var total = 0, i;
+    for (i = 0; i < segs.length; i++) total += segs[i][0];
+    var stops = [], at = 0;
+    for (i = 0; i < segs.length; i++) {
+      var w = total > 0 ? (segs[i][0] / total) * 100 : 100 / segs.length;
+      // The last band lands exactly on 100% so rounding can never leave a sliver
+      // of bare track inside the fill.
+      var end = i === segs.length - 1 ? 100 : at + w;
+      stops.push((segs[i][1] ? "var(--fs-again-c)" : "var(--fs-good-c)")
+                 + " " + at.toFixed(3) + "% " + end.toFixed(3) + "%");
+      at = end;
+    }
+    return "linear-gradient(90deg," + stops.join(",") + ")";
+  }
+
   // Give the card its own scroll area BELOW the bar instead of letting the page
   // scroll under it. The bar keeps a fixed strip at the very top; <body> becomes
   // a scroll container pinned beneath it, so card content (even a tall histology
@@ -652,12 +690,36 @@
       }
       rowParts += '<span class="fs-elapsed">' + clock + "</span>";
     }
+    // The colours named in words. Two bands of colour alone are a state you
+    // have to be told the key to; with the legend up you can read the bar
+    // without one, and the standalone Again chip below would only say the same
+    // number again, so it stands down while this is showing.
+    if (p.splitBar && p.cardsDone > 0) {
+      rowParts += '<span class="fs-split">'
+        + '<span class="fs-good-txt">' + p.doneGood + " good</span>"
+        + '<span class="fs-split-sep">·</span>'
+        + '<span class="fs-again-txt">' + p.doneAgain + " again</span>"
+        + "</span>";
+    }
+    // The estimate. Cards/fraction/ambient forecast the time left; time mode
+    // forecasts the cards instead, because there the clock is the thing you
+    // already know. Absent until there's enough pace to mean it.
+    if (p.showEta) {
+      if (isTime && p.projCards !== null && p.projCards !== undefined) {
+        rowParts += '<span class="fs-eta">~' + p.projCards + " more " + unit + "</span>";
+      } else if (!isTime && p.etaSeconds) {
+        rowParts += '<span class="fs-eta">' + fmtEta(p.etaSeconds) + "</span>";
+      }
+    }
+    if (p.showPace && p.perMin) {
+      rowParts += '<span class="fs-pace">' + p.perMin.toFixed(1) + " " + unit + "/min</span>";
+    }
     // Live stats — each gated by its toggle (Python already applies the
     // anti-pressure hide before sending these).
     if (p.showAccuracy) {
       rowParts += '<span class="fs-acc">' + p.accuracy + "%</span>";
     }
-    if (p.showAgain) {
+    if (p.showAgain && !p.splitBar) {
       rowParts += '<span class="fs-again">Again ×' + p.again + "</span>";
     }
     if (p.showStreak) {
@@ -665,10 +727,44 @@
       rowParts += '<span class="fs-streak' + anim + '">🔥 ' + p.streak + "</span>";
     }
     lastStreak = p.streak || 0;
-    var barHtml = p.showBar
-      ? '<div class="fs-bar-wrap"><div class="fs-bar" style="width:' + pct.toFixed(2) + '%"></div></div>'
-      : "";
-    bar.innerHTML = '<div class="fs-row">' + rowParts + "</div>" + barHtml;
+    // The filled region carries the session's texture: one band per answer, in
+    // the order you did them, green for a clean pass and red for an Again, each
+    // as wide as the thinking time that card took. The fill EDGE still means
+    // exactly what it did — this much of the pile is done — because the bands
+    // are normalised across the fill rather than added to it.
+    var fill = "";
+    if (p.showBar) {
+      if (p.splitBar && p.segs && p.segs.length) {
+        fill = '<div class="fs-bar fs-seg fs-cap" style="width:' + pct.toFixed(2)
+             + "%;background-image:" + segGradient(p.segs) + '"></div>';
+      } else {
+        fill = '<div class="fs-bar" style="width:' + pct.toFixed(2) + '%"></div>';
+      }
+    }
+
+    // Two layouts for the same numbers.
+    //
+    // Overlaid (the default): one thick band IS the bar, and the counters sit on
+    // top of it. The stacked layout spent most of the strip's height on empty
+    // surface with a 7px bar underneath it; this spends it on the bar. The fill
+    // goes down twice — once turned right down as the full-height band, once at
+    // full strength as a rail along the bottom edge — so the text stays
+    // light-on-dark whether it's over the fill or over the empty track, while
+    // the fill edge and the green/red boundary stay crisp.
+    //
+    // Stacked: the original. Kept because a busy row over a coloured band is a
+    // fair thing to not want on every card.
+    var rowHtml = '<div class="fs-row">' + rowParts + "</div>";
+    if (p.overlayStats !== false && p.showBar) {
+      bar.innerHTML =
+        '<div class="fs-bar-wrap fs-overlay">'
+        + '<div class="fs-fill">' + fill + "</div>"
+        + '<div class="fs-rail">' + fill + "</div>"
+        + rowHtml + "</div>";
+    } else {
+      bar.innerHTML = rowHtml
+        + (fill ? '<div class="fs-bar-wrap">' + fill + "</div>" : "");
+    }
     // Reserve a dedicated strip and scroll the card beneath it. Rows can wrap when
     // live stats are on, so measure the bar's ACTUAL height every render.
     reserveStrip(bar.offsetHeight);

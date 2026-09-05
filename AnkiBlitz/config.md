@@ -274,10 +274,62 @@ no record.
   learning pushes the target out by one rather than letting the bar claim
   ground it hasn't taken — and the bar reaches the end exactly when your queue
   empties. It follows `show_progress_bar` / `show_card_counter` /
-  `show_elapsed_time`, and never shows accuracy, Again or streak: a bar you
-  didn't opt into is the last place to put grading pressure. Nothing about it is
-  recorded — it is not a Blitz, there is no Focus Lock on it, and leaving is
-  free.
+  `show_elapsed_time`, and it gets the grade colours and the time estimate below
+  as well — "how long is this pile going to take" is the same question whether
+  or not you called it a Blitz. It still never shows the accuracy %, the Again
+  tally or the streak: a bar you didn't opt into is the last place to put
+  grading pressure. Nothing about it is recorded — it is not a Blitz, there is
+  no Focus Lock on it, and leaving is free.
+- `bar_flush_with_top` — sit the bar at the very **top of the window**. Anki's
+  *hide top bar during review* doesn't remove the toolbar, it only fades it out;
+  the webview keeps its height, so the reviewer — and the bar fixed to the top of
+  it — start a toolbar's height down the screen with an empty band above them,
+  which is what makes the bar look detached. Turned on, that band is collapsed
+  while the bar is up and handed straight back when Anki shows the toolbar again
+  (moving the mouse to the top of the window still reveals it) or when you leave
+  the reviewer, so the deck list is never left without its links. It only ever
+  takes a band Anki has already blanked: with the top bar kept visible, this key
+  does nothing.
+- `overlay_stats_on_bar` — draw the bar as one thick band with the counters
+  sitting **on** it, rather than a row of text stacked above a 7px bar. Same
+  numbers, less of the screen spent on the surface between them. The fill goes
+  down twice: turned right down as the full-height band, so the text stays
+  light-on-dark whether it's over the fill or over the empty track, and at full
+  strength as a 3px rail along the bottom edge, so the fill edge and the
+  green/red boundary stay crisp. Off returns the stacked layout.
+- `split_bar_by_grade` — colour the filled part of the bar **card by card, in
+  the order you did them**: green for a clean pass, red for an Again, so a
+  good/again/good run reads green-red-green. Each band is **as wide as the time
+  that card took**, measured from the question appearing to the answer being
+  shown — the answer side is reading, not working, so it isn't charged for.
+  Widths are clamped into ¼×–4× the session's own median, so a fast card can't
+  vanish and one slow card can't swallow the bar. Bands butt straight up against
+  each other with no divider: a colour change already separates itself, and the
+  only thing a divider adds is a seam inside a run of one colour — which is the
+  part you're meant to read as a run. The fill *edge* still means exactly what
+  it did — this much of the pile is done —
+  because the bands are normalised across the fill rather than added to it.
+  `12 good · 3 again` sits in words beside it so the colours never carry the
+  meaning alone. This is an accuracy display, so `hide_all_accuracy_stats`
+  hides it too.
+- `show_eta` — the estimate: **`~14 min left`** in card and fraction modes and
+  on the ambient bar, and **`~34 more cards`** in time mode, where the clock is
+  the part you already know. It is built from your pace over the last several
+  cards rather than the whole session, so one interruption doesn't wreck it
+  (each gap is capped at 2 minutes, so a hard card counts as a slow card and a
+  walk-away can't count as a twenty-minute one). Nothing is shown until there
+  are enough cards behind it to mean something, and it is deliberately rounded
+  to the minute — it's a forecast, and a ticking seconds digit would claim a
+  precision it hasn't got.
+- `eta_error_adjust` — fold your live Again rate into the estimate. A card you
+  press Again on comes back, so with an Again rate *p* each remaining card
+  costs `1/(1-p)` passes: at 90% good that's every tenth card returning, and the
+  estimate buys the time for it (it charges for second lapses too). Off gives
+  you the raw first-pass figure. Only affects arithmetic — the rate itself is
+  never displayed by this setting.
+- `show_pace` — show the pace the estimate is built from (`18.4 cards/min`),
+  in whatever unit `count_mode` counts. Off by default; the estimate is the
+  answer, this is the working.
 - `track_pb_*` — which personal bests to record.
 - `hide_all_accuracy_stats` — master anti-pressure switch; hides every
   accuracy/streak/again figure (including on the end-of-Blitz summary) regardless

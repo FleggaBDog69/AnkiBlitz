@@ -280,6 +280,53 @@ handler of its own.
 
 ---
 
+## Cleared 2026-09-03 — 15: the bar sits at the top of the window
+
+| #  | Change | Core | aSFM | PWR |
+|----|--------|:----:|:----:|:---:|
+| 15 | Progress bar flush with the top of the window | ✅ | n/a | n/a |
+
+Ported to Core the same day it was built, so nothing is outstanding. aSFM and
+PWR have no progress bar.
+
+**The bug, and why it isn't ours.** With Anki's *hide top bar during review* on,
+`TopWebView.hide()` only adds `body.hidden` to the toolbar's page — `opacity: 0`,
+or a `translateY(-100vh)` on the fancy skin. The **widget keeps the fixed height
+Anki measured for it** (unlike `BottomWebView.hide()`, which animates its height
+down to 1px), because the reserved band is what you hover to bring the toolbar
+back. So the reviewer webview starts a toolbar's height down the window, and our
+strip — `position: fixed; top: 0` inside the *reviewer* — sits in mid-air with an
+empty band above it. Nothing about the CSS can fix that: the strip is already at
+the top of everything it can see.
+
+New module `engine/topbar.py` (copied verbatim into Core — it only needs
+`get_section("sprint")`), wired into `injection.push_progress` /
+`clear_progress` / `register`, plus the config key `sprint.bar_flush_with_top`,
+a checkbox in the Blitz tab, and the `config.md` / `README.md` lines.
+
+Four decisions worth keeping:
+
+- **It only takes a band Anki has already blanked** — it collapses the widget
+  only while `web.hidden` is true. A toolbar you can see is a toolbar you're
+  using, and no progress bar is worth eating it. A missing `hidden` attribute
+  (an older Anki) reads as *visible*, so the fallback is always "do nothing".
+- **Anki's `hide()`/`show()` are wrapped per instance, not per class.** Anki
+  calls them on that one widget, an instance attribute shadows the class method,
+  and no other webview in the app is touched. `show()` gives the height back
+  *before* Anki's own show, or hovering the top of the window would reveal a
+  toolbar with nowhere to draw itself.
+- **It hands back the exact height it took**, rather than asking Anki to
+  re-measure. `adjustHeightToFit()` is async and measures a page in a 0px
+  viewport; if it ever came back 0 the deck list would be left without its
+  links, which is far worse than a stale pixel or two. Anki re-measures on its
+  own on theme and state changes anyway.
+- **`claim()` runs on every progress push**, so it doubles as the repair: if
+  anything re-measures the toolbar behind our back, the band is closed again on
+  the next card instead of staying open for the session. Releases are belt and
+  braces — `clear_progress()` **and** `state_did_change` off `review`.
+
+---
+
 ## The cross-add-on trap (decide before shipping 6)
 
 In the full AnkiBlitz the reveal key and the pause key can be **the same key**

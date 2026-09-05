@@ -56,6 +56,9 @@
 
 /* Sprint progress bar: fixed strip at the top of the reviewer. */
 #fs-progress {
+  /* The split's palette, hoisted so the JS can name it inside a gradient. */
+  --fs-good-c: var(--ab-on, #22c55e);
+  --fs-again-c: var(--ab-tomato, #ef4444);
   position: fixed;
   top: 0;
   left: 0;
@@ -77,10 +80,12 @@
   padding-top: 6px;
   padding-bottom: 6px;
 }
-#fs-progress.fs-ambient .fs-bar-wrap {
+#fs-progress.fs-ambient .fs-bar-wrap:not(.fs-overlay) {
   height: 4px;
 }
-#fs-progress.fs-ambient .fs-bar {
+/* Turned down, but not repainted: the split's whole job is its two colours, so
+   the dim skin only takes over the plain single fill. */
+#fs-progress.fs-ambient .fs-bar:not(.fs-seg) {
   background: var(--ab-track-fill, rgba(255, 255, 255, 0.45));
 }
 #fs-progress .fs-label {
@@ -93,6 +98,61 @@
   flex-wrap: wrap;
   gap: 14px;
   padding: 9px 16px;
+}
+
+/* ---- Overlaid layout: the band IS the bar, and the numbers ride on it. ----
+   Three stacked layers in one strip: the band (the fill, turned right down),
+   the rail (the same fill at full strength, 3px along the bottom), and the row
+   of counters on top. Splitting the fill across two layers is what lets the
+   text stay readable over it — see the note in focus_suite.js. */
+#fs-progress .fs-bar-wrap.fs-overlay {
+  position: relative;
+  display: block;
+  height: auto;
+  min-height: 31px;
+}
+#fs-progress .fs-overlay .fs-fill,
+#fs-progress .fs-overlay .fs-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  pointer-events: none;
+}
+/* The band. One text colour that works over the fill AND over the empty track
+   beats two that each work half the time, so the colour goes quiet rather than
+   the text going dark. */
+#fs-progress .fs-overlay .fs-fill {
+  top: 0;
+  bottom: 0;
+  opacity: 0.30;
+}
+/* The rail keeps the fill edge and the green/red boundary legible at a glance,
+   which a 30% band on its own doesn't. */
+#fs-progress .fs-overlay .fs-rail {
+  bottom: 0;
+  height: 3px;
+}
+/* A 3px cap on a 31px band is invisible anyway, and squaring it keeps the two
+   segments meeting cleanly. The rail keeps its rounded leading edge. */
+#fs-progress .fs-overlay .fs-fill .fs-bar {
+  border-radius: 0;
+}
+#fs-progress .fs-overlay .fs-row {
+  position: relative;
+  z-index: 1;
+  padding: 7px 16px 9px;   /* the extra 2px at the bottom clears the rail */
+}
+/* Ambient: the whole strip is already at 0.62, so the band only needs to come
+   down far enough that an unasked-for bar never competes with the card. */
+#fs-progress.fs-ambient .fs-overlay {
+  min-height: 27px;
+}
+#fs-progress.fs-ambient .fs-overlay .fs-fill {
+  opacity: 0.22;
+}
+#fs-progress.fs-ambient .fs-overlay .fs-row {
+  padding: 5px 16px 7px;
 }
 #fs-progress .fs-counter {
   font-weight: 600;
@@ -107,6 +167,33 @@
 }
 #fs-progress .fs-again {
   opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+/* The bar's colours, named in words. Same hues as the segments below, so the
+   legend reads as a key rather than as one more number. */
+#fs-progress .fs-split {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+}
+#fs-progress .fs-good-txt {
+  color: var(--ab-on, #22c55e);
+}
+#fs-progress .fs-again-txt {
+  color: var(--ab-tomato, #ef4444);
+}
+#fs-progress .fs-split-sep {
+  opacity: 0.4;
+}
+/* The estimate is a forecast, not a measurement: quieter than the counter it
+   sits beside, so it never reads as a number you have to hit. */
+#fs-progress .fs-eta {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+#fs-progress .fs-pace {
+  opacity: 0.6;
   font-variant-numeric: tabular-nums;
 }
 #fs-progress .fs-streak {
@@ -126,14 +213,26 @@
 #fs-progress .fs-bar-wrap {
   height: 7px;
   width: 100%;
+  display: flex;
   background: var(--ab-track, rgba(255, 255, 255, 0.10));
 }
 #fs-progress .fs-bar {
   height: 100%;
   background: linear-gradient(90deg, var(--ab-acc-from, #4ade80), var(--ab-acc-to, #22d3ee));
+  transition: width 0.3s ease;
+}
+/* Split fill: a single element whose background-image the JS builds as a
+   gradient of hard stops, one band per card. Solid stops rather than blends —
+   a gradient across two meanings would blur the very boundary the split exists
+   to draw. The width transition has to go: it animates the fill edge, and with
+   the bands normalised across that width every band would slide with it. */
+#fs-progress .fs-bar.fs-seg {
+  transition: none;
+}
+#fs-progress .fs-bar.fs-cap,
+#fs-progress .fs-bar:not(.fs-seg) {
   border-top-right-radius: 3px;
   border-bottom-right-radius: 3px;
-  transition: width 0.3s ease;
 }
 
 /* "More time" button: the pause key made visible. Sits in the same slot as the

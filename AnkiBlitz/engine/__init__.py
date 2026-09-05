@@ -7,6 +7,8 @@
 #   reveal.py     - builds the per-card payload pushed to the JS bundle
 #   tts_sync.py   - matches reveal speed to native/AnKing {{tts}} playback rate
 #   injection.py  - the ONE webview injection + per-card eval bridge + pycmd
+#   topbar.py     - reclaims the blank band Anki leaves above the reviewer
+#                   when it hides the top bar, so the strip sits at the very top
 #   sprint.py     - Blitz lifecycle (start, hooks, completion, momentum) and the
 #                   ambient due-pile bar for ordinary (non-Blitz) review
 #   breathing.py  - guided breathing pacer widget for the break screen

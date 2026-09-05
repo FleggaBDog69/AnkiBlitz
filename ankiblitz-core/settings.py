@@ -751,8 +751,18 @@ class SprintPanel(QWidget):
         self.show_counter.setChecked(bool(cfg.get("show_card_counter", True)))
         self.show_elapsed = QCheckBox("Elapsed time")
         self.show_elapsed.setChecked(bool(cfg.get("show_elapsed_time", True)))
-        for w in (self.show_bar, self.show_counter, self.show_elapsed):
+        self.flush_top = QCheckBox("Sit the bar at the very top of the window")
+        self.flush_top.setChecked(bool(cfg.get("bar_flush_with_top", True)))
+        for w in (self.show_bar, self.show_counter, self.show_elapsed,
+                  self.flush_top):
             dnl.addWidget(w)
+        dnl.addWidget(_hint(
+            "With Anki set to hide the top bar during review it doesn't remove "
+            "the toolbar, only fade it out — the empty band it leaves is why the "
+            "bar can look like it's floating below the top of the screen. Turned "
+            "on, that band is closed up while the bar is showing and given back "
+            "the moment you move the mouse to the top of the window (or leave "
+            "the reviewer). Nothing happens if you keep the top bar visible."))
         self.bar_outside = QCheckBox("Keep the bar up outside a Blitz (all due cards)")
         self.bar_outside.setChecked(bool(cfg.get("show_bar_outside_blitz", True)))
         dnl.addWidget(self.bar_outside)
@@ -836,6 +846,7 @@ class SprintPanel(QWidget):
             "fraction_quick_picks": frac_picks,
             "card_source": self.source.currentData(),
             "show_bar_outside_blitz": self.bar_outside.isChecked(),
+            "bar_flush_with_top": self.flush_top.isChecked(),
             "show_progress_bar": self.show_bar.isChecked(),
             "show_card_counter": self.show_counter.isChecked(),
             "show_elapsed_time": self.show_elapsed.isChecked(),

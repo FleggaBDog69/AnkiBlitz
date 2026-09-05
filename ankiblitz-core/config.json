@@ -88,6 +88,7 @@
     "fraction_quick_picks": [2, 3],
     "card_source": "current_queue",
     "show_bar_outside_blitz": true,
+    "bar_flush_with_top": true,
     "show_progress_bar": true,
     "show_card_counter": true,
     "show_elapsed_time": true,

@@ -203,6 +203,16 @@ no record.
   follows `show_progress_bar` / `show_card_counter` / `show_elapsed_time` and
   **never** shows accuracy, Again or streak — a bar you didn't opt into is the
   worst place to put grading pressure.
+- `bar_flush_with_top` — sit the bar at the very **top of the window**. Anki's
+  *hide top bar during review* doesn't remove the toolbar, it only fades it out;
+  the webview keeps its height, so the reviewer — and the bar fixed to the top of
+  it — start a toolbar's height down the screen with an empty band above them,
+  which is what makes the bar look detached. Turned on, that band is collapsed
+  while the bar is up and handed straight back when Anki shows the toolbar again
+  (moving the mouse to the top of the window still reveals it) or when you leave
+  the reviewer, so the deck list is never left without its links. It only ever
+  takes a band Anki has already blanked: with the top bar kept visible, this key
+  does nothing.
 - `show_*` — what to display during a Blitz and on the completion screen.
 - `track_pb_*` — which personal bests to record.
 - `hide_all_accuracy_stats` — master anti-pressure switch; hides every

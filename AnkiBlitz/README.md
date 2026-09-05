@@ -66,9 +66,40 @@ The **progress bar** stays up outside a Blitz too, dimmed and labelled *All due*
 filling against everything you have due rather than a session target. Its target
 is live rather than fixed at the start — a card that comes back in learning
 pushes it out by one — so it reaches the end exactly when your queue empties,
-never before. It shows nothing but the count and the clock: no accuracy, no
-Again count, no streak. Turn it off under **Settings ▸ Blitz ▸ Show during
-Blitz**.
+never before. It shows no accuracy %, no Again tally, no streak. Turn it off
+under **Settings ▸ Blitz ▸ Show during Blitz**.
+
+The bar is a single **thick band with the counters on it** rather than a row of
+text stacked above a thin bar — the same numbers, without spending most of the
+strip on the gap between them. (`Settings ▸ Blitz` has a toggle back to the
+stacked layout.)
+
+The strip sits **flush with the top of the window**. Anki's *hide top bar during
+review* doesn't remove the toolbar — it only fades it out, and the empty band it
+leaves behind is what otherwise makes the bar look like it's floating below the
+top of the screen. AnkiBlitz closes that band up while the bar is showing and
+gives it back the moment you move the mouse to the top of the window, or leave
+the reviewer. With the top bar kept visible it changes nothing.
+
+The fill is **split by grade, card by card, in the order you did them** — green
+for a clean pass, red for an Again, so a good/again/good run reads
+green-red-green. Each band is **as wide as the time that card took**, from the
+question appearing to the answer being shown; the answer side is reading rather
+than working, so it isn't charged for. The fill edge still means what it always
+did — this much of the pile is done — because the bands are normalised across
+the fill rather than added to it. `18 good · 2 again` sits in words beside it so
+the colours never carry the meaning on their own.
+
+Beside it is an **estimate of the time left** — `~14 min left` — built from your
+pace over the last several cards rather than the whole session, so one
+interruption doesn't wreck it. It folds in your live Again rate, because a card
+you press Again on comes back and that costs time: at a 90% good rate roughly
+every tenth card returns, and the estimate buys the time for it. In a *timed*
+Blitz the estimate runs the other way — the clock is the part you already know,
+so it tells you how many cards you should get through instead (`~89 more
+cards`). Nothing is shown until there are enough cards behind it to mean
+something. All of this works on an ordinary review session too; the question
+"how long is this pile going to take" is the same either way.
 
 Starting a Blitz from **Start Blitz…** also lets you pick a **Focus lock** level
 for that one session — commit hard to a session you need to finish, or let

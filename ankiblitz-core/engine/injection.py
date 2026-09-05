@@ -24,7 +24,7 @@ from aqt import gui_hooks, mw
 from aqt.reviewer import Reviewer
 
 from ..config import PACKAGE, get_section
-from . import session
+from . import session, topbar
 
 PYCMD_PREFIX = "focus:"
 
@@ -121,6 +121,7 @@ def push_progress() -> None:
         ambient = sprint.ambient_payload()
         if ambient:
             _eval(f"window.FocusSuite && FocusSuite.setProgress({json.dumps(ambient)});")
+            topbar.claim()
         else:
             clear_progress()
         return
@@ -153,10 +154,12 @@ def push_progress() -> None:
         "ambient": False,
     }
     _eval(f"window.FocusSuite && FocusSuite.setProgress({json.dumps(payload)});")
+    topbar.claim()
 
 
 def clear_progress() -> None:
     _eval("window.FocusSuite && FocusSuite.clearProgress();")
+    topbar.release()
 
 
 def pause_auto_reveal() -> None:
@@ -167,6 +170,7 @@ def pause_auto_reveal() -> None:
 
 def register() -> None:
     mw.addonManager.setWebExports(PACKAGE, r"web.*")
+    topbar.register()
     gui_hooks.webview_will_set_content.append(_on_will_set_content)
     gui_hooks.reviewer_did_show_question.append(_on_show_question)
     gui_hooks.reviewer_did_show_answer.append(_on_show_answer)

@@ -6,6 +6,8 @@
 # Submodules:
 #   session.py    - the single source-of-truth Blitz session
 #   injection.py  - the ONE webview injection + per-card eval bridge
+#   topbar.py     - reclaims the blank band Anki leaves above the reviewer
+#                   when it hides the top bar, so the strip sits at the very top
 #   sprint.py     - Blitz lifecycle (start, hooks, completion, momentum) and the
 #                   ambient due-pile bar for ordinary (non-Blitz) review
 #   breathing.py  - guided breathing pacer widget for the break screen

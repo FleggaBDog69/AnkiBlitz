@@ -163,6 +163,13 @@ DEFAULTS = {
         # so it hits 100% exactly when the queue empties. Uses the three
         # show_* toggles below; never shows accuracy / again / streak.
         "show_bar_outside_blitz": True,
+        # Sit the strip at the very top of the window. Anki's "hide top bar
+        # during review" only fades the toolbar out — the widget keeps its
+        # height — so the strip otherwise starts a toolbar's height down the
+        # screen with an empty band above it. Collapses that band while the
+        # strip is up, and gives it straight back on hover or on leaving the
+        # reviewer. Does nothing when the toolbar is visible.
+        "bar_flush_with_top": True,
         "show_progress_bar": True,
         "show_card_counter": True,
         "show_elapsed_time": True,
