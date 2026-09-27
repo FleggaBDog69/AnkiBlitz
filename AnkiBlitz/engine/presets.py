@@ -38,7 +38,9 @@ from ..config import get_section, save_section
 # pace and playback choices the user owns globally, not per profile.
 PROFILE_SPEC = {
     "speed_focus": [
-        "enabled", "base_seconds", "seconds_per_word", "min_delay_seconds",
+        "enabled", "base_seconds", "seconds_per_word",
+        "seconds_per_answer_word", "max_answer_seconds",
+        "min_delay_seconds",
         "max_delay_seconds", "unfamiliar_multiplier", "new_multiplier",
         "enable_on_new", "difficulty_weight", "min_post_seconds",
         "show_countdown", "warning_sound", "warning_at_percent",

@@ -2,13 +2,13 @@
   "enabled": true,
 
   "quick_start": {
-    "enabled": true,
+    "enabled": false,
     "launch_style": "immediate",
     "countdown_seconds": 3,
     "mode": "cards",
     "target": 50,
     "min_due": 1,
-    "relaunch_on_new_day": true,
+    "relaunch_on_new_day": false,
     "relaunch_after_hour": 5
   },
 
@@ -27,7 +27,7 @@
     "long_break_every": 4,
     "long_break_minutes": 25,
     "cycles": 0,
-    "auto_return_level": 2,
+    "auto_return_level": 1,
     "break_sound": true,
     "break_mute_audio": true,
     "daily_goal": 0,
@@ -52,14 +52,14 @@
     "show_on_break": true,
     "show_dropdown": true,
     "show_on_home": true,
-    "service": "youtube",
-    "last_url": "https://music.youtube.com/"
+    "service": "soundcloud",
+    "last_url": "https://soundcloud.com/discover"
   },
 
   "focus": {
     "enabled": true,
     "apply_to_reviews": false,
-    "lock_level": 1,
+    "lock_level": 3,
     "lock_min_cards": 10,
     "score_enabled": true,
     "score_include_accuracy": true,

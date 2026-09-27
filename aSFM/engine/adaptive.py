@@ -4,8 +4,16 @@ The auto-reveal timer (our redefined "Speed Focus") never grades a card; it
 only reveals the answer after a delay. That delay should feel proportionate:
 longer questions and less-familiar / harder cards get more thinking time.
 
-    delay = (base + length_term) * familiarity_mult * difficulty_mult
+    delay = (base + length_term + answer_term) * familiarity_mult * difficulty_mult
     delay = clamp(delay, min_delay, max_delay)
+
+The ``answer_term`` is off unless ``seconds_per_answer_word`` is above zero
+(its default is 0.0, so the shipped behaviour is unchanged). It is **additive**, sitting
+inside the bracket. Additive because the whole point is the short-question /
+long-answer card: a multiplicative answer term would scale the bonus by the
+question's length, giving the shortest questions the smallest bonus — exactly
+backwards. Inside the bracket because the familiarity / difficulty modifiers
+should still apply to it: a new card with a long answer gets both.
 
 The difficulty term is driven by the card's **FSRS difficulty** (1–10) when
 available, falling back to SM-2 ease only for cards without FSRS state. It is a
@@ -100,24 +108,20 @@ def _count_words(text: str) -> int:
     return len([w for w in text.split() if any(ch.isalnum() for ch in w)])
 
 
-def _question_word_count(card) -> int:
-    """Word count of the rendered question as a human SEES it: scripts/styles and
+def _visible_words(raw: str) -> int:
+    """Word count of rendered card HTML as a human SEES it: scripts/styles and
     hidden / tag-chip / hint chrome dropped, remaining tags stripped, entities
     unescaped. Falls back to a plain tag-strip if HTML parsing ever fails."""
-    raw = ""
-    try:
-        raw = card.render_output(reload=False).question_text
-    except Exception:
-        try:
-            raw = card.question()
-        except Exception:
-            raw = ""
     raw = raw or ""
     try:
         parser = _VisibleText()
         parser.feed(raw)
         parser.close()
-        return _count_words("".join(parser.parts))
+        # Join with a SPACE. The parser emits one string per text run, so a card
+        # split across <div>/<br> lines yields several parts; gluing them
+        # together with "" would merge the last word of one line into the first
+        # word of the next and silently lose one word per line break.
+        return _count_words(" ".join(parser.parts))
     except Exception:
         # Defensive fallback: old behaviour (over-counts hidden chrome, but never
         # crashes the timer). Drop script/style/comment bodies, then tags.
@@ -125,6 +129,46 @@ def _question_word_count(card) -> int:
         text = _COMMENT_RE.sub(" ", text)
         text = _html.unescape(_TAG_RE.sub(" ", text))
         return _count_words(text)
+
+
+def _question_word_count(card) -> int:
+    """Visible word count of the card's question side."""
+    try:
+        raw = card.render_output(reload=False).question_text
+    except Exception:
+        try:
+            raw = card.question()
+        except Exception:
+            raw = ""
+    return _visible_words(raw)
+
+
+def _answer_word_count(card, question_words: int) -> int:
+    """Visible words the ANSWER side adds beyond the question — a proxy for how
+    much there is to recall, which the question side alone cannot show.
+
+    One subtraction covers both card shapes:
+
+    * **Front-and-back**: the back is normally ``{{FrontSide}}`` plus the answer,
+      so subtracting the question leaves the answer field alone.
+    * **Cloze**: the question shows ``[...]`` (no alphanumerics, so it counts as
+      zero words) and the back shows the hidden text, so the difference is
+      exactly what was concealed. Deletions that are *not* on this card render
+      identically on both sides and cancel out.
+
+    Hidden Extra fields, tag chips and sources are already dropped by
+    ``_VisibleText``, so a note type that piles chrome onto its back side does
+    not inflate the count. Free to compute: ``answer_text`` comes from the same
+    cached ``render_output`` as ``question_text``, so there is no second render.
+    """
+    try:
+        raw = card.render_output(reload=False).answer_text
+    except Exception:
+        try:
+            raw = card.answer()
+        except Exception:
+            raw = ""
+    return max(0, _visible_words(raw) - question_words)
 
 
 def _is_unfamiliar(card) -> bool:
@@ -194,9 +238,25 @@ def _difficulty_multiplier(difficulty, ease: int, lapses: int, reps: int,
     return 1.0 + _difficulty_signal(difficulty, ease, lapses, reps) * weight
 
 
+def _answer_term(cfg: dict, answer_words: int) -> float:
+    """Extra seconds for a long answer — additive, bounded, off by default.
+
+    Capped in SECONDS (not words) so the ceiling is a flat, honest number the
+    settings panel can state outright ("adds at most N s"); with an additive
+    term that promise holds on every card, which it could not with a multiplier.
+    The cap is applied BEFORE the familiarity / difficulty modifiers, so a new
+    card with a long answer still gets its new-card multiplier on top.
+    """
+    per_word = float(cfg.get("seconds_per_answer_word", 0.0))
+    if per_word <= 0:
+        return 0.0          # 0 s per answer word IS the off switch
+    cap = float(cfg.get("max_answer_seconds", 5.0))
+    return min(per_word * max(0, answer_words), max(0.0, cap))
+
+
 def delay_for(cfg: dict, words: int, ease: int, lapses: int, reps: int,
               unfamiliar: bool, is_new: bool = False, difficulty=None,
-              fixed_time: bool = False) -> float:
+              fixed_time: bool = False, answer_words: int = 0) -> float:
     """Pure core: the reveal delay from explicit card primitives.
 
     Shared by the live runtime (reveal_delay_seconds) and the settings preview,
@@ -204,6 +264,10 @@ def delay_for(cfg: dict, words: int, ease: int, lapses: int, reps: int,
     learning / relearning cards use ``unfamiliar_multiplier``. ``difficulty`` is
     the FSRS difficulty (1–10) when available; otherwise the ease/lapse fallback
     is used. The difficulty term only shifts the delay by ±``difficulty_weight``.
+
+    ``answer_words`` is how many words the answer side adds beyond the question
+    (see ``_answer_word_count``); it contributes an additive, capped term and is
+    inert while ``seconds_per_answer_word`` is 0.
 
     ``fixed_time`` cards (picture / visual note types or decks — see
     ``is_fixed_time_card``) ignore word count and familiarity entirely: they get
@@ -222,7 +286,7 @@ def delay_for(cfg: dict, words: int, ease: int, lapses: int, reps: int,
         per_word = float(cfg.get("seconds_per_word", 0.35))
         unfamiliar_mult = float(cfg.get("unfamiliar_multiplier", 1.3))
         new_mult = float(cfg.get("new_multiplier", 2.0))
-        delay = base + per_word * words
+        delay = base + per_word * words + _answer_term(cfg, answer_words)
         if is_new:
             delay *= new_mult
         elif unfamiliar:
@@ -273,9 +337,15 @@ def reveal_delay_seconds(card, cfg: dict) -> float:
     except Exception:
         lapses, reps = 0, 1
     fixed = is_fixed_time_card(card, cfg)
+    words = 0 if fixed else _question_word_count(card)
+    # Only measure the answer side when the term can actually contribute, and
+    # never for fixed-time cards (which ignore length by definition).
+    answer_words = 0
+    if not fixed and float(cfg.get("seconds_per_answer_word", 0.0)) > 0:
+        answer_words = _answer_word_count(card, words)
     return delay_for(
         cfg,
-        words=0 if fixed else _question_word_count(card),
+        words=words,
         ease=ease,
         lapses=lapses,
         reps=reps,
@@ -283,4 +353,5 @@ def reveal_delay_seconds(card, cfg: dict) -> float:
         is_new=is_new_card(card),
         difficulty=fsrs_difficulty(card),
         fixed_time=fixed,
+        answer_words=answer_words,
     )

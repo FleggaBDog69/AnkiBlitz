@@ -17,12 +17,20 @@ DEFAULTS = {
     "enabled": True,              # master switch
     "base_seconds": 3.0,          # fixed thinking budget added to every card
     "seconds_per_word": 0.30,     # reading budget scaled by question length
+    # Answer length: give cards whose ANSWER is long more thinking time. A
+    # short question with a five-item answer needs more than its front side
+    # suggests. Additive and capped (see engine/adaptive.py), so it does NOT
+    # scale with question length, but IS scaled by the new / learning /
+    # difficulty modifiers. 0.0 seconds per answer word = off, which is the
+    # shipped default: turning it on lengthens timers, so it is opt-in.
+    "seconds_per_answer_word": 0.1,   # seconds added per answer-side word (0 = off)
+    "max_answer_seconds": 5.0,        # ceiling on that addition
     "min_delay_seconds": 2.0,     # floor for the computed delay
     "max_delay_seconds": 20.0,    # ceiling for the computed delay
-    "unfamiliar_multiplier": 1.2, # extra time for learning / relearning cards
+    "unfamiliar_multiplier": 1.1, # extra time for learning / relearning cards
     "new_multiplier": 1.5,        # extra time for genuinely new cards
-    "enable_on_new": True,        # run the auto-reveal timer on new cards
-    "difficulty_weight": 0.20,    # max ± swing from FSRS difficulty (0 = off)
+    "enable_on_new": False,        # run the auto-reveal timer on new cards
+    "difficulty_weight": 0.30,    # max ± swing from FSRS difficulty (0 = off)
     "show_countdown": True,       # show the depleting countdown indicator
     "warning_sound": True,        # play an alert before the answer auto-shows
     "warning_at_percent": 75,     # warn once this % of the delay has elapsed

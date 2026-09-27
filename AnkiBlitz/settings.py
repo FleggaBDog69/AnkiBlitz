@@ -53,6 +53,7 @@ _PREVIEW_CARDS = [
     ("New", dict(ease=0, lapses=0, reps=0, unfamiliar=True, is_new=True, difficulty=None)),
 ]
 _PREVIEW_WORDS = (15, 25)
+_PREVIEW_ANSWERS = (5, 40)   # answer-side words, for the answer-length rows
 
 
 def _hint(text: str) -> QLabel:
@@ -203,6 +204,15 @@ class SpeedFocusPanel(QWidget):
         self.per_word.setValue(float(cfg.get("seconds_per_word", 0.35)))
         form.addRow("Per word:", self.per_word)
 
+        # --- answer length: 0 s per answer word is the off switch ---
+        self.per_answer_word = _double(0.0, 5.0, 0.05, 2, " s")
+        self.per_answer_word.setValue(float(cfg.get("seconds_per_answer_word", 0.0)))
+        form.addRow("Per answer word:", self.per_answer_word)
+
+        self.max_answer = _double(0.0, 60.0, 0.5, 1, " s")
+        self.max_answer.setValue(float(cfg.get("max_answer_seconds", 5.0)))
+        form.addRow("Answer time cap:", self.max_answer)
+
         self.min_delay = _double(0.0, 120.0, 0.5, 1, " s")
         self.min_delay.setValue(float(cfg.get("min_delay_seconds", 2.0)))
         form.addRow("Minimum delay:", self.min_delay)
@@ -212,6 +222,18 @@ class SpeedFocusPanel(QWidget):
         form.addRow("Maximum delay:", self.max_delay)
 
         layout.addLayout(form)
+
+        layout.addWidget(_hint(
+            "“Per answer word” is 0 s by default, which means the timer only "
+            "looks at the QUESTION — so a one-line question with a five-item "
+            "answer gets a short timer even though there's a lot to recall. "
+            "Raise it above 0 and the words on the answer side add time too; "
+            "set it back to 0 to switch that off.\n\n"
+            "It works on both card shapes: on front-and-back cards it measures "
+            "the answer field, and on cloze cards it measures the text hidden "
+            "behind [...] on this card. Hidden Extra fields, tags and sources "
+            "don't count. The cap is the most it can ever add, so a card with a "
+            "huge answer can't run away with your session."))
 
         layout.addWidget(_hline())
         layout.addWidget(QLabel("<b>Modifiers (weighted)</b>"))
@@ -238,7 +260,8 @@ class SpeedFocusPanel(QWidget):
         mod.addRow("Difficulty weight:", self.difficulty)
         layout.addLayout(mod)
         layout.addWidget(_hint(
-            "Time = (base + per-word × words). New cards multiply by the new-card "
+            "Time = (base + per-word × question words + answer time). New "
+            "cards multiply by the new-card "
             "modifier; learning/relearning cards by the learning modifier. The "
             "card’s FSRS difficulty then nudges the delay by at most ± the "
             "difficulty weight (e.g. 0.10 → ±10%; hardest cards longer, easiest "
@@ -296,8 +319,10 @@ class SpeedFocusPanel(QWidget):
         layout.addWidget(_hint(
             "The alert plays once this share of the auto-reveal delay has "
             "elapsed — e.g. 60% leaves the final 40% as a heads-up before the "
-            "answer shows. (Replace sounds/alert.mp3, or drop alert.mp3 in "
-            "user_files, to change the sound.)\n\n"
+            "answer shows. To change the sound, drop your own alert file in "
+            "user_files — .flac, .ogg, .opus or .wav play directly in the "
+            "reviewer; an .mp3 needs Anki's own audio player, which "
+            "depends on a working mpv.)\n\n"
             "“Hold after reveal” keeps the answer hidden until at least this "
             "long after the progressive word reveal finishes — so the timer "
             "can never cut the reading short."))
@@ -351,12 +376,14 @@ class SpeedFocusPanel(QWidget):
         self.preview.setTextFormat(Qt.TextFormat.RichText)
         side.addWidget(self.preview)
         side.addWidget(_hint(
+            "Rows are question words + answer words. "
             "Easy = a familiar review card; Hard = a lapsed card (low ease, "
             "several lapses). Updates live as you change the knobs."))
         side.addStretch(1)
 
         for w in (self.base, self.per_word, self.min_delay, self.max_delay,
-                  self.unfamiliar, self.new_mult, self.difficulty):
+                  self.unfamiliar, self.new_mult, self.difficulty,
+                  self.per_answer_word, self.max_answer):
             w.valueChanged.connect(self._update_preview)
         self._update_preview()
 
@@ -364,6 +391,8 @@ class SpeedFocusPanel(QWidget):
         return {
             "base_seconds": self.base.value(),
             "seconds_per_word": self.per_word.value(),
+            "seconds_per_answer_word": self.per_answer_word.value(),
+            "max_answer_seconds": self.max_answer.value(),
             "min_delay_seconds": self.min_delay.value(),
             "max_delay_seconds": self.max_delay.value(),
             "unfamiliar_multiplier": self.unfamiliar.value(),
@@ -371,17 +400,28 @@ class SpeedFocusPanel(QWidget):
             "difficulty_weight": self.difficulty.value(),
         }
 
+    def _preview_rows(self):
+        """(label, question words, answer words) per preview row. The answer
+        column only appears while the answer-length term is on — otherwise every
+        pair of rows would print the same number twice."""
+        if self.per_answer_word.value() > 0:
+            return [(f"{q} + {a} words", q, a)
+                    for q in _PREVIEW_WORDS for a in _PREVIEW_ANSWERS]
+        return [(f"{q} words", q, 0) for q in _PREVIEW_WORDS]
+
     def _update_preview(self):
         cfg = self._current_cfg()
         header = "<tr><th>Card</th>" + "".join(
             f"<th>{name}</th>" for name, _ in _PREVIEW_CARDS) + "</tr>"
         rows = ""
-        for words in _PREVIEW_WORDS:
+        for label, words, answer_words in self._preview_rows():
             cells = "".join(
-                f"<td align='center'>{adaptive.delay_for(cfg, words=words, **card):.1f} s</td>"
+                "<td align='center'>"
+                f"{adaptive.delay_for(cfg, words=words, answer_words=answer_words, **card):.1f} s"
+                "</td>"
                 for _, card in _PREVIEW_CARDS
             )
-            rows += f"<tr><td>{words} words</td>{cells}</tr>"
+            rows += f"<tr><td>{label}</td>{cells}</tr>"
         self.preview.setText(
             "<table border='1' cellspacing='0' cellpadding='5'>"
             f"{header}{rows}</table>"
@@ -393,6 +433,8 @@ class SpeedFocusPanel(QWidget):
             "enabled": self.enabled.isChecked(),
             "base_seconds": round(self.base.value(), 2),
             "seconds_per_word": round(self.per_word.value(), 2),
+            "seconds_per_answer_word": round(self.per_answer_word.value(), 2),
+            "max_answer_seconds": round(self.max_answer.value(), 2),
             "min_delay_seconds": round(self.min_delay.value(), 2),
             "max_delay_seconds": round(self.max_delay.value(), 2),
             "unfamiliar_multiplier": round(self.unfamiliar.value(), 2),

@@ -62,6 +62,20 @@ def _reveal_block(wr: dict, enabled: bool, card=None, side: str = "question") ->
     }
 
 
+def _alert_url() -> str:
+    """The warning alert as a webview-playable URL.
+
+    Lazy import: ``injection`` imports this module at load time, so the reverse
+    cannot be a top-level import. Empty string on any failure — the JS then
+    falls back to asking Python to play it.
+    """
+    try:
+        from . import injection
+        return injection.alert_url()
+    except Exception:
+        return ""
+
+
 def question_payload(card) -> dict:
     """Payload for reviewer_did_show_question."""
     suite_on = suite_enabled()
@@ -86,6 +100,7 @@ def question_payload(card) -> dict:
             "minPostMs": int(float(sf.get("min_post_seconds", 1.0)) * 1000),
             "showCountdown": bool(sf.get("show_countdown", True)),
             "warn": bool(sf.get("warning_sound", True)),
+            "alertUrl": _alert_url() if sf.get("warning_sound", True) else "",
             "warnPercent": int(sf.get("warning_at_percent", 60)),
             **_pause_block(sf, suite_on),
         },

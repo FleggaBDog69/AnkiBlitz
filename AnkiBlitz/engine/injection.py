@@ -44,10 +44,8 @@ def _stamp(name: str) -> str:
 _CSS_HREF = f"/_addons/{PACKAGE}/web/focus_suite.css?v={_stamp('focus_suite.css')}"
 _JS_SRC = f"/_addons/{PACKAGE}/web/focus_suite.js?v={_stamp('focus_suite.js')}"
 
-# Warning alert: user_files/alert.mp3 overrides the bundled sounds/alert.mp3.
+# Warning alert: an alert.* in user_files overrides the bundled sounds/alert.*
 _SUITE_DIR = os.path.dirname(os.path.dirname(__file__))
-_DEFAULT_ALERT = os.path.join(_SUITE_DIR, "sounds", "alert.mp3")
-_USER_ALERT = os.path.join(_SUITE_DIR, "user_files", "alert.mp3")
 
 
 # The pause key's sticky state. Held here rather than in the JS so it survives
@@ -78,12 +76,57 @@ def _sticky_pause(payload: dict) -> bool:
     return _auto_paused
 
 
+# Formats the reviewer webview can decode, best first. Anki ships the
+# open-codec QtWebEngine build, which carries NO mp3 decoder (verified: no
+# mpegaudiodec/mp3float symbol in QtWebEngineCore, while vorbis/opus/flac/pcm
+# are all present). An .mp3 handed to <audio> therefore fails to decode, which
+# is why the bundled alert is also shipped as .flac.
+_WEB_AUDIO_EXTS = (".flac", ".ogg", ".oga", ".opus", ".wav")
+
+
+def _alert_candidates():
+    """(path, relative url) for the alert file, in precedence order.
+
+    A user's own file in user_files always outranks the bundled one, even when
+    it is an mp3 the webview cannot decode: the URL is still handed over, the
+    JS play() fails, and the av_player fallback plays THEIR sound rather than
+    silently substituting ours.
+    """
+    for folder in ("user_files", "sounds"):
+        for ext in _WEB_AUDIO_EXTS + (".mp3",):
+            path = os.path.join(_SUITE_DIR, folder, "alert" + ext)
+            if os.path.exists(path):
+                yield path, f"{folder}/alert{ext}"
+
+
+def alert_url() -> str:
+    """The warning alert as a URL the reviewer webview can play itself.
+
+    Anki routes every sound FILE through mpv, and Anki's bundled mpv does not
+    run on every macOS it ships to (on macOS 13 it aborts at launch on a
+    missing Swift symbol), which silently costs you the alert. Card TTS is
+    unaffected, as Anki's macOS TTS shells out to ``say``. Playing the alert in
+    the webview sidesteps av_player entirely; ``_play_alert`` stays as the
+    fallback for when the webview cannot play what it is given.
+    """
+    for path, rel in _alert_candidates():
+        try:
+            ver = str(int(os.path.getmtime(path)))
+        except Exception:
+            ver = "0"
+        return f"/_addons/{PACKAGE}/{rel}?v={ver}"
+    return ""
+
+
 def _play_alert() -> None:
-    path = _USER_ALERT if os.path.exists(_USER_ALERT) else _DEFAULT_ALERT
-    try:
-        av_player.play_file(path)
-    except Exception:
-        pass
+    """Fallback: hand the alert to Anki's own player (needs a working mpv)."""
+    for path, _rel in _alert_candidates():
+        try:
+            av_player.play_file(path)
+        except Exception:
+            pass
+        return
+
 
 # The external bundle loads async, so the first onCard() eval can arrive before
 # it is ready. This inline shim installs a stub that buffers calls; the real
@@ -349,7 +392,15 @@ def pause_auto_reveal() -> None:
 
 
 def register() -> None:
-    mw.addonManager.setWebExports(PACKAGE, r"web.*")
+    # Anki serves /_addons/<pkg>/<sub> only when <sub> re.fullmatch-es this
+    # pattern, so the alert has to be exported explicitly or the <audio> src
+    # 404s and the sound silently never plays. user_files is opened for the
+    # alert FILE ONLY, never the folder — it also holds the break journal,
+    # sprint stats and music profile, and everything exported here is readable
+    # by any page loaded in the webview.
+    mw.addonManager.setWebExports(
+        PACKAGE, r"web.*|sounds/alert\.[A-Za-z0-9]+|user_files/alert\.[A-Za-z0-9]+"
+    )
     topbar.register()
     gui_hooks.webview_will_set_content.append(_on_will_set_content)
     gui_hooks.reviewer_did_show_question.append(_on_show_question)

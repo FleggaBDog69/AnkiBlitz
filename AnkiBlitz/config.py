@@ -27,14 +27,22 @@ DEFAULTS = {
     # computed in Python per card (see engine/adaptive.py); these are its knobs.
     "speed_focus": {
         "enabled": True,
-        "base_seconds": 2.0,          # fixed thinking budget added to every card
-        "seconds_per_word": 0.20,     # reading budget scaled by question length
+        "base_seconds": 3.0,          # fixed thinking budget added to every card
+        "seconds_per_word": 0.30,     # reading budget scaled by question length
+        # Answer length: give cards whose ANSWER is long more thinking time. A
+        # short question with a five-item answer needs more than its front side
+        # suggests. Additive and capped (see engine/adaptive.py), so it does NOT
+        # scale with question length, but IS scaled by the new / learning /
+        # difficulty modifiers. 0.0 seconds per answer word = off, which is the
+        # shipped default: turning it on lengthens timers, so it is opt-in.
+        "seconds_per_answer_word": 0.1,   # seconds added per answer-side word (0 = off)
+        "max_answer_seconds": 5.0,        # ceiling on that addition
         "min_delay_seconds": 2.0,     # floor for the computed delay
         "max_delay_seconds": 15.0,    # ceiling for the computed delay
-        "unfamiliar_multiplier": 1.2, # extra time for learning / relearning cards
+        "unfamiliar_multiplier": 1.1, # extra time for learning / relearning cards
         "new_multiplier": 1.5,        # extra time for genuinely new cards
-        "enable_on_new": True,        # run the auto-reveal timer on new cards
-        "difficulty_weight": 0.20,    # max ± swing from FSRS difficulty (0 = off)
+        "enable_on_new": False,        # run the auto-reveal timer on new cards
+        "difficulty_weight": 0.30,    # max ± swing from FSRS difficulty (0 = off)
         "min_post_seconds": 1.0,      # hold answer >= this long after the reveal finishes
         "show_countdown": True,       # show the depleting countdown indicator
         "warning_sound": True,        # play an alert before the answer auto-shows
@@ -87,7 +95,7 @@ DEFAULTS = {
     # Quick Start: auto-launch a Blitz on the first open of the day. Uses its
     # own preset (mode + target), independent of the Start-Blitz dialog defaults.
     "quick_start": {
-        "enabled": True,              # opt-in; off until turned on
+        "enabled": False,              # opt-in; off until turned on
         "launch_style": "immediate",  # "countdown" (3-2-1, cancelable) | "immediate"
         "countdown_seconds": 3,
         "mode": "cards",              # own preset: "cards" | "time" | "fraction"
@@ -96,7 +104,7 @@ DEFAULTS = {
         # If Anki is left open across a day rollover, relaunch the daily Blitz the
         # first time you bring Anki to the foreground on/after relaunch_after_hour.
         # It opens PAUSED (no auto-reveal, clock at 0:00) until your first key/click.
-        "relaunch_on_new_day": True,
+        "relaunch_on_new_day": False,
         "relaunch_after_hour": 5,     # earliest local hour the foreground relaunch may fire
     },
 
@@ -120,7 +128,7 @@ DEFAULTS = {
         "long_break_every": 4,        # long break after every Nth work block
         "long_break_minutes": 25,
         "cycles": 0,                  # 0 = unlimited; else stop after N work blocks
-        "auto_return_level": 2,       # 0 notify | 1 prompt | 2 auto | 3 raise+auto
+        "auto_return_level": 1,       # 0 notify | 1 prompt | 2 auto | 3 raise+auto
         "break_sound": True,          # chime when a break starts and ends
         # Silence the card behind the break: a block ends on an answer, so Anki
         # renders the next card underneath and reads it out at you mid-break.
@@ -165,8 +173,8 @@ DEFAULTS = {
         "show_on_break": True,        # offer a "♪ Music" panel on the break screen
         "show_dropdown": True,        # allow the floating review window (menu / Ctrl+Shift+M)
         "show_on_home": True,         # add a "♪ Music" button to the deck-list rail
-        "service": "youtube",         # quick-jump default: "soundcloud" | "youtube"
-        "last_url": "https://music.youtube.com/",  # remembered last page, so it reopens where you left off
+        "service": "soundcloud",         # quick-jump default: "soundcloud" | "youtube"
+        "last_url": "https://soundcloud.com/discover",  # remembered last page, so it reopens where you left off
     },
 
     # Focus (Stage 6): discipline + scoring for a study session.
@@ -185,7 +193,7 @@ DEFAULTS = {
     "focus": {
         "enabled": True,
         "apply_to_reviews": False,     # also lock ordinary review sessions, not just Blitzes
-        "lock_level": 1,               # 0 none | 1 confirm | 2 min-cards | 3 finish
+        "lock_level": 3,               # 0 none | 1 confirm | 2 min-cards | 3 finish
         "lock_min_cards": 10,          # level 2: extra cards forced when you try to leave
         "score_enabled": True,         # compute + show the Focus Score
         "score_include_accuracy": True,  # count accuracy as a score component
@@ -328,14 +336,13 @@ def migrate() -> None:
         cfg["_migrations"] = flags
     changed = False
 
-    # v5.x: the Pomodoro auto-return default moved from "prompt" (1) to
-    # "auto-start" (2). Bump only the value that still equals the old default.
-    if not flags.get("pomodoro_autoreturn_v2"):
-        po = cfg.get("pomodoro")
-        if isinstance(po, dict) and int(po.get("auto_return_level", 2)) == 1:
-            po["auto_return_level"] = 2
-        flags["pomodoro_autoreturn_v2"] = True
-        changed = True
+    # v5.x moved the Pomodoro auto-return default from "prompt" (1) to
+    # "auto-start" (2) and migrated anyone still sitting on 1. The shipped
+    # default is 1 again, so that migration is not just obsolete, it is
+    # backwards: on a fresh install it would read the new default as the old
+    # one and bump it straight back to 2. Retired rather than re-guarded. The
+    # spent `pomodoro_autoreturn_v2` flag is left in existing configs, dead and
+    # harmless, per the additive-only rule.
 
     # v6.x: the music player's first cut stored a pasted link per service; the
     # browser version replaced that with a single `last_url`. Drop the two dead
@@ -348,6 +355,18 @@ def migrate() -> None:
                     mu.pop(dead, None)
                     changed = True
         flags["music_drop_url_keys"] = True
+        changed = True
+
+    # The answer-length term shipped first as a bool flag + a 0.10 s/word rate,
+    # then the flag was dropped in favour of "0 s per answer word = off". A
+    # config saved under the interim build therefore holds the rate at 0.10 with
+    # the flag False, which the flagless code would read as ON. Honour the old
+    # OFF once, then leave the dead flag alone (additive-only).
+    if not flags.get("answer_length_flagless"):
+        sf = cfg.get("speed_focus")
+        if isinstance(sf, dict) and sf.get("answer_length_enabled") is False:
+            sf["seconds_per_answer_word"] = 0.0
+        flags["answer_length_flagless"] = True
         changed = True
 
     if changed:

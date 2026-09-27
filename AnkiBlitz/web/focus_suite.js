@@ -282,13 +282,73 @@
     document.addEventListener("keydown", go, true);
   }
 
+  // The heads-up alert. Anki routes sound FILES through mpv, and its bundled
+  // mpv does not run on every macOS it ships to — on macOS 13 it aborts at
+  // launch, which costs you the alert (card TTS is unaffected: that goes
+  // through `say`). Playing it here keeps the alert on the reviewer's own audio
+  // stack; `focus:warn` stays as the fallback when the webview won't play.
+  var alertAudio = null;
+  var alertPrimed = false;
+
+  function alertElement(url) {
+    if (!alertAudio || alertAudio.getAttribute("data-src") !== url) {
+      alertAudio = new Audio(url);
+      alertAudio.setAttribute("data-src", url);
+      alertAudio.preload = "auto";
+    }
+    return alertAudio;
+  }
+
+  // Chromium refuses to play audio until the DOCUMENT has seen a user gesture,
+  // and Anki rebuilds the reviewer document every time you enter the reviewer —
+  // so on the first card the alert fires before the page has been touched and
+  // is refused. A muted play/pause on the first gesture is enough to mark the
+  // element allowed, so the alert is ready by the time the timer reaches it.
+  // Left registered rather than {once:true}: the first gesture can land before
+  // any card payload has arrived, and there is nothing to prime yet.
+  function primeAlert() {
+    if (alertPrimed) return;
+    var url = pendingAuto && pendingAuto.alertUrl;
+    if (!url) return;
+    alertPrimed = true;
+    try {
+      var el = alertElement(url);
+      el.muted = true;
+      var settle = function () {
+        try { el.pause(); el.currentTime = 0; } catch (e) {}
+        el.muted = false;
+      };
+      var p = el.play();
+      if (p && typeof p.then === "function") { p.then(settle, settle); }
+      else { settle(); }
+    } catch (e) {}
+  }
+  document.addEventListener("pointerdown", primeAlert, true);
+  document.addEventListener("keydown", primeAlert, true);
+
+  function playAlert() {
+    var url = pendingAuto && pendingAuto.alertUrl;
+    if (!url) { pycmd("focus:warn"); return; }
+    try {
+      var el = alertElement(url);
+      el.muted = false;
+      el.currentTime = 0;
+      var played = el.play();
+      if (played && typeof played.catch === "function") {
+        played.catch(function () { pycmd("focus:warn"); });
+      }
+    } catch (e) {
+      pycmd("focus:warn");
+    }
+  }
+
   // Start (or restart, after a pause) the reveal + warning timers, remembering
   // the deadlines so a pause can work out what was left on each.
   function armAutoTimers(effectiveMs, warnMs) {
     autoTimer = setTimeout(fireReveal, effectiveMs);
     autoDeadline = Date.now() + effectiveMs;
     if (warnMs > 0 && warnMs < effectiveMs) {
-      warnTimer = setTimeout(function () { pycmd("focus:warn"); }, warnMs);
+      warnTimer = setTimeout(playAlert, warnMs);
       warnDeadline = Date.now() + warnMs;
     } else {
       warnDeadline = 0;
