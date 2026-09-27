@@ -17,14 +17,13 @@ Three built-ins — **Default** (everyday), **Blitz** (a committed, locked-in ru
 
 They deliberately leave your session shape alone (you pick mode and target at each launch), and your music too. Save your own as well — your current setup is kept as a *My setup* profile, so nothing is lost.
 
-## New in 1.2.0
+## New in 1.3.0
 
-- **The progress bar now stays up outside a Blitz**, dimmed and labelled *All due*, filling against your whole due pile. Its target is **live**: a card that comes back in learning pushes it out by one, so the bar fills exactly as your queue empties and never before. It shows no accuracy, Again count or streak — a bar you didn't opt into is the wrong place for grading pressure.
-- **Per-Blitz Focus Lock.** *Start Blitz…* now has a Focus lock picker: commit hard to a session you need to finish, or let yourself off for a tired one, without changing your saved default.
-- **A guided breathing pacer on the break screen** — a circle that expands and contracts with the phase named and counted underneath, so there's something to follow rather than just being told to relax. Collapsed as a **Breathe** button until you press it. Box 4-4-4-4, Simple 4-4, Coherent 5-5, or Calming 4-7-8.
-- **A break you can walk away from** — a *Step away* button with a floating countdown, muted card audio during the break, and the option to resume an unfinished run from earlier the same day.
-- **Fixed:** Focus Lock level 3 now keeps a Blitz alive on focus loss based on the level that Blitz was *started* with, rather than whatever is configured right now.
-- **Fixed:** *Finish all due* on the deck-list panel no longer swallows the click.
+A settings-only release — Core's features are unchanged.
+
+- **Retuned defaults** for new installs: Quick Start off until you turn it on, Pomodoro auto-return set to *prompt* rather than starting the next block by itself, and Focus Lock at *finish*.
+
+Existing setups are untouched — an update only fills in settings you don't already have, so nothing you've tuned is rewritten.
 
 ## Want reveal pacing too?
 

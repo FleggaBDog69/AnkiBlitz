@@ -6,7 +6,7 @@ AnkiBlitz rolls three review-pacing ideas into one engine, one menu and one sett
 
 ## What it does
 
-- **Adaptive auto-reveal** — after the question shows, AnkiBlitz waits a delay computed from the card's length and its FSRS difficulty, then reveals the answer. It **never grades for you** — you still press the button. Picture or visual note types and decks can use a set time instead, since there's nothing to read.
+- **Adaptive auto-reveal** — after the question shows, AnkiBlitz waits a delay computed from the card's length and its FSRS difficulty, then reveals the answer. The delay can count the **answer's** length as well as the question's, so a one-line question with a five-item answer gets the time it needs. It **never grades for you** — you still press the button. Picture or visual note types and decks can use a set time instead, since there's nothing to read.
 - **Progressive word reveal** — the question fades in word by word at a reading pace you set, optionally locked to the card's `{{tts}}` voice. Skipping ahead stops the card's audio too: you've read it, so the voice still reading it to you is just noise.
 - **Blitz sessions** — focused, timed runs by card count, time, or a fraction of what's due, with a progress bar and a completion screen. The bar stays up **outside** a Blitz too, dimmed and labelled *All due*, filling against everything you have due — so plain reviewing isn't a blank screen.
 - **Know how long it's going to take** — the bar's fill is coloured card by card in the order you did them (green for a clean pass, red for an Again), each band as wide as the time that card took, named in words beside it, and it estimates the time left from your recent pace. The estimate folds in your live Again rate, because a card you press Again on comes back: at a 90% good rate every tenth card or so returns, and the estimate buys the time for it. In a timed Blitz it runs the other way and tells you how many cards you should get through. Works on ordinary review sessions, not just Blitzes.
@@ -21,17 +21,14 @@ Three built-ins — **Default** (everyday), **Blitz** (a committed, locked-in ru
 
 They deliberately leave your session shape alone (you pick mode and target at each launch), along with word-reveal speed and music. The picker shows each profile's key settings before you apply it. Save your own too — your current setup is kept as a *My setup* profile, so nothing is lost.
 
-## New in 1.2.0
+## New in 1.3.0
 
-- **A “More time” button** on the card, by request. The pause key already did this, but a keypress is invisible — now you can see that it's there. Click to stop the countdown, click again (or click the “paused” badge) to carry on.
-- **A pause key** (default `P`) for the same hold, from the keyboard.
-- **The progress bar now stays up outside a Blitz**, dimmed and labelled *All due*, filling against your whole due pile. Its target is **live**: a card that comes back in learning pushes it out by one, so the bar fills exactly as your queue empties and never before. It shows no accuracy, Again count or streak — a bar you didn't opt into is the wrong place for grading pressure.
-- **Per-Blitz Focus Lock.** *Start Blitz…* now has a Focus lock picker: commit hard to a session you need to finish, or let yourself off for a tired one, without changing your saved default.
-- **A guided breathing pacer on the break screen** — a circle that expands and contracts with the phase named and counted underneath, so there's something to follow rather than just being told to relax. Collapsed as a **Breathe** button until you press it. Box 4-4-4-4, Simple 4-4, Coherent 5-5, or Calming 4-7-8.
-- **Skipping the word reveal stops the card's TTS and `[sound:]` playback.**
-- **SynapsePro theming** — matches SynapsePro's palette when that add-on is installed, and looks exactly as before when it isn't.
-- **Fixed:** the reveal key no longer fires while you're typing in Anki's type-in-the-answer box, or with Ctrl/Cmd/Alt held.
-- **Fixed:** *Finish all due* on the deck-list panel no longer swallows the click.
+- **Long answers can get more time.** The delay now also scales with the **answer's** length, not just the question's — for the cards where the question is one line but the answer is a list of five things. Works on cloze and front/back alike. Set *Per answer word* to `0.0` to switch it off.
+- **Fixed: the warning sound now plays.** It had been silent on some setups. The reviewer plays it itself now, rather than handing it to Anki's external media player, so it works even where that player fails to start.
+- **Fixed: multi-line cards were being timed short.** Text either side of a line break was glued together, losing one word per line — a four-line cloze counted 27 words instead of 29, and got a shorter timer than it should have.
+- **Retuned defaults** for new installs: a slightly longer base time, auto-reveal off on new cards, and Quick Start off until you turn it on.
+
+Existing setups are untouched — an update only fills in settings you don't already have, so nothing you've tuned is rewritten.
 
 ## Before you start
 
@@ -64,6 +61,7 @@ Core + aSFM + Progressive Word Reveal together equal this add-on. Don't run any 
 ## Notes
 
 - Works standalone. Your stats and settings are preserved across updates.
+- To change the warning sound, drop your own `alert.flac`, `.ogg`, `.opus` or `.wav` into the add-on's `user_files/` folder. An `alert.mp3` works too, but only where Anki's external media player is running — the reviewer can't decode MP3 by itself.
 - Word-count timing counts only the text you actually see — hidden fields and tag chips on AnKing-style notes don't inflate the timer.
 - Bundles concepts from **Glutanimate's Speed Focus Mode** (Copyright © 2017-2021 Aristotelis P., [glutanimate.com](https://glutanimate.com/)) and from **Patrick Lee's** Progressive Word Reveal and Sprint Mode ([patricklee.com.au](https://www.patricklee.com.au/)). Licensed under the GNU AGPLv3 **with** Glutanimate's Section 7 additional terms — preserve attribution, don't misrepresent origin, no use of the Glutanimate name for endorsement. Full terms in `LICENSE`.
 - Tested on Anki 2.1.50+ (Qt6).

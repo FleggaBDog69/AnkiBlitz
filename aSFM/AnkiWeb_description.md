@@ -6,7 +6,7 @@ After the question shows, aSFM waits a delay computed from the card's length and
 
 ## What it does
 
-- Waits `(base + per-word × words) × familiarity × difficulty`, clamped between a minimum and a maximum, then auto-reveals.
+- Waits `(base + per-word × question words + per-answer-word × answer words) × familiarity × difficulty`, clamped between a minimum and a maximum, then auto-reveals. The answer term is capped, and setting it to `0.0` turns it off.
 - Counts only the text you actually **see** — hidden fields and AnKing-style tag chips don't inflate the timer.
 - Gives new and learning/relearning cards more time (tunable).
 - Nudges the delay by the card's **FSRS difficulty** — harder cards get longer, bounded so it stays a gentle shift rather than a cliff.
@@ -14,10 +14,14 @@ After the question shows, aSFM waits a delay computed from the card's length and
 - A **“More time” button** on the card, and a **pause key** (default `P`) — either one holds the countdown where it stands so you can sit on a card, then picks it up where it stopped. The hold sticks across cards, and every card it applies to says so on screen. The button stays faint until you hover it.
 - **Picture-card mode:** chosen note types or decks use a set time instead of a word count, since there's nothing to read.
 
-## New in 1.2.0
+## New in 1.3.0
 
-- **A visible “More time” button**, by request. The pause key already did this, but a keypress is invisible — you only find it if you read the settings. Now you can see that it's there: click to stop the countdown, click again (or click the “paused” badge) to carry on. Turn it off in Settings if you'd rather keep the card clear.
-- **A pause key** (default `P`) for the same hold, if you prefer the keyboard. Give it a different key from Progressive Word Reveal's if you run both.
+- **Long answers can get more time.** The delay now also scales with the **answer's** length, not just the question's — for the cards where the question is one line but the answer is a list of five things. Works on cloze and front/back alike. Set *Per answer word* to `0.0` to switch it off.
+- **Fixed: the warning sound now plays.** It had been silent on some setups. The reviewer plays it itself now, rather than handing it to Anki's external media player, so it works even where that player fails to start.
+- **Fixed: multi-line cards were being timed short.** Text either side of a line break was glued together, losing one word per line — a four-line cloze counted 27 words instead of 29, and got a shorter timer than it should have.
+- **Retuned defaults** for new installs: a gentler familiarity multiplier, a stronger difficulty nudge, and the timer off on new cards.
+
+Existing setups are untouched — an update only fills in settings you don't already have, so nothing you've tuned is rewritten.
 
 ## Before you start
 
@@ -39,5 +43,5 @@ Core + aSFM + Progressive Word Reveal together equal the full AnkiBlitz. Don't r
 ## Notes
 
 - Reworks the auto-reveal concept from **Glutanimate's Speed Focus Mode** (Copyright © 2017-2021 Aristotelis P., [glutanimate.com](https://glutanimate.com/)); the “More time” button is his idea too. Licensed under the GNU AGPLv3 **with** Glutanimate's Section 7 additional terms — preserve attribution, don't misrepresent origin, no use of the Glutanimate name for endorsement. Full terms in `LICENSE`.
-- To change the warning sound, drop your own `alert.mp3` into the add-on's `user_files/` folder.
+- To change the warning sound, drop your own `alert.flac`, `.ogg`, `.opus` or `.wav` into the add-on's `user_files/` folder. An `alert.mp3` works too, but only where Anki's external media player is running — the reviewer can't decode MP3 by itself.
 - Tested on Anki 2.1.50+ (Qt6).
