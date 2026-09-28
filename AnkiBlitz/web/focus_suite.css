@@ -34,11 +34,12 @@
   background: linear-gradient(90deg, var(--ab-bar-from, #f59e0b), var(--ab-bar-to, #ef4444));
 }
 
-/* Warning colour shift (countdown_warning_colour): the bar runs a calm grey
-   until the warning point, then turns red — a silent heads-up. Solid colours
-   rather than the gradient above, because a gradient can't fade. */
+/* Warning colour shift (countdown_warning_colour): the bar runs in Anki's own
+   primary blue (--button-primary-bg, which follows light/dark mode) until the
+   warning point, then turns red — a silent heads-up. Solid colours rather than
+   the gradient above, because a gradient can't fade. */
 #fs-countdown.fs-shift > .fs-countdown-fill {
-  background: var(--ab-bar-idle, rgba(148, 163, 184, 0.85));
+  background: var(--button-primary-bg, #3b82f6);
 }
 #fs-countdown.fs-shift.fs-warned > .fs-countdown-fill {
   background: var(--ab-bar-to, #ef4444);

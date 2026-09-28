@@ -325,7 +325,7 @@ class SpeedFocusPanel(QWidget):
             "The alert plays (and the bar turns red) once this share of the "
             "auto-reveal delay has elapsed — e.g. 75% leaves the final 25% as a "
             "heads-up before the answer shows. With the colour on, the bar runs "
-            "grey until then; with it off, it keeps its amber-to-red gradient. "
+            "blue until then; with it off, it keeps its amber-to-red gradient. "
             "To change the sound, drop your own alert file in "
             "user_files — .flac, .ogg, .opus or .wav play directly in the "
             "reviewer; an .mp3 needs Anki's own audio player, which "

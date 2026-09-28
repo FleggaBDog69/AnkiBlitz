@@ -44,7 +44,7 @@ DEFAULTS = {
         "difficulty_weight": 0.30,    # max ± swing from FSRS difficulty (0 = off)
         "min_post_seconds": 1.0,      # hold answer >= this long after the reveal finishes
         "show_countdown": True,       # show the depleting countdown indicator
-        # Turn the countdown bar from a calm grey to red once the warning point
+        # Turn the countdown bar from Anki's blue to red once the warning point
         # (warning_at_percent) is reached — a silent heads-up, with or without
         # the sound.
         "countdown_warning_colour": True,

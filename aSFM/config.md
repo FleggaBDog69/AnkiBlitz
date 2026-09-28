@@ -25,7 +25,7 @@ delay = clamp(delay, min_delay_seconds, max_delay_seconds)
 | `enable_on_new` | Run the timer on new cards at all. |
 | `difficulty_weight` | Max ± swing applied from the card's FSRS difficulty (0 = ignore difficulty). |
 | `show_countdown` | Show the thin depleting countdown bar while waiting. |
-| `countdown_warning_colour` | Run the bar grey, then turn it red at the warning point. Off = the original amber-to-red gradient. |
+| `countdown_warning_colour` | Run the bar in Anki's blue, then turn it red at the warning point. Off = the original amber-to-red gradient. |
 | `warning_sound` | Play an alert before the answer auto-shows. |
 | `warning_at_percent` | Warn (sound and/or colour) once this % of the delay has elapsed. |
 | `pause_key_enabled` | A key that freezes the timer on the current card. |

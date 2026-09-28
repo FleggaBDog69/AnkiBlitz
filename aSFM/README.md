@@ -19,7 +19,7 @@ Focus Mode*, extracted from the **AnkiBlitz** suite so you can use just this pie
 - Treats new and learning/relearning cards as needing more time (tunable).
 - Nudges the delay by the card's **FSRS difficulty** (harder = longer), bounded.
 - Optional thin **countdown bar** and a **warning sound** before the reveal. The
-  bar can also turn from grey to red at the warning point — a silent heads-up.
+  bar can also turn from blue to red at the warning point — a silent heads-up.
 - A **“More time” button** on the card, and a **pause key** (default `p`) — both
   freeze the countdown on the card you're on and pick it up where it stopped. The
   hold sticks across cards, and every card it applies to says so on screen. The
