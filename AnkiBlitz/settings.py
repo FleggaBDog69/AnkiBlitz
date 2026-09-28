@@ -38,7 +38,7 @@ from aqt.qt import (
 from aqt.utils import tooltip
 
 from .config import get_section, save_section, suite_enabled, set_suite_enabled
-from .engine import adaptive, breathing, presets, tts_sync
+from .engine import adaptive, breathing, pace, presets, tts_sync
 
 _CHECKED = Qt.CheckState.Checked
 _UNCHECKED = Qt.CheckState.Unchecked
@@ -224,15 +224,9 @@ class SpeedFocusPanel(QWidget):
         layout.addLayout(form)
 
         layout.addWidget(_hint(
-            "“Per answer word” adds time for the words on the ANSWER side, so a "
-            "one-line question with a five-item answer doesn't get a short timer "
-            "just because its front is short. Set it to 0 to time from the "
-            "question alone.\n\n"
-            "It works on both card shapes: on front-and-back cards it measures "
-            "the answer field, and on cloze cards it measures the text hidden "
-            "behind [...] on this card. Hidden Extra fields, tags and sources "
-            "don't count. The cap is the most it can ever add, so a card with a "
-            "huge answer can't run away with your session."))
+            "Adds time for the answer side's words (on cloze, the hidden text). "
+            "Hidden fields and tags don't count. The cap is the most it can add; "
+            "0 = off."))
 
         layout.addWidget(_hline())
         layout.addWidget(QLabel("<b>Modifiers (weighted)</b>"))
@@ -259,14 +253,9 @@ class SpeedFocusPanel(QWidget):
         mod.addRow("Difficulty weight:", self.difficulty)
         layout.addLayout(mod)
         layout.addWidget(_hint(
-            "Time = (base + per-word × question words + answer time). New "
-            "cards multiply by the new-card "
-            "modifier; learning/relearning cards by the learning modifier. The "
-            "card’s FSRS difficulty then nudges the delay by at most ± the "
-            "difficulty weight (e.g. 0.10 → ±10%; hardest cards longer, easiest "
-            "shorter; 0 = ignore difficulty). The result is clamped between the "
-            "minimum and maximum delay. Untick “Run on new cards” to leave new "
-            "cards with no auto-reveal timer at all."))
+            "Time = base + per word × question words + answer time, × the new or "
+            "learning modifier, nudged by up to ± the difficulty weight (0 = "
+            "ignore difficulty), then clamped to the min and max."))
 
         layout.addWidget(_hline())
         self.show_countdown = QCheckBox("Show countdown bar while waiting")
@@ -305,34 +294,64 @@ class SpeedFocusPanel(QWidget):
         self.pause_key_enabled.toggled.connect(self.pause_key.setEnabled)
         self.pause_key.setEnabled(self.pause_key_enabled.isChecked())
         layout.addWidget(_hint(
-            "Press it to freeze the auto-reveal countdown (and its warning) so "
-            "you can sit on a card; press again to pick up where it stopped. The "
-            "pause sticks across cards, and every card it applies to says so on "
-            "screen.\n\n"
-            "It may be the SAME key as the progressive reveal key (both default "
-            "to “p”): while words are still fading in the key reveals them, and "
-            "once the question is fully shown the same key pauses the timer."))
+            "Freezes the countdown; press again to carry on. The pause sticks "
+            "across cards until you release it. It can share the reveal key: the "
+            "first press finishes the reveal, the next one pauses."))
 
         self.more_time_button = QCheckBox("Show a “More time” button on the card")
         self.more_time_button.setChecked(bool(cfg["more_time_button"]))
         layout.addWidget(self.more_time_button)
         layout.addWidget(_hint(
-            "A small button above the countdown that holds the timer — the same "
-            "hold as the pause key, but you can see that it's there. It stays "
-            "faint until you hover it. While the timer is held, the “paused” "
-            "badge is clickable too, so whatever you paused with can resume."))
+            "The pause key as a button. Faint until you hover it; click the "
+            "paused badge to resume."))
         layout.addWidget(_hint(
-            "The alert plays (and the bar turns red) once this share of the "
-            "auto-reveal delay has elapsed — e.g. 75% leaves the final 25% as a "
-            "heads-up before the answer shows. With the colour on, the bar runs "
-            "blue until then; with it off, it keeps its amber-to-red gradient. "
-            "To change the sound, drop your own alert file in "
-            "user_files — .flac, .ogg, .opus or .wav play directly in the "
-            "reviewer; an .mp3 needs Anki's own audio player, which "
-            "depends on a working mpv.\n\n"
-            "“Hold after reveal” keeps the answer hidden until at least this "
-            "long after the progressive word reveal finishes — so the timer "
-            "can never cut the reading short."))
+            "The sound plays, and the bar turns red, once this much of the wait "
+            "has passed. For your own sound, put alert.flac/.ogg/.opus/.wav in "
+            "user_files.\n\n“Hold after reveal”: the answer never shows sooner "
+            "than this after the words finish revealing."))
+
+        layout.addWidget(_hline())
+        layout.addWidget(QLabel("<b>Learn my pace</b>"))
+        target_form = QFormLayout()
+        self.target = QSpinBox()
+        self.target.setRange(5, 50)
+        self.target.setSuffix(" % of cards")
+        self.target.setValue(int(cfg["target_timer_wins_percent"]))
+        target_form.addRow("Timer beats me on:", self.target)
+        layout.addLayout(target_form)
+
+        self.auto_tune = QCheckBox("Auto-tune the timer to how fast I reveal cards")
+        self.auto_tune.setChecked(bool(cfg["auto_tune_enabled"]))
+        layout.addWidget(self.auto_tune)
+
+        pace_row = QHBoxLayout()
+        self.pace_label = QLabel()
+        pace_row.addWidget(self.pace_label, 1)
+        self.reset_pace_btn = QPushButton("Reset")
+        self.reset_pace_btn.clicked.connect(self._on_reset_pace)
+        pace_row.addWidget(self.reset_pace_btn)
+        layout.addLayout(pace_row)
+
+        calib_row = QHBoxLayout()
+        calibrate = QPushButton("Calibrate from my reviews…")
+        calibrate.clicked.connect(self._on_calibrate)
+        calib_row.addWidget(calibrate)
+        calib_row.addStretch(1)
+        layout.addLayout(calib_row)
+
+        self.sessions_label = QLabel()
+        self.sessions_label.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(self.sessions_label)
+        layout.addWidget(_hint(
+            "“Timer beats me on” is how often the answer should show before you "
+            "reveal it. Auto-tune adjusts gently: about −0.5% when you reveal "
+            "first, +5% on a timeout or More time, and never more than 15% "
+            "quicker. Calibrate suggests timings from your own reveals (a rough "
+            "estimate from review history at first); nothing changes until you "
+            "apply and save. Saved per profile, numbers only."))
+        self._pace_reset_pending = False
+        self.auto_tune.toggled.connect(self._refresh_pace)
+        self._refresh_pace()
 
         layout.addWidget(_hline())
         layout.addWidget(QLabel("Skip the auto-reveal timer for these (review normally):"))
@@ -357,11 +376,9 @@ class SpeedFocusPanel(QWidget):
         fixed_form.addRow("Set time:", self.fixed_base)
         layout.addLayout(fixed_form)
         layout.addWidget(_hint(
-            "For image / visual cards there's nothing to read, so word count is "
-            "meaningless. Cards matching the note types or decks below get this "
-            "set time instead, with only the difficulty weight as a modifier "
-            "(no per-word, no new/learning multiplier). This choice lives outside "
-            "profiles — it stays the same no matter which profile is active."))
+            "A set time instead of a word count, for the note types or decks "
+            "below. Only the difficulty weight still applies. Not part of "
+            "profiles."))
 
         self.fixed_nt_list = _FilterList(
             "Picture note types", notetypes, cfg["fixed_time_note_types"])
@@ -383,9 +400,8 @@ class SpeedFocusPanel(QWidget):
         self.preview.setTextFormat(Qt.TextFormat.RichText)
         side.addWidget(self.preview)
         side.addWidget(_hint(
-            "Rows are question words + answer words. "
-            "Easy = a familiar review card; Hard = a lapsed card (low ease, "
-            "several lapses). Updates live as you change the knobs."))
+            "Rows are question + answer words. Easy = a familiar review card; "
+            "Hard = a lapsed card."))
         side.addStretch(1)
 
         for w in (self.base, self.per_word, self.min_delay, self.max_delay,
@@ -418,13 +434,14 @@ class SpeedFocusPanel(QWidget):
 
     def _update_preview(self):
         cfg = self._current_cfg()
+        p = self._preview_pace()
         header = "<tr><th>Card</th>" + "".join(
             f"<th>{name}</th>" for name, _ in _PREVIEW_CARDS) + "</tr>"
         rows = ""
         for label, words, answer_words in self._preview_rows():
             cells = "".join(
                 "<td align='center'>"
-                f"{adaptive.delay_for(cfg, words=words, answer_words=answer_words, **card):.1f} s"
+                f"{adaptive.delay_for(cfg, words=words, answer_words=answer_words, pace=p, **card):.1f} s"
                 "</td>"
                 for _, card in _PREVIEW_CARDS
             )
@@ -456,6 +473,8 @@ class SpeedFocusPanel(QWidget):
             "pause_key_enabled": self.pause_key_enabled.isChecked(),
             "pause_key": self.pause_key.key_value(),
             "more_time_button": self.more_time_button.isChecked(),
+            "auto_tune_enabled": self.auto_tune.isChecked(),
+            "target_timer_wins_percent": self.target.value(),
             "excluded_note_types": self.nt_list.checked(),
             "excluded_decks": self.deck_list.checked(),
             "fixed_time_enabled": self.fixed_enabled.isChecked(),
@@ -464,11 +483,156 @@ class SpeedFocusPanel(QWidget):
             "fixed_time_decks": self.fixed_deck_list.checked(),
         })
         save_section(self.SECTION, cfg)
+        if self._pace_reset_pending:
+            pace.reset_pace()
 
 
 # --------------------------------------------------------------------------- #
 #  Word Reveal panel  (full Progressive Word Reveal option set)
 # --------------------------------------------------------------------------- #
+
+    # ----- learn my pace -----
+
+    def _preview_pace(self) -> float:
+        if not self.auto_tune.isChecked() or self._pace_reset_pending:
+            return 1.0
+        return pace.current({"auto_tune_enabled": True})
+
+    def _refresh_pace(self, *_):
+        data = pace.summary()
+        n = int(data.get("pace_cards", 0))
+        if self._pace_reset_pending:
+            text = "Current pace: 1.00× (resets when you save)"
+        elif not self.auto_tune.isChecked():
+            text = f"Auto-tune off. Learned pace {float(data.get('pace', 1.0)):.2f}× is kept."
+        elif n == 0:
+            text = "Current pace: 1.00× (nothing learned yet)"
+        else:
+            text = (f"Current pace: {float(data.get('pace', 1.0)):.2f}× "
+                    f"· learned from {n} cards")
+        self.pace_label.setText(text)
+        self._refresh_sessions(data)
+        if hasattr(self, "preview"):      # built after this section
+            self._update_preview()
+
+    def _refresh_sessions(self, data):
+        rows = list(data.get("sessions", []))[-5:]
+        live = pace.session_so_far()
+        if live and live["cards"]:
+            t = sorted(live["reveal_s"])
+            rows.append({"date": "now", "cards": live["cards"], "self": live["self"],
+                         "median_s": t[len(t) // 2] if t else None, "pace": None})
+        if not rows:
+            self.sessions_label.setText("")
+            return
+        body = ""
+        for r in reversed(rows):
+            share = f"{round(100 * r['self'] / r['cards'])}%" if r["cards"] else "–"
+            med = f"{r['median_s']:.1f} s" if r.get("median_s") else "–"
+            pc = f"{r['pace']:.2f}×" if r.get("pace") else "–"
+            body += (f"<tr><td>{r['date']}</td><td align='right'>{r['cards']}</td>"
+                     f"<td align='right'>{share}</td><td align='right'>{med}</td>"
+                     f"<td align='right'>{pc}</td></tr>")
+        self.sessions_label.setText(
+            "<table cellspacing='0' cellpadding='3'>"
+            "<tr><th align='left'>Session</th><th>Cards</th><th>You revealed</th>"
+            "<th>Median</th><th>Pace</th></tr>" + body + "</table>")
+
+    def _on_reset_pace(self):
+        self._pace_reset_pending = True
+        self._refresh_pace()
+
+    def _on_calibrate(self):
+        # The whole config, not just the timing knobs: calibration has to skip
+        # picture cards the same way the timer does.
+        cfg = {**get_section(self.SECTION), **self._current_cfg(),
+               "target_timer_wins_percent": self.target.value()}
+        dlg = _CalibrateDialog(self, cfg)
+        if dlg.exec() and dlg.result_values:
+            r = dlg.result_values
+            self.base.setValue(r["base_seconds"])
+            self.per_word.setValue(r["seconds_per_word"])
+            if self.per_answer_word.value() > 0:
+                self.per_answer_word.setValue(r["seconds_per_answer_word"])
+            # The new values already reflect your pace, so the multiplier
+            # starts again from 1 rather than being applied twice.
+            self._pace_reset_pending = True
+            self._refresh_pace()
+
+
+class _CalibrateDialog(QDialog):
+    """Works out suggested timings, shows them next to the current ones, and
+    hands them back only if you press Apply. Nothing is saved from here — the
+    settings dialog's own Save does that."""
+
+    def __init__(self, parent, cfg):
+        super().__init__(parent)
+        self.setWindowTitle("Calibrate from my reviews")
+        self.setMinimumWidth(460)
+        self.cfg = cfg
+        self.result_values = None
+        layout = QVBoxLayout(self)
+        self.body = QLabel("Working…")
+        self.body.setWordWrap(True)
+        self.body.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(self.body)
+        self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        self.apply_btn = self.buttons.addButton(
+            "Apply", QDialogButtonBox.ButtonRole.AcceptRole)
+        self.apply_btn.setEnabled(False)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+
+        if pace.reveal_data_ready():
+            self._show(pace.fit_from_reveals(cfg), measured=True)
+        elif mw.col is not None:
+            from aqt.operations import QueryOp
+            QueryOp(
+                parent=self,
+                op=lambda col: pace.fit_from_revlog(col, cfg),
+                success=lambda r: self._show(r, measured=False),
+            ).with_progress("Reading your review history…").run_in_background()
+        else:
+            self._show(None, measured=False)
+
+    def _show(self, r, measured: bool):
+        target = int(self.cfg["target_timer_wins_percent"])
+        if not r:
+            self.body.setText(
+                "<b>Not enough data yet.</b><br><br>Calibration needs about "
+                f"{pace.MIN_CALIBRATION} cards you revealed yourself, or a few "
+                "hundred passed reviews in Anki's history. Keep reviewing with "
+                "the timer on and try again.")
+            return
+        rows = [("Base time", "base_seconds", "s"),
+                ("Per word", "seconds_per_word", "s")]
+        if float(self.cfg["seconds_per_answer_word"]) > 0:
+            rows.append(("Per answer word", "seconds_per_answer_word", "s"))
+        table = "".join(
+            f"<tr><td>{label}</td><td align='right'>{float(self.cfg[key]):.2f} {u}</td>"
+            f"<td align='right'><b>{r[key]:.2f} {u}</b></td></tr>"
+            for label, key, u in rows)
+        if measured:
+            source = (f"From <b>{r['cards']}</b> cards AnkiBlitz watched you answer. "
+                      "Timed so the answer shows before you've revealed it on "
+                      f"about {target}% of cards.")
+        else:
+            source = (f"A <b>rough estimate</b> from Anki's review history "
+                      f"({r.get('cards_seen', r['cards'])} cards). That history "
+                      "times the answer side too, so an allowance is taken off, "
+                      "and if you've been reviewing with a timer it partly "
+                      "reflects that timer. Once AnkiBlitz has watched "
+                      f"{pace.MIN_CALIBRATION} cards you reveal yourself, "
+                      "calibrating again uses those instead.")
+        self.body.setText(
+            source + "<br><br><table cellspacing='0' cellpadding='4'>"
+            "<tr><th></th><th>Now</th><th>Suggested</th></tr>" + table +
+            "</table><br>Apply fills these into Settings and resets the learned "
+            "pace to 1.00×. Nothing changes until you save.")
+        self.result_values = r
+        self.apply_btn.setEnabled(True)
+
 
 class WordRevealPanel(QWidget):
     SECTION = "word_reveal"

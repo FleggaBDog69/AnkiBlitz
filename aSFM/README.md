@@ -25,6 +25,10 @@ Focus Mode*, extracted from the **AnkiBlitz** suite so you can use just this pie
   hold sticks across cards, and every card it applies to says so on screen. The
   button stays faint until you hover it; the “paused” badge is clickable to
   resume, so whatever you paused with can start you again.
+- **Learns your pace.** Auto-tune gently adjusts the timer to how fast you
+  actually reveal cards (never more than 15% quicker; timeouts back it off
+  fast), and **Calibrate from my reviews…** suggests base / per-word timings
+  from your own data, shown side by side before anything changes.
 - **Picture-card mode:** chosen note types / decks use a set time instead of a
   word count (there's nothing to read).
 

@@ -21,7 +21,7 @@ from aqt.sound import av_player
 from aqt.utils import tooltip
 
 from ..config import PACKAGE, get_section
-from . import reveal, session, topbar
+from . import pace, reveal, session, topbar
 
 PYCMD_PREFIX = "focus:"
 
@@ -209,6 +209,17 @@ def _on_show_question(*args, **kwargs) -> None:
     s = session.get_active()
     if s is not None and getattr(s, "paused", False):
         payload["paused"] = True
+    track = (payload.get("autoReveal") or {}).pop("_track", None)
+    try:
+        # A card whose timer is held from the start (the pause key, or a paused
+        # launch waiting for your first key) never runs one: nothing to learn.
+        if track and not payload["autoPaused"] and not payload.get("paused"):
+            pace.start_card(card, get_section("speed_focus"),
+                            track["inputs"], track["delay"])
+        else:
+            pace.clear_card()
+    except Exception:
+        pace.clear_card()
     _eval(f"window.FocusSuite && FocusSuite.onCard({json.dumps(payload)});")
     push_progress()
 
@@ -226,6 +237,10 @@ def _on_show_answer(*args, **kwargs) -> None:
     t = _tracker()
     if t is not None:
         t.note_answer_shown()
+    try:
+        pace.end_card(card, get_section("speed_focus"))
+    except Exception:
+        pass
     payload = reveal.answer_payload(card)
     payload["autoPaused"] = _sticky_pause(payload)
     _eval(f"window.FocusSuite && FocusSuite.onCard({json.dumps(payload)});")
@@ -241,6 +256,7 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
     if action == "reveal":
         rv = mw.reviewer
         if rv and rv.card and rv.state == "question":
+            pace.note_auto_fire()   # before _showAnswer, which ends the card
             rv._showAnswer()
         return (True, None)
     if action == "stopaudio":
@@ -261,6 +277,9 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
     if action.startswith("autopause:"):
         global _auto_paused
         _auto_paused = action.endswith("1")
+        rv = mw.reviewer
+        if _auto_paused and rv and rv.state == "question":
+            pace.note_hold()
         key = str(get_section("speed_focus").get("pause_key") or "p").upper()
         tooltip(
             f"⏸ Speed Focus paused — press {key} to resume" if _auto_paused

@@ -43,4 +43,13 @@ def _on_profile_open() -> None:
     _initialized = True
 
 
+def _on_profile_close() -> None:
+    try:
+        from .engine import pace
+        pace.end_session()
+    except Exception:
+        pass
+
+
 gui_hooks.profile_did_open.append(_on_profile_open)
+gui_hooks.profile_will_close.append(_on_profile_close)

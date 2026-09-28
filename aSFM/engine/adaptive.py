@@ -258,7 +258,8 @@ def _answer_term(cfg: dict, answer_words: int) -> float:
 
 def delay_for(cfg: dict, words: int, ease: int, lapses: int, reps: int,
               unfamiliar: bool, is_new: bool = False, difficulty=None,
-              fixed_time: bool = False, answer_words: int = 0) -> float:
+              fixed_time: bool = False, answer_words: int = 0,
+              pace: float = 1.0) -> float:
     """Pure core: the reveal delay from explicit card primitives.
 
     Shared by the live runtime (reveal_delay_seconds) and the settings preview,
@@ -275,6 +276,10 @@ def delay_for(cfg: dict, words: int, ease: int, lapses: int, reps: int,
     ``is_fixed_time_card``) ignore word count and familiarity entirely: they get
     a SET base time (``fixed_time_base_seconds``) with only the difficulty term
     as a modifier, since there is no text to read.
+
+    ``pace`` is the learned personal multiplier (see engine/pace.py). It
+    applies to the whole delay, before the min/max clamp, so the clamp still
+    has the last word.
     """
     def knob(key):
         return float(cfg.get(key, DEFAULTS[key]))
@@ -298,6 +303,7 @@ def delay_for(cfg: dict, words: int, ease: int, lapses: int, reps: int,
             delay *= unfamiliar_mult
         delay *= _difficulty_multiplier(difficulty, ease, lapses, reps, weight)
 
+    delay *= pace
     if hi < lo:
         hi = lo
     return max(lo, min(delay, hi))
@@ -330,8 +336,22 @@ def is_fixed_time_card(card, cfg: dict) -> bool:
     return False
 
 
-def reveal_delay_seconds(card, cfg: dict) -> float:
-    """Seconds to wait (after the reveal finishes) before showing the answer."""
+def difficulty_multiplier(cfg: dict, inputs: dict) -> float:
+    """The difficulty factor ``delay_for`` would apply to a card with these
+    inputs. The pace tracker divides it back out of an observed reveal time, so
+    calibration fits the length terms alone."""
+    weight = float(cfg.get("difficulty_weight", DEFAULTS["difficulty_weight"]))
+    return _difficulty_multiplier(inputs["difficulty"], inputs["ease"],
+                                  inputs["lapses"], inputs["reps"], weight)
+
+
+def card_inputs(card, cfg: dict) -> dict:
+    """The primitives ``delay_for`` takes, read off a live card.
+
+    The answer side is always measured (it's the same cached render), even
+    while the answer term is off: the pace tracker records it so calibration
+    can suggest a value if you ever switch the term on.
+    """
     try:
         ease = card.factor or _DEFAULT_EASE
     except Exception:
@@ -342,13 +362,9 @@ def reveal_delay_seconds(card, cfg: dict) -> float:
         lapses, reps = 0, 1
     fixed = is_fixed_time_card(card, cfg)
     words = 0 if fixed else _question_word_count(card)
-    # Only measure the answer side when the term can actually contribute, and
-    # never for fixed-time cards (which ignore length by definition).
-    answer_words = 0
-    if not fixed and _answer_term(cfg, 1) > 0:
-        answer_words = _answer_word_count(card, words)
-    return delay_for(
-        cfg,
+    # Fixed-time cards ignore length by definition, so skip the answer side.
+    answer_words = 0 if fixed else _answer_word_count(card, words)
+    return dict(
         words=words,
         ease=ease,
         lapses=lapses,
@@ -359,3 +375,8 @@ def reveal_delay_seconds(card, cfg: dict) -> float:
         fixed_time=fixed,
         answer_words=answer_words,
     )
+
+
+def reveal_delay_seconds(card, cfg: dict, pace: float = 1.0) -> float:
+    """Seconds to wait (after the reveal finishes) before showing the answer."""
+    return delay_for(cfg, pace=pace, **card_inputs(card, cfg))

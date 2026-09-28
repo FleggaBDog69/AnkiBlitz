@@ -30,11 +30,32 @@ delay = clamp(delay, min_delay_seconds, max_delay_seconds)
 | `warning_at_percent` | Warn (sound and/or colour) once this % of the delay has elapsed. |
 | `pause_key_enabled` | A key that freezes the timer on the current card. |
 | `pause_key` | Which key that is (default `p`). Give it a different key from Progressive Word Reveal's if you run both. |
+| `auto_tune_enabled` | Learn a personal pace multiplier (0.85–2×) from how you actually reveal cards. See *Learn my pace* below. |
+| `target_timer_wins_percent` | How often the answer should appear before you've revealed it yourself (default 10%). Drives both auto-tune and calibration. |
 | `more_time_button` | Show a small **More time** button above the countdown. Same hold as the pause key, but visible — click it and the timer stops until you click (or press the key) again. Faint until hovered. |
 | `excluded_note_types` / `excluded_decks` | Skip the timer for these (a parent deck covers its subdecks). |
 | `fixed_time_enabled` | Use a set time (no word count) for picture / visual cards. |
 | `fixed_time_base_seconds` | The set time for a picture card (difficulty still applies). |
 | `fixed_time_note_types` / `fixed_time_decks` | Which cards count as picture cards. |
+
+### Learn my pace
+
+Auto-tune scales every delay by a learned pace until the timer beats you on
+about `target_timer_wins_percent` of cards. It is deliberately gentle: each
+card you reveal first shortens the timer ~0.5%, each timeout or More time
+lengthens it ~5%, and it never goes below 0.85×. If you normally let the
+timer run, timeouts aren't counted as "too short" and the pace drifts back to
+1.0×.
+
+**Calibrate from my reviews…** (in Settings) fits `base_seconds`,
+`seconds_per_word` and, if it's on, `seconds_per_answer_word` to your reveal
+times, and shows the suggestion before anything changes. It uses what aSFM
+has measured once it has seen 150 cards you revealed yourself; before that it
+makes a rough estimate from Anki's review history.
+
+What's learned is kept per profile in `user_files/pace_<profile>.json`:
+the pace, a compact histogram of reveal times, and a one-line summary per
+session. Counts only, never card content, and a few KB at most.
 
 ### Word counting
 

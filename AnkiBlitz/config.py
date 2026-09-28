@@ -61,6 +61,12 @@ DEFAULTS = {
         # but discoverable without knowing the key exists. Glutanimate's Speed
         # Focus Mode had one; this is the equivalent.
         "more_time_button": True,
+        # Learn my pace (engine/pace.py). Auto-tune scales every delay by a
+        # learned multiplier, steering until the timer beats you on about
+        # target_timer_wins_percent of cards; calibration fits base / per-word
+        # to the same target. The learned pace lives in user_files, not here.
+        "auto_tune_enabled": True,
+        "target_timer_wins_percent": 10,
         "excluded_note_types": [],    # skip the auto-reveal timer for these note types
         "excluded_decks": [],         # skip the auto-reveal timer for these decks
         # Picture / visual cards: ignore word count and familiarity; give a SET

@@ -19,7 +19,7 @@ from aqt.sound import av_player
 from aqt.utils import tooltip
 
 from ..config import DEFAULTS, PACKAGE, get_config
-from . import adaptive
+from . import adaptive, pace
 
 PYCMD_PREFIX = "asfm:"
 
@@ -179,10 +179,14 @@ def question_payload(card) -> dict:
     if adaptive.is_new_card(card) and not cfg.get("enable_on_new",
                                                   DEFAULTS["enable_on_new"]):
         return off
-    delay_ms = int(adaptive.reveal_delay_seconds(card, cfg) * 1000)
+    inputs = adaptive.card_inputs(card, cfg)
+    delay_s = adaptive.delay_for(cfg, pace=pace.current(cfg), **inputs)
     return {
         "enabled": True,
-        "delayMs": delay_ms,
+        # Stripped before the payload goes to the webview; the pace tracker
+        # needs the card's inputs and doesn't want to measure them twice.
+        "_track": {"inputs": inputs, "delay": delay_s},
+        "delayMs": int(delay_s * 1000),
         "showCountdown": bool(cfg.get("show_countdown", True)),
         "warnColour": bool(cfg.get("countdown_warning_colour",
                                    DEFAULTS["countdown_warning_colour"])),
@@ -204,7 +208,18 @@ def _on_show_question(*args, **kwargs) -> None:
     card = mw.reviewer.card if mw.reviewer else None
     if not card:
         return
-    _eval(f"window.ASFM && ASFM.onCard({json.dumps(question_payload(card))});")
+    payload = question_payload(card)
+    track = payload.pop("_track", None)
+    try:
+        # A card that opens with the timer already held never runs one, so
+        # there's nothing to learn from it.
+        if track and not payload.get("autoPaused"):
+            pace.start_card(card, get_config(), track["inputs"], track["delay"])
+        else:
+            pace.clear_card()
+    except Exception:
+        pace.clear_card()
+    _eval(f"window.ASFM && ASFM.onCard({json.dumps(payload)});")
 
 
 def _on_show_answer(*args, **kwargs) -> None:
@@ -212,6 +227,10 @@ def _on_show_answer(*args, **kwargs) -> None:
     # via the timer).
     # The pause block still rides along: the key has to keep working (and the
     # sticky flag has to stay true) while the answer is on screen.
+    try:
+        pace.end_card(mw.reviewer.card if mw.reviewer else None, get_config())
+    except Exception:
+        pass
     payload = {"enabled": False, **_pause_block(get_config())}
     _eval(f"window.ASFM && ASFM.onCard({json.dumps(payload)});")
 
@@ -223,6 +242,7 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
     if action == "reveal":
         rv = mw.reviewer
         if rv and rv.card and rv.state == "question":
+            pace.note_auto_fire()   # before _showAnswer, which ends the card
             rv._showAnswer()
         return (True, None)
     if action == "warn":
@@ -231,6 +251,9 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
     if action.startswith("autopause:"):
         global _auto_paused
         _auto_paused = action.endswith("1")
+        rv = mw.reviewer
+        if _auto_paused and rv and rv.state == "question":
+            pace.note_hold()
         key = str(get_config().get("pause_key") or "p").upper()
         tooltip(
             f"⏸ Auto-reveal paused — press {key} to resume" if _auto_paused

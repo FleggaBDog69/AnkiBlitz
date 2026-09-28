@@ -8,7 +8,7 @@ is "dumb": it just executes whatever payload Python sends.
 from aqt import mw
 
 from ..config import DEFAULTS, get_section, suite_enabled
-from . import adaptive, tts_sync
+from . import adaptive, pace, tts_sync
 
 
 def _deck_excluded(deck_name: str, excluded: list) -> bool:
@@ -89,8 +89,14 @@ def question_payload(card) -> dict:
         auto_on = False
 
     delay_ms = 0
+    track = None
     if auto_on:
-        delay_ms = int(adaptive.reveal_delay_seconds(card, sf) * 1000)
+        inputs = adaptive.card_inputs(card, sf)
+        delay_s = adaptive.delay_for(sf, pace=pace.current(sf), **inputs)
+        delay_ms = int(delay_s * 1000)
+        # Stripped before the payload reaches the webview; the pace tracker
+        # needs the card's inputs and doesn't want to measure them twice.
+        track = {"inputs": inputs, "delay": delay_s}
 
     return {
         "side": "question",
@@ -98,6 +104,7 @@ def question_payload(card) -> dict:
         "autoReveal": {
             "enabled": auto_on,
             "delayMs": delay_ms,
+            "_track": track,
             "minPostMs": int(float(sf.get("min_post_seconds", 1.0)) * 1000),
             "showCountdown": bool(sf.get("show_countdown", True)),
             "warnColour": bool(sf.get("countdown_warning_colour", True)),

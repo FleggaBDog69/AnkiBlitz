@@ -10,7 +10,7 @@ Mode (AGPL). Extracted from the AnkiBlitz suite so it can be used on its own.
 from aqt import gui_hooks
 
 from . import config
-from .engine import injection
+from .engine import injection, pace
 from .menu import build_menu
 
 _initialized = False
@@ -26,4 +26,12 @@ def _on_profile_open() -> None:
     _initialized = True
 
 
+def _on_profile_close() -> None:
+    try:
+        pace.end_session()
+    except Exception:
+        pass
+
+
 gui_hooks.profile_did_open.append(_on_profile_open)
+gui_hooks.profile_will_close.append(_on_profile_close)
