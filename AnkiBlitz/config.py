@@ -33,8 +33,7 @@ DEFAULTS = {
         # short question with a five-item answer needs more than its front side
         # suggests. Additive and capped (see engine/adaptive.py), so it does NOT
         # scale with question length, but IS scaled by the new / learning /
-        # difficulty modifiers. 0.0 seconds per answer word = off, which is the
-        # shipped default: turning it on lengthens timers, so it is opt-in.
+        # difficulty modifiers. 0.0 seconds per answer word switches it off.
         "seconds_per_answer_word": 0.1,   # seconds added per answer-side word (0 = off)
         "max_answer_seconds": 5.0,        # ceiling on that addition
         "min_delay_seconds": 2.0,     # floor for the computed delay
@@ -45,6 +44,10 @@ DEFAULTS = {
         "difficulty_weight": 0.30,    # max ± swing from FSRS difficulty (0 = off)
         "min_post_seconds": 1.0,      # hold answer >= this long after the reveal finishes
         "show_countdown": True,       # show the depleting countdown indicator
+        # Turn the countdown bar from a calm grey to red once the warning point
+        # (warning_at_percent) is reached — a silent heads-up, with or without
+        # the sound.
+        "countdown_warning_colour": True,
         "warning_sound": True,        # play an alert before the answer auto-shows
         "warning_at_percent": 75,     # warn once this % of the delay has elapsed
         # Pause key: hold the auto-reveal timer (and its warning) until you press

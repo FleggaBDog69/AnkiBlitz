@@ -18,6 +18,16 @@
   background: linear-gradient(90deg, #f59e0b, #ef4444);
 }
 
+/* Warning colour shift (countdown_warning_colour): the bar runs a calm grey
+   until the warning point, then turns red — a silent heads-up. Solid colours
+   rather than the gradient above, because a gradient can't fade. */
+#asfm-countdown.asfm-shift > .asfm-countdown-fill {
+  background: rgba(148, 163, 184, 0.85);
+}
+#asfm-countdown.asfm-shift.asfm-warned > .asfm-countdown-fill {
+  background: #ef4444;
+}
+
 /* Pause badge. It says "paused" in words rather than relying on the countdown
    bar having stopped — a frozen bar on its own reads as a bug. */
 #asfm-paused {

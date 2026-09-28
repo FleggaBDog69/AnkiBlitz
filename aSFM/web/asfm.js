@@ -31,6 +31,7 @@
   var warnDeadline = 0;   // when the warning sound would play
   var pauseLeftMs = 0;    // what was left on each when the timer was paused
   var pauseWarnLeftMs = 0;
+  var warned = false;     // has this card passed its warning point?
 
   function fire() {
     pycmd("asfm:reveal");
@@ -177,33 +178,60 @@
     fill.style.transform = current;
   }
 
+  // The inline transition replaces the stylesheet's, so it has to carry the
+  // colour fade for the warning point as well as the depletion.
+  function depletion(ms) {
+    return "transform " + ms + "ms linear, background-color 0.4s ease";
+  }
+
   function resumeCountdown(ms) {
     var fill = countdownFill();
     if (!fill) {
-      showCountdown(ms);
+      // The paused badge took the bar down; rebuild it at the length that was
+      // actually left, not at full, so it doesn't overstate the wait.
+      var total = (pending && pending.delayMs) || ms;
+      showCountdown(ms, Math.min(1, ms / total));
       return;
     }
     requestAnimationFrame(function () {
-      fill.style.transition = "transform " + ms + "ms linear";
+      fill.style.transition = depletion(ms);
       requestAnimationFrame(function () { fill.style.transform = "scaleX(0)"; });
     });
   }
 
-  function showCountdown(ms) {
+  // Deplete left-to-right over ms, starting from `from` (1 = full).
+  function showCountdown(ms, from) {
     removeCountdown();
     var bar = document.createElement("div");
     bar.id = "asfm-countdown";
+    if (pending && pending.warnColour) bar.className = "asfm-shift";
     var fill = document.createElement("div");
     fill.className = "asfm-countdown-fill";
+    if (from !== undefined && from < 1) {
+      fill.style.transform = "scaleX(" + Math.max(0, from) + ")";
+    }
     bar.appendChild(fill);
     document.body.appendChild(bar);
-    // Deplete left-to-right over ms.
+    if (warned) markWarned();
     requestAnimationFrame(function () {
-      fill.style.transition = "transform " + ms + "ms linear";
+      fill.style.transition = depletion(ms);
       requestAnimationFrame(function () {
         fill.style.transform = "scaleX(0)";
       });
     });
+  }
+
+  function markWarned() {
+    var bar = document.getElementById("asfm-countdown");
+    if (bar) bar.classList.add("asfm-warned");
+  }
+
+  // The warning point: the sound, the colour shift, or both.
+  function onWarn() {
+    warned = true;
+    if (!pending) return;
+    if (pending.warn) playAlert();
+    if (pending.warnColour) markWarned();
   }
 
   function removeCountdown() {
@@ -286,7 +314,7 @@
     autoTimer = setTimeout(fire, delay);
     autoDeadline = Date.now() + delay;
     if (warnMs > 0 && warnMs < delay) {
-      warnTimer = setTimeout(playAlert, warnMs);
+      warnTimer = setTimeout(onWarn, warnMs);
       warnDeadline = Date.now() + warnMs;
     } else {
       warnDeadline = 0;
@@ -309,9 +337,10 @@
     // Only once there is a wait to hold: on a zero-delay card the answer is
     // already up, and a button offering to pause it would do nothing.
     showMoreTime();
-    // Heads-up alert once warnPercent% of the wait has elapsed.
+    // Heads-up (sound and/or bar colour) once warnPercent% of the wait is gone.
     var pct = pending.warnPercent || 0;
-    var warnMs = (pending.warn && pct > 0 && pct < 100) ? delay * (pct / 100) : 0;
+    var wantWarn = pending.warn || (pending.warnColour && pending.showCountdown);
+    var warnMs = (wantWarn && pct > 0 && pct < 100) ? delay * (pct / 100) : 0;
     armAutoTimers(delay, warnMs);
   }
 
@@ -326,6 +355,7 @@
   A.onCard = function (payload) {
     cancel();
     started = false;
+    warned = false;
     pending = null;
     payload = payload || {};
     A._pauseKey = (payload.pauseKey || "p").toLowerCase();

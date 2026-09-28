@@ -175,6 +175,7 @@ _CSS_MAP = {
     "--ab-track":      ("grey_light",  "rgba(255, 255, 255, 0.08)"),
     "--ab-bar-from":   ("blue",        "#f59e0b"),
     "--ab-bar-to":     ("red",         "#ef4444"),
+    "--ab-bar-idle":   ("grey_mid",    "rgba(148, 163, 184, 0.85)"),
     "--ab-warn":       ("red",         "rgba(245, 158, 11, 0.92)"),
     "--ab-warn-fg":    ("surface",     "#1b1b1b"),
     "--ab-acc-from":   ("green",       "#4ade80"),

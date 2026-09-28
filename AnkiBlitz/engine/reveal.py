@@ -7,7 +7,7 @@ is "dumb": it just executes whatever payload Python sends.
 
 from aqt import mw
 
-from ..config import get_section, suite_enabled
+from ..config import DEFAULTS, get_section, suite_enabled
 from . import adaptive, tts_sync
 
 
@@ -84,7 +84,8 @@ def question_payload(card) -> dict:
 
     reveal_on = bool(suite_on and wr.get("enabled", True) and not _section_excluded(card, wr))
     auto_on = bool(suite_on and sf.get("enabled", True) and not _section_excluded(card, sf))
-    if auto_on and adaptive.is_new_card(card) and not sf.get("enable_on_new", True):
+    if auto_on and adaptive.is_new_card(card) and not sf.get(
+            "enable_on_new", DEFAULTS["speed_focus"]["enable_on_new"]):
         auto_on = False
 
     delay_ms = 0
@@ -99,6 +100,7 @@ def question_payload(card) -> dict:
             "delayMs": delay_ms,
             "minPostMs": int(float(sf.get("min_post_seconds", 1.0)) * 1000),
             "showCountdown": bool(sf.get("show_countdown", True)),
+            "warnColour": bool(sf.get("countdown_warning_colour", True)),
             "warn": bool(sf.get("warning_sound", True)),
             "alertUrl": _alert_url() if sf.get("warning_sound", True) else "",
             "warnPercent": int(sf.get("warning_at_percent", 60)),

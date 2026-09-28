@@ -11,13 +11,15 @@ Focus Mode*, extracted from the **AnkiBlitz** suite so you can use just this pie
 
 ## What it does
 
-- Waits `(base + per-word × words) × familiarity × difficulty`, clamped between a
-  min and max, then auto-reveals.
+- Waits `(base + per-word × question words + per-answer-word × answer words) ×
+  familiarity × difficulty`, clamped between a min and max, then auto-reveals.
+  The answer term is capped; set it to `0` to time from the question alone.
 - Counts only the words you actually **see** — hidden fields and AnKing-style tag
   chips don't inflate the timer.
 - Treats new and learning/relearning cards as needing more time (tunable).
 - Nudges the delay by the card's **FSRS difficulty** (harder = longer), bounded.
-- Optional thin **countdown bar** and a **warning sound** before the reveal.
+- Optional thin **countdown bar** and a **warning sound** before the reveal. The
+  bar can also turn from grey to red at the warning point — a silent heads-up.
 - A **“More time” button** on the card, and a **pause key** (default `p`) — both
   freeze the countdown on the card you're on and pick it up where it stopped. The
   hold sticks across cards, and every card it applies to says so on screen. The

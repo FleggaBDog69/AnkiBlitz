@@ -18,7 +18,7 @@ from aqt.reviewer import Reviewer
 from aqt.sound import av_player
 from aqt.utils import tooltip
 
-from ..config import PACKAGE, get_config
+from ..config import DEFAULTS, PACKAGE, get_config
 from . import adaptive
 
 PYCMD_PREFIX = "asfm:"
@@ -176,13 +176,16 @@ def question_payload(card) -> dict:
     off = {"enabled": False, **_pause_block(cfg)}
     if not cfg.get("enabled", True) or _excluded(card, cfg):
         return off
-    if adaptive.is_new_card(card) and not cfg.get("enable_on_new", True):
+    if adaptive.is_new_card(card) and not cfg.get("enable_on_new",
+                                                  DEFAULTS["enable_on_new"]):
         return off
     delay_ms = int(adaptive.reveal_delay_seconds(card, cfg) * 1000)
     return {
         "enabled": True,
         "delayMs": delay_ms,
         "showCountdown": bool(cfg.get("show_countdown", True)),
+        "warnColour": bool(cfg.get("countdown_warning_colour",
+                                   DEFAULTS["countdown_warning_colour"])),
         "warn": bool(cfg.get("warning_sound", True)),
         "alertUrl": alert_url() if cfg.get("warning_sound", True) else "",
         "warnPercent": int(cfg.get("warning_at_percent", 75)),
@@ -242,9 +245,8 @@ def register() -> None:
     # Anki serves /_addons/<pkg>/<sub> only when <sub> re.fullmatch-es this
     # pattern, so the alert has to be exported explicitly or the <audio> src
     # 404s and the sound silently never plays. user_files is opened for the
-    # alert FILE ONLY, never the folder — it also holds the break journal,
-    # sprint stats and music profile, and everything exported here is readable
-    # by any page loaded in the webview.
+    # alert FILE ONLY, never the whole folder: everything exported here is
+    # readable by any page loaded in the webview.
     mw.addonManager.setWebExports(
         PACKAGE, r"web.*|sounds/alert\.[A-Za-z0-9]+|user_files/alert\.[A-Za-z0-9]+"
     )

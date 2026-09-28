@@ -39,6 +39,8 @@
   var warnDeadline = 0;      // when the warning sound would play
   var pauseLeftMs = 0;       // what was left on each when the timer was paused
   var pauseWarnLeftMs = 0;
+  var countdownTotalMs = 0;  // the whole wait the countdown bar stands for
+  var warned = false;        // has this card passed its warning point?
 
   function getRoot() {
     return document.getElementById("qa") || document.body;
@@ -348,7 +350,7 @@
     autoTimer = setTimeout(fireReveal, effectiveMs);
     autoDeadline = Date.now() + effectiveMs;
     if (warnMs > 0 && warnMs < effectiveMs) {
-      warnTimer = setTimeout(playAlert, warnMs);
+      warnTimer = setTimeout(onWarn, warnMs);
       warnDeadline = Date.now() + warnMs;
     } else {
       warnDeadline = 0;
@@ -368,6 +370,7 @@
     // finished; the adaptive delay applies on top of that floor.
     var floor = (revealDurationMs || 0) + (minPostMs || 0);
     var effective = Math.max(delay, floor);
+    countdownTotalMs = effective;
     if (pendingAuto.showCountdown && effective > 0) showCountdown(effective);
     if (effective <= 0) {
       fireReveal();
@@ -376,9 +379,11 @@
     // Only once there is a wait to hold: on a zero-delay card the answer is
     // already up, and a button offering to pause it would do nothing.
     showMoreTime();
-    // Heads-up alert once warnPercent% of the wait has elapsed.
+    // Heads-up (sound and/or bar colour) once warnPercent% of the wait is gone.
     var pct = pendingAuto.warnPercent || 0;
-    var warnMs = (pendingAuto.warn && pct > 0 && pct < 100) ? effective * (pct / 100) : 0;
+    var wantWarn = pendingAuto.warn
+      || (pendingAuto.warnColour && pendingAuto.showCountdown);
+    var warnMs = (wantWarn && pct > 0 && pct < 100) ? effective * (pct / 100) : 0;
     armAutoTimers(effective, warnMs);
   }
 
@@ -508,33 +513,60 @@
     fill.style.transform = current;
   }
 
+  // The inline transition replaces the stylesheet's, so it has to carry the
+  // colour fade for the warning point as well as the depletion.
+  function depletion(ms) {
+    return "transform " + ms + "ms linear, background-color 0.4s ease";
+  }
+
   function resumeCountdown(ms) {
     var fill = countdownFill();
     if (!fill) {
-      showCountdown(ms);
+      // The paused badge took the bar down; rebuild it at the length that was
+      // actually left, not at full, so it doesn't overstate the wait.
+      var total = countdownTotalMs || ms;
+      showCountdown(ms, Math.min(1, ms / total));
       return;
     }
     requestAnimationFrame(function () {
-      fill.style.transition = "transform " + ms + "ms linear";
+      fill.style.transition = depletion(ms);
       requestAnimationFrame(function () { fill.style.transform = "scaleX(0)"; });
     });
   }
 
-  function showCountdown(ms) {
+  // Deplete left-to-right over ms, starting from `from` (1 = full).
+  function showCountdown(ms, from) {
     removeCountdown();
     var bar = document.createElement("div");
     bar.id = "fs-countdown";
+    if (pendingAuto && pendingAuto.warnColour) bar.className = "fs-shift";
     var fill = document.createElement("div");
     fill.className = "fs-countdown-fill";
+    if (from !== undefined && from < 1) {
+      fill.style.transform = "scaleX(" + Math.max(0, from) + ")";
+    }
     bar.appendChild(fill);
     document.body.appendChild(bar);
-    // Deplete left-to-right over ms.
+    if (warned) markWarned();
     requestAnimationFrame(function () {
-      fill.style.transition = "transform " + ms + "ms linear";
+      fill.style.transition = depletion(ms);
       requestAnimationFrame(function () {
         fill.style.transform = "scaleX(0)";
       });
     });
+  }
+
+  function markWarned() {
+    var bar = document.getElementById("fs-countdown");
+    if (bar) bar.classList.add("fs-warned");
+  }
+
+  // The warning point: the sound, the colour shift, or both.
+  function onWarn() {
+    warned = true;
+    if (!pendingAuto) return;
+    if (pendingAuto.warn) playAlert();
+    if (pendingAuto.warnColour) markWarned();
   }
 
   function removeCountdown() {
@@ -574,6 +606,8 @@
     minPostMs = (payload.autoReveal && payload.autoReveal.minPostMs) || 0;
     autoStarted = false;
     autoFired = false;
+    warned = false;
+    countdownTotalMs = 0;
     pendingAuto = null;
     pausedHold = !!payload.paused;
     FS._revealKey = (payload.reveal && payload.reveal.revealKey) || "p";

@@ -21,8 +21,7 @@ DEFAULTS = {
     # short question with a five-item answer needs more than its front side
     # suggests. Additive and capped (see engine/adaptive.py), so it does NOT
     # scale with question length, but IS scaled by the new / learning /
-    # difficulty modifiers. 0.0 seconds per answer word = off, which is the
-    # shipped default: turning it on lengthens timers, so it is opt-in.
+    # difficulty modifiers. 0.0 seconds per answer word switches it off.
     "seconds_per_answer_word": 0.1,   # seconds added per answer-side word (0 = off)
     "max_answer_seconds": 5.0,        # ceiling on that addition
     "min_delay_seconds": 2.0,     # floor for the computed delay
@@ -32,14 +31,18 @@ DEFAULTS = {
     "enable_on_new": False,        # run the auto-reveal timer on new cards
     "difficulty_weight": 0.30,    # max ± swing from FSRS difficulty (0 = off)
     "show_countdown": True,       # show the depleting countdown indicator
+    # Turn the countdown bar from a calm grey to red once the warning point
+    # (warning_at_percent) is reached — a silent heads-up, with or without the
+    # sound.
+    "countdown_warning_colour": True,
     "warning_sound": True,        # play an alert before the answer auto-shows
     "warning_at_percent": 75,     # warn once this % of the delay has elapsed
     "pause_key_enabled": True,    # a key that holds/releases the auto-reveal timer
-    "pause_key": "p",
+    "pause_key": "p",             # which key that is
     # The visible "More time" button — the same hold the pause key applies, but
     # discoverable without knowing the key exists. Glutanimate's Speed Focus Mode
     # had one; this is the equivalent.
-    "more_time_button": True,             # which key that is
+    "more_time_button": True,
     "excluded_note_types": [],    # skip the auto-reveal timer for these note types
     "excluded_decks": [],         # skip the auto-reveal timer for these decks
     # Picture / visual cards: ignore word count and familiarity; give a SET reveal

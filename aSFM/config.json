@@ -11,6 +11,7 @@
   "enable_on_new": false,
   "difficulty_weight": 0.30,
   "show_countdown": true,
+  "countdown_warning_colour": true,
   "warning_sound": true,
   "warning_at_percent": 75,
   "pause_key_enabled": true,

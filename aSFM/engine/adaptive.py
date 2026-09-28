@@ -7,9 +7,8 @@ longer questions and less-familiar / harder cards get more thinking time.
     delay = (base + length_term + answer_term) * familiarity_mult * difficulty_mult
     delay = clamp(delay, min_delay, max_delay)
 
-The ``answer_term`` is off unless ``seconds_per_answer_word`` is above zero
-(its default is 0.0, so the shipped behaviour is unchanged). It is **additive**, sitting
-inside the bracket. Additive because the whole point is the short-question /
+The ``answer_term`` is off when ``seconds_per_answer_word`` is zero. It is
+**additive**, sitting inside the bracket. Additive because the whole point is the short-question /
 long-answer card: a multiplicative answer term would scale the bonus by the
 question's length, giving the shortest questions the smallest bonus — exactly
 backwards. Inside the bracket because the familiarity / difficulty modifiers
@@ -19,12 +18,14 @@ The difficulty term is driven by the card's **FSRS difficulty** (1–10) when
 available, falling back to SM-2 ease only for cards without FSRS state. It is a
 gentle, bounded nudge: ``difficulty_mult`` stays within ``1 ± difficulty_weight``
 (set ``difficulty_weight`` to 0 to ignore difficulty entirely). Everything here
-is config-tunable (see config.py → "speed_focus") and deliberately transparent.
+is config-tunable (see ``DEFAULTS`` in config.py) and deliberately transparent.
 """
 
 import html as _html
 import re
 from html.parser import HTMLParser
+
+from ..config import DEFAULTS
 
 # Strip whole <script>/<style> blocks INCLUDING their text bodies first: a card's
 # rendered question_text carries the front template's inline JS/CSS source, and
@@ -239,7 +240,7 @@ def _difficulty_multiplier(difficulty, ease: int, lapses: int, reps: int,
 
 
 def _answer_term(cfg: dict, answer_words: int) -> float:
-    """Extra seconds for a long answer — additive, bounded, off by default.
+    """Extra seconds for a long answer — additive, bounded, 0 per word = off.
 
     Capped in SECONDS (not words) so the ceiling is a flat, honest number the
     settings panel can state outright ("adds at most N s"); with an additive
@@ -247,10 +248,11 @@ def _answer_term(cfg: dict, answer_words: int) -> float:
     The cap is applied BEFORE the familiarity / difficulty modifiers, so a new
     card with a long answer still gets its new-card multiplier on top.
     """
-    per_word = float(cfg.get("seconds_per_answer_word", 0.0))
+    per_word = float(cfg.get("seconds_per_answer_word",
+                             DEFAULTS["seconds_per_answer_word"]))
     if per_word <= 0:
         return 0.0          # 0 s per answer word IS the off switch
-    cap = float(cfg.get("max_answer_seconds", 5.0))
+    cap = float(cfg.get("max_answer_seconds", DEFAULTS["max_answer_seconds"]))
     return min(per_word * max(0, answer_words), max(0.0, cap))
 
 
@@ -274,18 +276,21 @@ def delay_for(cfg: dict, words: int, ease: int, lapses: int, reps: int,
     a SET base time (``fixed_time_base_seconds``) with only the difficulty term
     as a modifier, since there is no text to read.
     """
-    lo = float(cfg.get("min_delay_seconds", 2.0))
-    hi = float(cfg.get("max_delay_seconds", 30.0))
-    weight = float(cfg.get("difficulty_weight", 1.0))
+    def knob(key):
+        return float(cfg.get(key, DEFAULTS[key]))
+
+    lo = knob("min_delay_seconds")
+    hi = knob("max_delay_seconds")
+    weight = knob("difficulty_weight")
 
     if fixed_time:
-        delay = float(cfg.get("fixed_time_base_seconds", 6.0))
+        delay = knob("fixed_time_base_seconds")
         delay *= _difficulty_multiplier(difficulty, ease, lapses, reps, weight)
     else:
-        base = float(cfg.get("base_seconds", 4.0))
-        per_word = float(cfg.get("seconds_per_word", 0.35))
-        unfamiliar_mult = float(cfg.get("unfamiliar_multiplier", 1.3))
-        new_mult = float(cfg.get("new_multiplier", 2.0))
+        base = knob("base_seconds")
+        per_word = knob("seconds_per_word")
+        unfamiliar_mult = knob("unfamiliar_multiplier")
+        new_mult = knob("new_multiplier")
         delay = base + per_word * words + _answer_term(cfg, answer_words)
         if is_new:
             delay *= new_mult
@@ -301,9 +306,8 @@ def delay_for(cfg: dict, words: int, ease: int, lapses: int, reps: int,
 def is_fixed_time_card(card, cfg: dict) -> bool:
     """True when this card is a 'picture / visual' card that should use a set
     reveal time (no per-word term). Matched by note-type name or deck, exactly
-    like the exclusion lists. These two lists live outside the profile system so
-    the choice endures across every profile."""
-    if not cfg.get("fixed_time_enabled", True):
+    like the exclusion lists."""
+    if not cfg.get("fixed_time_enabled", DEFAULTS["fixed_time_enabled"]):
         return False
     note_types = cfg.get("fixed_time_note_types", [])
     decks = cfg.get("fixed_time_decks", [])
@@ -341,7 +345,7 @@ def reveal_delay_seconds(card, cfg: dict) -> float:
     # Only measure the answer side when the term can actually contribute, and
     # never for fixed-time cards (which ignore length by definition).
     answer_words = 0
-    if not fixed and float(cfg.get("seconds_per_answer_word", 0.0)) > 0:
+    if not fixed and _answer_term(cfg, 1) > 0:
         answer_words = _answer_word_count(card, words)
     return delay_for(
         cfg,

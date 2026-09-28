@@ -154,7 +154,7 @@ class _Panel(QWidget):
         outer.addLayout(side, 2)
 
         self.enabled = QCheckBox("Enable adaptive auto-reveal")
-        self.enabled.setChecked(bool(cfg.get("enabled", True)))
+        self.enabled.setChecked(bool(cfg["enabled"]))
         layout.addWidget(self.enabled)
         layout.addWidget(_hint(
             "After the question shows, aSFM waits a computed delay, then shows the "
@@ -163,37 +163,36 @@ class _Panel(QWidget):
 
         form = QFormLayout()
         self.base = _double(0.0, 60.0, 0.5, 1, " s")
-        self.base.setValue(float(cfg.get("base_seconds", 3.0)))
+        self.base.setValue(float(cfg["base_seconds"]))
         form.addRow("Base time:", self.base)
 
         self.per_word = _double(0.0, 5.0, 0.05, 2, " s")
-        self.per_word.setValue(float(cfg.get("seconds_per_word", 0.30)))
+        self.per_word.setValue(float(cfg["seconds_per_word"]))
         form.addRow("Per word:", self.per_word)
 
         # --- answer length: 0 s per answer word is the off switch ---
         self.per_answer_word = _double(0.0, 5.0, 0.05, 2, " s")
-        self.per_answer_word.setValue(float(cfg.get("seconds_per_answer_word", 0.0)))
+        self.per_answer_word.setValue(float(cfg["seconds_per_answer_word"]))
         form.addRow("Per answer word:", self.per_answer_word)
 
         self.max_answer = _double(0.0, 60.0, 0.5, 1, " s")
-        self.max_answer.setValue(float(cfg.get("max_answer_seconds", 5.0)))
+        self.max_answer.setValue(float(cfg["max_answer_seconds"]))
         form.addRow("Answer time cap:", self.max_answer)
 
         self.min_delay = _double(0.0, 120.0, 0.5, 1, " s")
-        self.min_delay.setValue(float(cfg.get("min_delay_seconds", 2.0)))
+        self.min_delay.setValue(float(cfg["min_delay_seconds"]))
         form.addRow("Minimum delay:", self.min_delay)
 
         self.max_delay = _double(0.0, 300.0, 1.0, 1, " s")
-        self.max_delay.setValue(float(cfg.get("max_delay_seconds", 20.0)))
+        self.max_delay.setValue(float(cfg["max_delay_seconds"]))
         form.addRow("Maximum delay:", self.max_delay)
         layout.addLayout(form)
 
         layout.addWidget(_hint(
-            "“Per answer word” is 0 s by default, which means the timer only "
-            "looks at the QUESTION — so a one-line question with a five-item "
-            "answer gets a short timer even though there's a lot to recall. "
-            "Raise it above 0 and the words on the answer side add time too; "
-            "set it back to 0 to switch that off.\n\n"
+            "“Per answer word” adds time for the words on the ANSWER side, so a "
+            "one-line question with a five-item answer doesn't get a short timer "
+            "just because its front is short. Set it to 0 to time from the "
+            "question alone.\n\n"
             "It works on both card shapes: on front-and-back cards it measures "
             "the answer field, and on cloze cards it measures the text hidden "
             "behind [...] on this card. Hidden Extra fields, tags and sources "
@@ -204,13 +203,13 @@ class _Panel(QWidget):
         layout.addWidget(QLabel("<b>Modifiers (weighted)</b>"))
         mod = QFormLayout()
         self.unfamiliar = _double(1.0, 5.0, 0.1, 2, "×")
-        self.unfamiliar.setValue(float(cfg.get("unfamiliar_multiplier", 1.2)))
+        self.unfamiliar.setValue(float(cfg["unfamiliar_multiplier"]))
         mod.addRow("Learning / relearning cards:", self.unfamiliar)
 
         self.new_mult = _double(1.0, 5.0, 0.1, 2, "×")
-        self.new_mult.setValue(float(cfg.get("new_multiplier", 1.5)))
+        self.new_mult.setValue(float(cfg["new_multiplier"]))
         self.enable_on_new = QCheckBox("Run on new cards")
-        self.enable_on_new.setChecked(bool(cfg.get("enable_on_new", True)))
+        self.enable_on_new.setChecked(bool(cfg["enable_on_new"]))
         new_row = QHBoxLayout()
         new_row.setContentsMargins(0, 0, 0, 0)
         new_row.addWidget(self.new_mult)
@@ -219,7 +218,7 @@ class _Panel(QWidget):
         mod.addRow("New cards:", new_row)
 
         self.difficulty = _double(0.0, 1.0, 0.05, 2, "")
-        self.difficulty.setValue(float(cfg.get("difficulty_weight", 0.20)))
+        self.difficulty.setValue(float(cfg["difficulty_weight"]))
         mod.addRow("Difficulty weight:", self.difficulty)
         layout.addLayout(mod)
         layout.addWidget(_hint(
@@ -233,23 +232,31 @@ class _Panel(QWidget):
 
         layout.addWidget(_hline())
         self.show_countdown = QCheckBox("Show countdown bar while waiting")
-        self.show_countdown.setChecked(bool(cfg.get("show_countdown", True)))
+        self.show_countdown.setChecked(bool(cfg["show_countdown"]))
         layout.addWidget(self.show_countdown)
 
+        self.warn_colour = QCheckBox("Turn the bar red at the warning point")
+        self.warn_colour.setChecked(bool(cfg["countdown_warning_colour"]))
+        layout.addWidget(self.warn_colour)
+        self.show_countdown.toggled.connect(self.warn_colour.setEnabled)
+        self.warn_colour.setEnabled(self.show_countdown.isChecked())
+
         self.warning_sound = QCheckBox("Play a warning sound before revealing")
-        self.warning_sound.setChecked(bool(cfg.get("warning_sound", True)))
+        self.warning_sound.setChecked(bool(cfg["warning_sound"]))
         layout.addWidget(self.warning_sound)
 
         warn_form = QFormLayout()
         self.warn_pct = QSpinBox()
         self.warn_pct.setRange(5, 95)
         self.warn_pct.setSuffix(" %")
-        self.warn_pct.setValue(int(cfg.get("warning_at_percent", 75)))
+        self.warn_pct.setValue(int(cfg["warning_at_percent"]))
         warn_form.addRow("Warn after:", self.warn_pct)
         layout.addLayout(warn_form)
         layout.addWidget(_hint(
-            "The alert plays once this share of the auto-reveal delay has elapsed — "
-            "e.g. 75% leaves the final 25% as a heads-up before the answer shows. "
+            "The alert plays (and the bar turns red) once this share of the "
+            "auto-reveal delay has elapsed — e.g. 75% leaves the final 25% as a "
+            "heads-up before the answer shows. With the colour on, the bar runs "
+            "grey until then; with it off, it keeps its amber-to-red gradient. "
             "To change the sound, drop your own alert file in user_files — "
             ".flac, .ogg, .opus or .wav play directly in the reviewer; an .mp3 "
             "needs Anki's own audio player, which depends on a working mpv."))
@@ -257,11 +264,11 @@ class _Panel(QWidget):
         layout.addWidget(_hline())
         self.pause_key_enabled = QCheckBox(
             "Pause key: hold the timer on the current card")
-        self.pause_key_enabled.setChecked(bool(cfg.get("pause_key_enabled", True)))
+        self.pause_key_enabled.setChecked(bool(cfg["pause_key_enabled"]))
         layout.addWidget(self.pause_key_enabled)
 
         pause_form = QFormLayout()
-        self.pause_key = _KeyCaptureEdit(cfg.get("pause_key", "p"))
+        self.pause_key = _KeyCaptureEdit(cfg["pause_key"])
         pause_form.addRow("Pause key:", self.pause_key)
         layout.addLayout(pause_form)
         self.pause_key_enabled.toggled.connect(self.pause_key.setEnabled)
@@ -276,7 +283,7 @@ class _Panel(QWidget):
             "take turns on one press the way they do inside AnkiBlitz."))
 
         self.more_time_button = QCheckBox("Show a “More time” button on the card")
-        self.more_time_button.setChecked(bool(cfg.get("more_time_button", True)))
+        self.more_time_button.setChecked(bool(cfg["more_time_button"]))
         layout.addWidget(self.more_time_button)
         layout.addWidget(_hint(
             "A small button above the countdown that holds the timer — the same "
@@ -287,9 +294,9 @@ class _Panel(QWidget):
         layout.addWidget(_hline())
         layout.addWidget(QLabel("Skip the auto-reveal timer for these (review normally):"))
         notetypes, decks = _collect_names()
-        self.nt_list = _FilterList("Note types", notetypes, cfg.get("excluded_note_types", []))
+        self.nt_list = _FilterList("Note types", notetypes, cfg["excluded_note_types"])
         self.deck_list = _FilterList(
-            "Decks (a parent also covers its subdecks)", decks, cfg.get("excluded_decks", []))
+            "Decks (a parent also covers its subdecks)", decks, cfg["excluded_decks"])
         sf_lists = QHBoxLayout()
         sf_lists.addWidget(self.nt_list)
         sf_lists.addWidget(self.deck_list)
@@ -297,11 +304,11 @@ class _Panel(QWidget):
 
         layout.addWidget(_hline())
         self.fixed_enabled = QCheckBox("Picture cards: use a set time (ignore word count)")
-        self.fixed_enabled.setChecked(bool(cfg.get("fixed_time_enabled", True)))
+        self.fixed_enabled.setChecked(bool(cfg["fixed_time_enabled"]))
         layout.addWidget(self.fixed_enabled)
         fixed_form = QFormLayout()
         self.fixed_base = _double(0.5, 60.0, 0.5, 1, " s")
-        self.fixed_base.setValue(float(cfg.get("fixed_time_base_seconds", 6.0)))
+        self.fixed_base.setValue(float(cfg["fixed_time_base_seconds"]))
         fixed_form.addRow("Set time:", self.fixed_base)
         layout.addLayout(fixed_form)
         layout.addWidget(_hint(
@@ -309,10 +316,10 @@ class _Panel(QWidget):
             "meaningless. Cards matching the note types or decks below get this set "
             "time instead, with only the difficulty weight as a modifier."))
         self.fixed_nt_list = _FilterList(
-            "Picture note types", notetypes, cfg.get("fixed_time_note_types", []))
+            "Picture note types", notetypes, cfg["fixed_time_note_types"])
         self.fixed_deck_list = _FilterList(
             "Picture decks (a parent also covers its subdecks)",
-            decks, cfg.get("fixed_time_decks", []))
+            decks, cfg["fixed_time_decks"])
         fixed_lists = QHBoxLayout()
         fixed_lists.addWidget(self.fixed_nt_list)
         fixed_lists.addWidget(self.fixed_deck_list)
@@ -389,6 +396,7 @@ class _Panel(QWidget):
             "enable_on_new": self.enable_on_new.isChecked(),
             "difficulty_weight": round(self.difficulty.value(), 2),
             "show_countdown": self.show_countdown.isChecked(),
+            "countdown_warning_colour": self.warn_colour.isChecked(),
             "warning_sound": self.warning_sound.isChecked(),
             "warning_at_percent": self.warn_pct.value(),
             "pause_key_enabled": self.pause_key_enabled.isChecked(),
