@@ -71,21 +71,9 @@ def _theme():
     return _theme_mod
 
 
-def reset_cache() -> None:
-    """Forget the resolved module — for after an add-on is enabled or installed."""
-    global _theme_mod
-    _theme_mod = _UNSET
-
-
 def synapse_available() -> bool:
     """True when SynapsePro is installed, enabled, and exposes its palette."""
     return _theme() is not None
-
-
-def theme_module():
-    """SynapsePro's ``theme`` module, or None — for callers that need its path
-    or its package name (icon files, the settings entry point)."""
-    return _theme()
 
 
 def package_name() -> str:

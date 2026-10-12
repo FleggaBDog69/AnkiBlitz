@@ -327,6 +327,33 @@ Four decisions worth keeping:
 
 ---
 
+## Outstanding (found 2026-10-12) — 16: the bar's grade split and time estimate
+
+| #  | Change | Core | aSFM | PWR |
+|----|--------|:----:|:----:|:---:|
+| 16 | Grade-split bands, time-left estimate, pace, stats overlaid on the bar | ❌ | n/a | n/a |
+
+Commit `1257cc4` says it brought these to Core, but only `topbar.py` and the
+flush-with-top key actually landed. Core has **none** of the `sprint` keys
+`split_bar_by_grade`, `overlay_stats_on_bar`, `show_eta`, `eta_error_adjust`,
+`show_pace`, nor the code behind them. Its docs don't claim them, so nothing
+is misadvertised; it's a gap, not a bug. Porting means `engine/session.py`
+(`_PaceStats`, now copyable wholesale from AnkiBlitz), `engine/forecast.py`
+(new, verbatim), `injection._estimate_fields`, `sprint.ambient_payload` and the
+`record_answer(..., ease)` call, the bar rendering in `focus_suite.js` /
+`focus_suite.css` (literal colours, not `--ab-*` vars), the five config keys,
+the Blitz-tab settings and the docs.
+
+Everything else was re-checked the same day: `focus.py`, `quickstart.py`,
+`stats.py` and `topbar.py` are byte-identical to AnkiBlitz; `widgets.py`,
+`pomodoro.py`, `breathing.py`, `music.py` and `onboarding.py` differ only by the
+SynapsePro bridge and Core's own branding. aSFM's `adaptive.py` / `pace.py`
+match AnkiBlitz's apart from the config namespace, and PWR's `tts_sync.py` is
+identical. One default differs and may be deliberate: `max_delay_seconds` is
+15 s in AnkiBlitz and 20 s in aSFM (it has been since the split).
+
+---
+
 ## The cross-add-on trap (decide before shipping 6)
 
 In the full AnkiBlitz the reveal key and the pause key can be **the same key**

@@ -53,11 +53,6 @@ _SUITE_DIR = os.path.dirname(os.path.dirname(__file__))
 # pushed out with every card payload. Cleared on profile close, not persisted.
 _auto_paused = False
 
-
-def auto_reveal_paused() -> bool:
-    return _auto_paused
-
-
 def _sticky_pause(payload: dict) -> bool:
     """The sticky pause flag for this card, dropping a hold that can no longer be
     released.

@@ -110,6 +110,9 @@
   function revealAllWords() {
     clearTimers();
     var hidden = document.querySelectorAll(".pwr-word.pwr-hidden");
+    // Already fully shown: a later click or key press is not a skip, so it must
+    // not cut the card's audio (the listeners stay up until the next card).
+    if (!hidden.length) return;
     Array.prototype.forEach.call(hidden, function (el) {
       el.classList.remove("pwr-hidden");
     });
@@ -176,6 +179,7 @@
       // Anki's type-in-the-answer box reveals the question, and any shortcut
       // using the key as a modifier combination triggers it too.
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.repeat) return;
       if (isTypingTarget(e.target)) return;
       if ((e.key || "").toLowerCase() === revealKey) revealAllWords();
     };

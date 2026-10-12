@@ -73,7 +73,7 @@ def _reveal_block(cfg: dict, enabled: bool, card, side: str) -> dict:
     """The reveal sub-payload. When TTS auto-match is on and the card has an active
     {{tts}} tag for this side, the reveal speed is driven from that tag."""
     wps = float(cfg.get("words_per_second", 6.0))
-    if enabled and card is not None and cfg.get("tts_auto_match", False):
+    if enabled and card is not None and cfg.get("tts_auto_match", True):
         matched = tts_sync.tts_wps_for_card(
             card, side, int(cfg.get("tts_base_wpm", tts_sync.DEFAULT_BASE_WPM)))
         if matched and matched > 0:

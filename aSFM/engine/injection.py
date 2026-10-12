@@ -28,11 +28,6 @@ PYCMD_PREFIX = "asfm:"
 # pushed out with every card payload. Cleared on profile close, not persisted.
 _auto_paused = False
 
-
-def auto_reveal_paused() -> bool:
-    return _auto_paused
-
-
 _CSS_HREF = f"/_addons/{PACKAGE}/web/asfm.css"
 _JS_SRC = f"/_addons/{PACKAGE}/web/asfm.js"
 
@@ -116,29 +111,9 @@ def _eval(js: str) -> None:
         pass
 
 
-def _deck_excluded(deck_name: str, excluded: list) -> bool:
-    if not deck_name:
-        return False
-    for entry in excluded:
-        if entry and (deck_name == entry or deck_name.startswith(entry + "::")):
-            return True
-    return False
-
-
 def _excluded(card, cfg: dict) -> bool:
-    try:
-        nt = card.note_type()
-        if nt and nt.get("name") in cfg.get("excluded_note_types", []):
-            return True
-    except Exception:
-        pass
-    try:
-        deck_name = mw.col.decks.name(card.current_deck_id())
-        if _deck_excluded(deck_name, cfg.get("excluded_decks", [])):
-            return True
-    except Exception:
-        pass
-    return False
+    return adaptive.card_matches(card, cfg.get("excluded_note_types", []),
+                                 cfg.get("excluded_decks", []))
 
 
 def _pause_block(cfg: dict) -> dict:

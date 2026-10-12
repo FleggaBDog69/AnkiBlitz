@@ -36,9 +36,6 @@ from aqt.utils import tooltip
 from .config import get_section, save_section, suite_enabled, set_suite_enabled
 from .engine import breathing, presets
 
-_CHECKED = Qt.CheckState.Checked
-_UNCHECKED = Qt.CheckState.Unchecked
-
 
 def _hint(text: str) -> QLabel:
     lbl = QLabel(text)
@@ -71,66 +68,6 @@ def _scroll(inner: QWidget) -> QScrollArea:
     area.setFrameShape(QFrame.Shape.NoFrame)
     area.setWidget(inner)
     return area
-
-
-class _FilterList(QWidget):
-    """A labelled, searchable list of checkable items."""
-
-    def __init__(self, title, all_items, checked_items, parent=None):
-        super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(QLabel(title))
-
-        self.search = QLineEdit()
-        self.search.setPlaceholderText("Filter…")
-        self.search.textChanged.connect(self._filter)
-        layout.addWidget(self.search)
-
-        self.list = QListWidget()
-        self.list.setMinimumHeight(140)
-        checked_set = set(checked_items or [])
-        for name in all_items:
-            item = QListWidgetItem(name)
-            item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-            item.setCheckState(_CHECKED if name in checked_set else _UNCHECKED)
-            self.list.addItem(item)
-        # Preserve any saved entries that no longer exist in the collection.
-        for name in checked_set:
-            if name not in set(all_items):
-                item = QListWidgetItem(name)
-                item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-                item.setCheckState(_CHECKED)
-                self.list.addItem(item)
-        layout.addWidget(self.list)
-
-    def _filter(self, text):
-        text = (text or "").lower()
-        for i in range(self.list.count()):
-            item = self.list.item(i)
-            item.setHidden(text not in item.text().lower())
-
-    def checked(self):
-        out = []
-        for i in range(self.list.count()):
-            item = self.list.item(i)
-            if item.checkState() == _CHECKED:
-                out.append(item.text())
-        return out
-
-
-def _collect_names():
-    notetypes, decks = [], []
-    if mw.col is not None:
-        try:
-            notetypes = sorted(nt.name for nt in mw.col.models.all_names_and_ids())
-        except Exception:
-            notetypes = []
-        try:
-            decks = sorted(d.name for d in mw.col.decks.all_names_and_ids())
-        except Exception:
-            decks = []
-    return notetypes, decks
 
 
 # --------------------------------------------------------------------------- #

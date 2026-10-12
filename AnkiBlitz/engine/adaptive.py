@@ -53,10 +53,27 @@ _HIDE_STYLE_RE = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.I)
 _SKIP_TAGS = {"script", "style", "head", "title", "audio", "video", "noscript"}
 _VOID_TAGS = {"br", "img", "hr", "input", "meta", "link", "area", "base",
               "col", "embed", "source", "track", "wbr"}
-# Substrings matched against an element's id + class (lower-cased). Conservative:
-# these name reveal-chrome on the common medical note types, not stem content.
+# Names of reveal-chrome on the common medical note types, matched against each
+# id / class as a WHOLE part of the name, not a substring: "tags-container",
+# "hint", "hint1234" (Anki's own {{hint:}} ids), "extra-btn" and "tagsContainer"
+# are chrome, but "stage", "vintage", "extract-table" and "hinterland" are stem
+# content that a substring match used to silently drop from the word count.
 _CHROME_TOKENS = ("tag", "hint", "extra", "ankihub", "onebyone", "one-by-one",
                   "timer", "notification", "kbd")
+# A token must sit between separators (start/end, "-", "_"), optionally followed
+# by a plural "s" or a number. camelCase is split into parts first (below).
+_CHROME_RE = re.compile(
+    r"(?:^|[-_])(?:" + "|".join(re.escape(t) for t in _CHROME_TOKENS) +
+    r")(?:s|\d+)?(?=$|[-_])")
+_CAMEL_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+
+def _is_chrome_name(names: str) -> bool:
+    """True if any whitespace-separated id/class in ``names`` is reveal-chrome."""
+    for name in names.split():
+        if _CHROME_RE.search(_CAMEL_RE.sub("-", name).lower()):
+            return True
+    return False
 
 
 class _VisibleText(HTMLParser):
@@ -82,8 +99,7 @@ class _VisibleText(HTMLParser):
             return True
         if _HIDE_STYLE_RE.search(d.get("style", "")):
             return True
-        idcls = (d.get("id", "") + " " + d.get("class", "")).lower()
-        return any(tok in idcls for tok in _CHROME_TOKENS)
+        return _is_chrome_name(d.get("id", "") + " " + d.get("class", ""))
 
     def handle_starttag(self, tag, attrs):
         if tag in _VOID_TAGS:
@@ -266,7 +282,7 @@ def delay_for(cfg: dict, words: int, ease: int, lapses: int, reps: int,
               pace: float = 1.0) -> float:
     """Pure core: the reveal delay from explicit card primitives.
 
-    Shared by the live runtime (reveal_delay_seconds) and the settings preview,
+    Shared by the live runtime (via ``card_inputs``) and the settings preview,
     so both always agree on the math. New cards use ``new_multiplier``;
     learning / relearning cards use ``unfamiliar_multiplier``. ``difficulty`` is
     the FSRS difficulty (1–10) when available; otherwise the ease/lapse fallback
@@ -290,27 +306,41 @@ def delay_for(cfg: dict, words: int, ease: int, lapses: int, reps: int,
 
     lo = knob("min_delay_seconds")
     hi = knob("max_delay_seconds")
-    weight = knob("difficulty_weight")
+    card = dict(ease=ease, lapses=lapses, reps=reps, unfamiliar=unfamiliar,
+                is_new=is_new, difficulty=difficulty)
 
     if fixed_time:
-        delay = knob("fixed_time_base_seconds")
-        delay *= _difficulty_multiplier(difficulty, ease, lapses, reps, weight)
+        delay = knob("fixed_time_base_seconds") * difficulty_multiplier(cfg, card)
     else:
-        base = knob("base_seconds")
-        per_word = knob("seconds_per_word")
-        unfamiliar_mult = knob("unfamiliar_multiplier")
-        new_mult = knob("new_multiplier")
-        delay = base + per_word * words + _answer_term(cfg, answer_words)
-        if is_new:
-            delay *= new_mult
-        elif unfamiliar:
-            delay *= unfamiliar_mult
-        delay *= _difficulty_multiplier(difficulty, ease, lapses, reps, weight)
+        delay = (knob("base_seconds") + knob("seconds_per_word") * words
+                 + _answer_term(cfg, answer_words))
+        delay *= _card_multiplier(cfg, card, 1.0)
 
     delay *= pace
     if hi < lo:
         hi = lo
     return max(lo, min(delay, hi))
+
+
+def card_matches(card, note_types: list, decks: list) -> bool:
+    """True if the card's note type is in ``note_types`` or its deck is one of
+    ``decks`` (a parent deck covers its subdecks). Shared by the exclusion
+    lists and picture-card mode, so the two can't drift apart."""
+    try:
+        nt = card.note_type()
+        if nt and nt.get("name") in note_types:
+            return True
+    except Exception:
+        pass
+    if not decks:
+        return False
+    try:
+        from aqt import mw
+        deck_name = mw.col.decks.name(card.current_deck_id())
+    except Exception:
+        return False
+    return any(entry and (deck_name == entry or deck_name.startswith(entry + "::"))
+               for entry in decks)
 
 
 def is_fixed_time_card(card, cfg: dict) -> bool:
@@ -324,21 +354,7 @@ def is_fixed_time_card(card, cfg: dict) -> bool:
     decks = cfg.get("fixed_time_decks", [])
     if not note_types and not decks:
         return False
-    try:
-        nt = card.note_type()
-        if nt and nt.get("name") in note_types:
-            return True
-    except Exception:
-        pass
-    try:
-        from aqt import mw
-        deck_name = mw.col.decks.name(card.current_deck_id())
-        for entry in decks:
-            if entry and (deck_name == entry or deck_name.startswith(entry + "::")):
-                return True
-    except Exception:
-        pass
-    return False
+    return card_matches(card, note_types, decks)
 
 
 def difficulty_multiplier(cfg: dict, inputs: dict) -> float:
@@ -380,11 +396,6 @@ def card_inputs(card, cfg: dict) -> dict:
         fixed_time=fixed,
         answer_words=answer_words,
     )
-
-
-def reveal_delay_seconds(card, cfg: dict, pace: float = 1.0) -> float:
-    """Seconds to wait (after the reveal finishes) before showing the answer."""
-    return delay_for(cfg, pace=pace, **card_inputs(card, cfg))
 
 
 # ----- cloze one-by-one ------------------------------------------------------
@@ -454,10 +465,7 @@ def _card_multiplier(cfg: dict, inputs: dict, pace: float) -> float:
         mult *= knob("new_multiplier")
     elif inputs["unfamiliar"]:
         mult *= knob("unfamiliar_multiplier")
-    mult *= _difficulty_multiplier(inputs["difficulty"], inputs["ease"],
-                                   inputs["lapses"], inputs["reps"],
-                                   knob("difficulty_weight"))
-    return mult * pace
+    return mult * difficulty_multiplier(cfg, inputs) * pace
 
 
 def cloze_delays(cfg: dict, inputs: dict, cloze_words: list,

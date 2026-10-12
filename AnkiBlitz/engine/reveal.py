@@ -5,37 +5,15 @@ adaptive auto-reveal timer should run, and with what parameters. The JS bundle
 is "dumb": it just executes whatever payload Python sends.
 """
 
-from aqt import mw
-
 from ..config import DEFAULTS, get_section, suite_enabled
 from . import adaptive, pace, tts_sync
-
-
-def _deck_excluded(deck_name: str, excluded: list) -> bool:
-    if not deck_name:
-        return False
-    for entry in excluded:
-        if entry and (deck_name == entry or deck_name.startswith(entry + "::")):
-            return True
-    return False
 
 
 def _section_excluded(card, section: dict) -> bool:
     """True if this card's note type or deck is in the section's exclusion lists.
     Shared by word_reveal and speed_focus (both carry the same two list keys)."""
-    try:
-        nt = card.note_type()
-        if nt and nt.get("name") in section.get("excluded_note_types", []):
-            return True
-    except Exception:
-        pass
-    try:
-        deck_name = mw.col.decks.name(card.current_deck_id())
-        if _deck_excluded(deck_name, section.get("excluded_decks", [])):
-            return True
-    except Exception:
-        pass
-    return False
+    return adaptive.card_matches(card, section.get("excluded_note_types", []),
+                                 section.get("excluded_decks", []))
 
 
 def _reveal_block(wr: dict, enabled: bool, card=None, side: str = "question") -> dict:
@@ -46,7 +24,7 @@ def _reveal_block(wr: dict, enabled: bool, card=None, side: str = "question") ->
     the voice; otherwise the configured words_per_second is used.
     """
     wps = float(wr.get("words_per_second", 6.0))
-    if enabled and card is not None and wr.get("tts_auto_match", False):
+    if enabled and card is not None and wr.get("tts_auto_match", True):
         matched = tts_sync.tts_wps_for_card(
             card, side, int(wr.get("tts_base_wpm", tts_sync.DEFAULT_BASE_WPM))
         )

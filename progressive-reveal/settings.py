@@ -74,6 +74,8 @@ class _KeyCaptureEdit(QLineEdit):
         text = event.text()
         if text and text.strip() and len(text) == 1:
             self.setText(text)
+        else:
+            super().keyPressEvent(event)
 
     def key_value(self):
         return (self.text() or "p").lower()

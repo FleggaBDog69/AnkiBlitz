@@ -271,10 +271,6 @@ class BlitzSession(_PaceStats):
     def elapsed_seconds(self) -> float:
         return time.time() - self.started_at
 
-    def active_seconds(self) -> float:
-        """Elapsed time minus the idle stretches between answers."""
-        return max(0.0, self.elapsed_seconds() - self.idle_seconds)
-
     def begin_engagement(self) -> None:
         """First interaction on a paused launch: clear the pause and rebase the
         elapsed clock to now, so the overnight idle gap isn't counted. No-op once

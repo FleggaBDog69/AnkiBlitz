@@ -151,6 +151,12 @@
   function revealAllWords() {
     clearRevealTimers();
     var hidden = document.querySelectorAll(".fs-word.fs-hidden");
+    if (!hidden.length) {
+      // Already fully shown: a later click on the card (a hint button, the
+      // replay button) is not a skip, so it must not cut the card's audio.
+      markRevealDone();
+      return;
+    }
     Array.prototype.forEach.call(hidden, function (el) {
       el.classList.remove("fs-hidden");
     });

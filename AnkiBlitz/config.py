@@ -266,10 +266,10 @@ DEFAULTS = {
         # accuracy display, so hide_all_accuracy_stats takes it too.
         "split_bar_by_grade": True,
         # The estimate: time left in card/fraction modes and on the ambient bar,
-        # cards left in time mode. Built from a rolling pace, and inflated by
-        # your live Again rate — a card you press Again on comes back, and the
-        # estimate has to buy the time for it.
+        # cards left in time mode, priced off your review history (forecast.py).
         "show_eta": True,
+        # No longer read — the estimate takes misses from your history now.
+        # Kept so saved configs aren't disturbed (keys are never removed).
         "eta_error_adjust": True,
         # The pace the estimate is built from, if you want to see the working.
         "show_pace": False,

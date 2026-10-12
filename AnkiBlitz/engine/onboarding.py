@@ -10,7 +10,7 @@ marks the run done so it can't nag on every restart.
 from aqt import mw
 from aqt.qt import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QDoubleSpinBox,
-    QDialogButtonBox, Qt,
+    QDialogButtonBox,
 )
 
 from .. import config

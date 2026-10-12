@@ -103,11 +103,6 @@ def record_completed_sprint(cards: int, seconds: float,
     return data
 
 
-def sprints_today() -> int:
-    today = date.today().isoformat()
-    return load_stats()["by_day"].get(today, {}).get("sprints", 0)
-
-
 # ----- Pomodoro day log (Stage 5) -----
 
 def record_pomodoro_block(cards: int, seconds: float) -> None:

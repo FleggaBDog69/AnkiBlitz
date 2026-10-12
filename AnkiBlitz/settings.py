@@ -854,7 +854,7 @@ class WordRevealPanel(QWidget):
 
         self.tts_auto_match = QCheckBox(
             "Auto-match reveal speed to each card's TTS")
-        self.tts_auto_match.setChecked(bool(cfg.get("tts_auto_match", False)))
+        self.tts_auto_match.setChecked(bool(cfg.get("tts_auto_match", True)))
         v.addWidget(self.tts_auto_match)
         v.addWidget(_hint(
             "When on, any card with active TTS overrides the reading speed above "

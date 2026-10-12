@@ -43,7 +43,7 @@ from aqt.utils import tooltip
 
 from ..config import get_section, suite_enabled
 from . import sprint, stats, injection, theme_bridge, breathing
-from .session import MODE_CARDS, MODE_TIME, MODE_FRACTION
+from .session import MODE_TIME, MODE_FRACTION
 
 
 class PomodoroState:
