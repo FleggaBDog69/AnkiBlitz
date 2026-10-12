@@ -120,6 +120,9 @@
   function onKeyDown(e) {
     if (!A._pauseEnabled) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // Holding the key down auto-repeats it, which would flicker the hold on and
+    // off; only a fresh press toggles.
+    if (e.repeat) return;
     if (isTypingTarget(e.target)) return;   // e.g. Anki's type-in-the-answer box
     if ((e.key || "").toLowerCase() !== A._pauseKey) return;
     e.preventDefault();
@@ -177,6 +180,7 @@
       // mouse user who pressed the button and can't press the key would
       // otherwise be stuck on the card.
       b.className = "asfm-clickable";
+      b.setAttribute("role", "button");
       b.addEventListener("click", onControlClick, false);
     }
     document.body.appendChild(b);
@@ -210,6 +214,9 @@
     if (document.getElementById("asfm-moretime")) return;
     var b = document.createElement("div");
     b.id = "asfm-moretime";
+    // Announced as a button, but deliberately not focusable: a focused button
+    // would take Space, which is Anki's show-answer key.
+    b.setAttribute("role", "button");
     b.textContent = "⏸ More time";
     b.title = A._pauseEnabled
       ? "Hold the auto-reveal (or press "

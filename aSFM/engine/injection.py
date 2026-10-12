@@ -25,7 +25,7 @@ PYCMD_PREFIX = "asfm:"
 
 # The pause key's sticky state. Held here rather than in the JS so it survives
 # the bundle being re-injected (leaving the reviewer and coming back), and is
-# pushed out with every card payload. Cleared on profile load, not persisted.
+# pushed out with every card payload. Cleared on profile close, not persisted.
 _auto_paused = False
 
 
@@ -171,6 +171,24 @@ def _pause_block(cfg: dict) -> dict:
     }
 
 
+def _resume_hint(block: dict) -> str:
+    """How to lift the hold, naming only inputs that are switched on — the
+    same wording as the on-card badge (resumeHint in asfm.js)."""
+    key = block["pauseKey"].upper()
+    if block["moreTimeButton"] and block["pauseEnabled"]:
+        return f"click the badge or press {key} to resume"
+    if block["moreTimeButton"]:
+        return "click the badge to resume"
+    return f"press {key} to resume"
+
+
+def clear_pause() -> None:
+    """Drop the sticky hold (profile closing), so the next profile doesn't
+    open on a paused timer it never asked for."""
+    global _auto_paused
+    _auto_paused = False
+
+
 def question_payload(card) -> dict:
     cfg = get_config()
     off = {"enabled": False, **_pause_block(cfg)}
@@ -266,10 +284,9 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
         rv = mw.reviewer
         if _auto_paused and rv and rv.state == "question":
             pace.note_hold()
-        key = str(get_config().get("pause_key") or "p").upper()
         tooltip(
-            f"⏸ Auto-reveal paused — press {key} to resume" if _auto_paused
-            else "▶ Auto-reveal resumed",
+            f"⏸ Auto-reveal paused — {_resume_hint(_pause_block(get_config()))}"
+            if _auto_paused else "▶ Auto-reveal resumed",
             period=1800,
         )
         return (True, None)

@@ -50,8 +50,12 @@ DEFAULTS = {"spp": 12.0, "new": 1.5, "learn": 1.3, "review": 1.15}
 _cache: dict = {"key": None, "stats": None}
 
 
-def _day_of(ms: int, rollover_h: int) -> int:
-    return int((ms / 1000 - rollover_h * 3600 - time.timezone) // 86400)
+def _day_of(ms: int, rollover_h: int) -> tuple:
+    """The Anki day a press falls on: local date, with the day starting at the
+    rollover hour. Via localtime rather than a fixed offset so daylight saving
+    doesn't shift the boundary by an hour for half the year."""
+    lt = time.localtime(ms / 1000 - rollover_h * 3600)
+    return (lt.tm_year, lt.tm_yday)
 
 
 def _measure(col) -> Optional[dict]:

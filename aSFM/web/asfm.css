@@ -7,7 +7,9 @@
   bottom: 0;
   height: 3px;
   width: 100%;
-  background: rgba(255, 255, 255, 0.08);
+  /* Neutral grey so the emptied part of the track shows in light mode too
+     (a white tint vanished on a white card). */
+  background: rgba(128, 128, 128, 0.18);
   z-index: 99998;
   pointer-events: none;
 }

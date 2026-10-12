@@ -121,7 +121,8 @@ def question_payload(card) -> dict:
             "warnColour": bool(sf.get("countdown_warning_colour", True)),
             "warn": bool(sf.get("warning_sound", True)),
             "alertUrl": _alert_url() if sf.get("warning_sound", True) else "",
-            "warnPercent": int(sf.get("warning_at_percent", 60)),
+            "warnPercent": int(sf.get("warning_at_percent",
+                                      DEFAULTS["speed_focus"]["warning_at_percent"])),
             **_pause_block(sf, suite_on),
         },
     }

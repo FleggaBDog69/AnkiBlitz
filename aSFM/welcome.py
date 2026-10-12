@@ -27,6 +27,23 @@ from .config import get_config, save_config
 from .engine import pace
 
 
+def _hold_line(cfg: dict) -> str:
+    """The 'need longer?' bullet, naming only the inputs that are switched on."""
+    key = str(cfg.get("pause_key") or "p").upper()
+    key_on = bool(cfg.get("pause_key_enabled", True))
+    button_on = bool(cfg.get("more_time_button", True))
+    if key_on and button_on:
+        how = f"Press <b>{key}</b> or click <b>More time</b>"
+    elif key_on:
+        how = f"Press <b>{key}</b>"
+    elif button_on:
+        how = "Click <b>More time</b>"
+    else:
+        return ""
+    return (f"• Need longer on a card? {how} to hold the timer, and do the "
+            "same again to carry on.<br>")
+
+
 def _label(html: str) -> QLabel:
     lbl = QLabel(html)
     lbl.setWordWrap(True)
@@ -40,7 +57,6 @@ class WelcomeDialog(QDialog):
         self.setWindowTitle("Welcome to Adaptive Speed Focus")
         self.setMinimumWidth(480)
         cfg = get_config()
-        key = str(cfg.get("pause_key") or "p").upper()
         layout = QVBoxLayout(self)
 
         layout.addWidget(_label(
@@ -49,9 +65,9 @@ class WelcomeDialog(QDialog):
             "card is and how hard it is for you, then shows the answer. "
             "<b>It never grades the card</b>, so you still press the button "
             "yourself.<br><br>"
-            f"• Need longer on a card? Press <b>{key}</b> or click "
-            "<b>More time</b> to hold the timer, and do the same again to carry on.<br>"
-            "• A thin bar at the top counts down to the reveal.<br>"
+            + _hold_line(cfg) +
+            ("• A thin bar along the bottom counts down to the reveal.<br>"
+             if cfg.get("show_countdown", True) else "") +
             "• Everything is under <b>Tools ▸ Adaptive Speed Focus</b>."))
 
         self.on_new = QCheckBox("Also run the timer on new cards")
@@ -74,6 +90,7 @@ class WelcomeDialog(QDialog):
         row.addStretch(1)
         layout.addLayout(row)
         self.calib_result = _label("")
+        self.calib_result.hide()     # shown once there's a result to report
         layout.addWidget(self.calib_result)
         if cfg["auto_tune_enabled"]:
             layout.addWidget(_label(
@@ -113,21 +130,20 @@ class WelcomeDialog(QDialog):
         self.calib_result.setText(
             f"✓ Saved: base {cfg['base_seconds']:.2f} s, "
             f"{cfg['seconds_per_word']:.2f} s per word.")
+        self.calib_result.show()
         self.calibrate_btn.setText("Calibrate again…")
 
     def _on_settings(self) -> None:
         from .settings import open_settings
 
-        self._save_on_new()
         self.accept()
         open_settings()
 
-    def accept(self) -> None:
-        self._save_on_new()
-        super().accept()
-
     def done(self, r) -> None:
-        # Closing the window any way counts as having seen it.
+        # Closing the window any way (Done, Esc, the close button) counts as
+        # having seen it, and keeps the new-cards choice: there's no Cancel
+        # here, so nothing reads as "discard".
+        self._save_on_new()
         _mark_shown()
         super().done(r)
 

@@ -210,7 +210,9 @@ def fsrs_difficulty(card):
     if d <= 0:
         return None
     # Defend against a 0–1 normalised representation by rescaling to 1–10.
-    if d <= 1.0:
+    # Strictly below 1: exactly 1.0 is FSRS's easiest difficulty, and "<=" would
+    # rescale it to 10, giving the easiest cards the hardest-card bonus.
+    if d < 1.0:
         d = 1.0 + d * 9.0
     return d
 

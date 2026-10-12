@@ -27,7 +27,7 @@ from aqt.qt import (
     Qt,
 )
 
-from .config import get_config, save_config, enabled, set_enabled
+from .config import get_config, save_config
 from .engine import adaptive, pace
 
 _CHECKED = Qt.CheckState.Checked
@@ -84,6 +84,8 @@ class _KeyCaptureEdit(QLineEdit):
         text = event.text()
         if text and text.strip() and len(text) == 1:
             self.setText(text)
+        else:
+            super().keyPressEvent(event)
 
     def key_value(self):
         return (self.text() or "p").lower()
@@ -190,6 +192,13 @@ class _Panel(QWidget):
         self.max_delay = _double(0.0, 300.0, 1.0, 1, " s")
         self.max_delay.setValue(float(cfg["max_delay_seconds"]))
         form.addRow("Maximum delay:", self.max_delay)
+        # A maximum under the minimum is clamped up to it at runtime anyway, so
+        # don't let the spin box show a number that never applies.
+        self.min_delay.valueChanged.connect(self.max_delay.setMinimum)
+        self.max_delay.setMinimum(self.min_delay.value())
+        self.per_answer_word.valueChanged.connect(
+            lambda v: self.max_answer.setEnabled(v > 0))
+        self.max_answer.setEnabled(self.per_answer_word.value() > 0)
         layout.addLayout(form)
 
         layout.addWidget(_hint(
@@ -214,6 +223,8 @@ class _Panel(QWidget):
         new_row.addWidget(self.enable_on_new)
         new_row.addStretch(1)
         mod.addRow("New cards:", new_row)
+        self.enable_on_new.toggled.connect(self.new_mult.setEnabled)
+        self.new_mult.setEnabled(self.enable_on_new.isChecked())
 
         self.difficulty = _double(0.0, 1.0, 0.05, 2, "")
         self.difficulty.setValue(float(cfg["difficulty_weight"]))
@@ -245,6 +256,13 @@ class _Panel(QWidget):
         self.warn_pct.setSuffix(" %")
         self.warn_pct.setValue(int(cfg["warning_at_percent"]))
         warn_form.addRow("Warn after:", self.warn_pct)
+
+        def _sync_warn(*_):
+            colour = self.show_countdown.isChecked() and self.warn_colour.isChecked()
+            self.warn_pct.setEnabled(self.warning_sound.isChecked() or colour)
+        for box in (self.show_countdown, self.warn_colour, self.warning_sound):
+            box.toggled.connect(_sync_warn)
+        _sync_warn()
         layout.addLayout(warn_form)
         layout.addWidget(_hint(
             "The sound plays, and the bar turns red, once this much of the wait "
@@ -350,6 +368,9 @@ class _Panel(QWidget):
         fixed_lists.addWidget(self.fixed_nt_list)
         fixed_lists.addWidget(self.fixed_deck_list)
         layout.addLayout(fixed_lists)
+        for w in (self.fixed_base, self.fixed_nt_list, self.fixed_deck_list):
+            self.fixed_enabled.toggled.connect(w.setEnabled)
+            w.setEnabled(self.fixed_enabled.isChecked())
 
         # --- Cloze one-by-one cards: per-cloze timers or a multiplier ---
         layout.addWidget(_hline())
@@ -381,7 +402,7 @@ class _Panel(QWidget):
             "cloze uncovers the next cloze each time it runs out; uncovering one "
             "yourself starts the next. The first cloze also gets the normal "
             "question-reading time. Needs the AnKing template doing one-by-one on "
-            "the front. Not part of profiles."))
+            "the front."))
 
         def _obo_mode_changed(*_):
             mode = self.obo_mode.currentData()
@@ -397,14 +418,15 @@ class _Panel(QWidget):
         self.preview = QLabel()
         self.preview.setTextFormat(Qt.TextFormat.RichText)
         side.addWidget(self.preview)
-        side.addWidget(_hint(
-            "Easy = a familiar review card; Hard = a lapsed card."))
+        self.preview_hint = _hint("")
+        side.addWidget(self.preview_hint)
         side.addStretch(1)
 
         for w in (self.base, self.per_word, self.min_delay, self.max_delay,
                   self.unfamiliar, self.new_mult, self.difficulty,
                   self.per_answer_word, self.max_answer):
             w.valueChanged.connect(self._update_preview)
+        self.enable_on_new.toggled.connect(self._update_preview)
         self._update_preview()
 
     def _current_cfg(self):
@@ -435,14 +457,26 @@ class _Panel(QWidget):
         header = "<tr><th>Card</th>" + "".join(
             f"<th>{name}</th>" for name, _ in _PREVIEW_CARDS) + "</tr>"
         rows = ""
+        new_on = self.enable_on_new.isChecked()
+
+        def cell(card, words, answer_words):
+            if card["is_new"] and not new_on:
+                return "<td align='center' style='color: gray;'>off</td>"
+            d = adaptive.delay_for(cfg, words=words, answer_words=answer_words,
+                                   pace=p, **card)
+            return f"<td align='center'>{d:.1f} s</td>"
+
         for label, words, answer_words in self._preview_rows():
-            cells = "".join(
-                "<td align='center'>"
-                f"{adaptive.delay_for(cfg, words=words, answer_words=answer_words, pace=p, **card):.1f} s"
-                "</td>"
-                for _, card in _PREVIEW_CARDS
-            )
+            cells = "".join(cell(card, words, answer_words)
+                            for _, card in _PREVIEW_CARDS)
             rows += f"<tr><td>{label}</td>{cells}</tr>"
+        self.preview_hint.setText(
+            ("Rows are question + answer words. " if self.per_answer_word.value() > 0
+             else "Rows are question words. ")
+            + "Easy = a familiar review card; Hard = a lapsed card."
+            + ("" if new_on else " New cards are off (see “Run on new cards”).")
+            + (f" Includes your learned pace ({p:.2f}×)." if abs(p - 1.0) >= 0.005
+               else ""))
         self.preview.setText(
             "<table border='1' cellspacing='0' cellpadding='5'>"
             f"{header}{rows}</table>")
@@ -517,6 +551,8 @@ class _Panel(QWidget):
             t = sorted(live["reveal_s"])
             rows.append({"date": "now", "cards": live["cards"], "self": live["self"],
                          "median_s": t[len(t) // 2] if t else None, "pace": None})
+        # Hidden while empty, so a blank label doesn't leave a gap in the panel.
+        self.sessions_label.setVisible(bool(rows))
         if not rows:
             self.sessions_label.setText("")
             return
@@ -588,13 +624,29 @@ class _CalibrateDialog(QDialog):
                 parent=self,
                 op=lambda col: pace.fit_from_revlog(col, cfg),
                 success=lambda r: self._show(r, measured=False),
+            ).failure(
+                lambda _exc: self._show(None, measured=False, failed=True)
             ).with_progress("Reading your review history…").run_in_background()
         else:
             self._show(None, measured=False)
 
-    def _show(self, r, measured: bool):
+    def _show(self, r, measured: bool, failed: bool = False):
+        try:
+            self._fill(r, measured, failed)
+        except RuntimeError:
+            pass    # the dialog was closed before the history read finished
+
+    def _fill(self, r, measured: bool, failed: bool):
         target = int(self.cfg["target_timer_wins_percent"])
         if not r:
+            cancel = self.buttons.button(QDialogButtonBox.StandardButton.Cancel)
+            if cancel:
+                cancel.setText("Close")
+            if failed:
+                self.body.setText(
+                    "<b>Couldn't read your review history.</b><br><br>Nothing "
+                    "was changed. Try again in a moment.")
+                return
             self.body.setText(
                 "<b>Not enough data yet.</b><br><br>Calibration needs about "
                 f"{pace.MIN_CALIBRATION} cards you revealed yourself, or a few "
@@ -640,6 +692,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent or mw)
         self.setWindowTitle("Adaptive Speed Focus — Settings")
         self.setMinimumSize(560, 560)
+        self.resize(820, 720)
         layout = QVBoxLayout(self)
 
         self.panel = _Panel()

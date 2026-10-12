@@ -326,19 +326,18 @@ no record.
   hides it too.
 - `show_eta` — the estimate: **`~14 min left`** in card and fraction modes and
   on the ambient bar, and **`~34 more cards`** in time mode, where the clock is
-  the part you already know. It is built from your pace over the last several
-  cards rather than the whole session, so one interruption doesn't wreck it
+  the part you already know. It prices what's left off your own review history:
+  how many presses a new card, a due review and a card mid-step have actually
+  cost you over the last 90 days (misses and learning steps included), times
+  your usual time per press, pulled toward today's pace as the session goes
   (each gap is capped at 2 minutes, so a hard card counts as a slow card and a
-  walk-away can't count as a twenty-minute one). Nothing is shown until there
-  are enough cards behind it to mean something, and it is deliberately rounded
-  to the minute — it's a forecast, and a ticking seconds digit would claim a
-  precision it hasn't got.
-- `eta_error_adjust` — fold your live Again rate into the estimate. A card you
-  press Again on comes back, so with an Again rate *p* each remaining card
-  costs `1/(1-p)` passes: at 90% good that's every tenth card returning, and the
-  estimate buys the time for it (it charges for second lapses too). Off gives
-  you the raw first-pass figure. Only affects arithmetic — the rate itself is
-  never displayed by this setting.
+  walk-away can't count as a twenty-minute one). Learning cards still waiting
+  on a step timer are counted before Anki's counts show them. It is
+  deliberately rounded to the minute — it's a forecast, and a ticking seconds
+  digit would claim a precision it hasn't got.
+- `eta_error_adjust` — no longer read. The estimate now takes misses from your
+  history (above) rather than from today's Again rate, so there's nothing left
+  to switch. The key is kept so saved settings aren't disturbed.
 - `show_pace` — show the pace the estimate is built from (`18.4 cards/min`),
   in whatever unit `count_mode` counts. Off by default; the estimate is the
   answer, this is the working.

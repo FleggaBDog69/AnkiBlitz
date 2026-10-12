@@ -245,6 +245,10 @@
 
   function onKeyDown(e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // Holding the key down auto-repeats it. On the shared default key that would
+    // finish the reveal and then flicker the hold on and off; only a fresh press
+    // counts.
+    if (e.repeat) return;
     if (isTypingTarget(e.target)) return;   // e.g. Anki's type-in-the-answer box
     var k = (e.key || "").toLowerCase();
     if (!revealDone && k === FS._revealKey) {
@@ -304,6 +308,7 @@
     if (!(left < obo.left)) return;   // another word of the same cloze (Shift+N)
     obo.left = left;
     if (left <= 0) {                  // the template flips to the answer now
+      stopAlert();
       if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
       if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
       autoDeadline = warnDeadline = 0;
@@ -536,6 +541,7 @@
       // user who pressed the button and can't press the key would otherwise be
       // stuck on the card.
       b.className = "fs-clickable";
+      b.setAttribute("role", "button");
       b.addEventListener("click", onControlClick, false);
     }
     document.body.appendChild(b);
@@ -569,6 +575,9 @@
     if (document.getElementById("fs-moretime")) return;
     var b = document.createElement("div");
     b.id = "fs-moretime";
+    // Announced as a button, but deliberately not focusable: a focused button
+    // would take Space, which is Anki's show-answer key.
+    b.setAttribute("role", "button");
     b.textContent = "⏸ More time";
     b.title = FS._pauseEnabled
       ? "Hold the auto-reveal (or press "
@@ -694,6 +703,10 @@
     if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
     autoDeadline = warnDeadline = 0;
     removeCountdown();
+    // The button and badge go too: with no timer behind them, "More time"
+    // would offer to hold nothing, and a paused badge would outlive its card.
+    removeMoreTime();
+    removePausedBadge();
     pendingAuto = null;
     autoFired = false;
   };
@@ -776,8 +789,8 @@
     return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r;
   }
 
-  // The estimate is rendered coarse on purpose. It is a forecast off a rolling
-  // pace, so "~14 min" is the whole of what it knows; a seconds digit ticking
+  // The estimate is rendered coarse on purpose. It is a forecast off your
+  // review history (forecast.py), so "~14 min" is the whole of what it knows; a seconds digit ticking
   // down would claim a precision it doesn't have, and would pull the eye off
   // the card every second to do it.
   function fmtEta(sec) {
@@ -910,7 +923,7 @@
     }
     // The estimate. Cards/fraction/ambient forecast the time left; time mode
     // forecasts the cards instead, because there the clock is the thing you
-    // already know. Absent until there's enough pace to mean it.
+    // already know. Absent only when there's no estimate to give.
     if (p.showEta) {
       if (isTime && p.projCards !== null && p.projCards !== undefined) {
         rowParts += '<span class="fs-eta">~' + p.projCards + " more " + unit + "</span>";

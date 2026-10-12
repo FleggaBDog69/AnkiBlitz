@@ -50,7 +50,7 @@ _SUITE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 # The pause key's sticky state. Held here rather than in the JS so it survives
 # the bundle being re-injected (leaving the reviewer and coming back), and is
-# pushed out with every card payload. Cleared on profile load, not persisted.
+# pushed out with every card payload. Cleared on profile close, not persisted.
 _auto_paused = False
 
 
@@ -74,6 +74,27 @@ def _sticky_pause(payload: dict) -> bool:
         if not (ar.get("pauseEnabled") or ar.get("moreTimeButton")):
             _auto_paused = False
     return _auto_paused
+
+
+def _resume_hint() -> str:
+    """How to lift the hold, naming only inputs that are switched on — the
+    same wording as the on-card badge (resumeHint in focus_suite.js)."""
+    sf = get_section("speed_focus")
+    key = str(sf.get("pause_key") or "p").upper()
+    key_on = bool(sf.get("pause_key_enabled", True))
+    button_on = bool(sf.get("more_time_button", True))
+    if button_on and key_on:
+        return f"click the badge or press {key} to resume"
+    if button_on:
+        return "click the badge to resume"
+    return f"press {key} to resume"
+
+
+def clear_pause() -> None:
+    """Drop the sticky hold (profile closing), so the next profile doesn't
+    open on a paused timer it never asked for."""
+    global _auto_paused
+    _auto_paused = False
 
 
 # Formats the reviewer webview can decode, best first. Anki ships the
@@ -280,9 +301,8 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
         rv = mw.reviewer
         if _auto_paused and rv and rv.state == "question":
             pace.note_hold()
-        key = str(get_section("speed_focus").get("pause_key") or "p").upper()
         tooltip(
-            f"⏸ Speed Focus paused — press {key} to resume" if _auto_paused
+            f"⏸ Speed Focus paused — {_resume_hint()}" if _auto_paused
             else "▶ Speed Focus resumed",
             period=1800,
         )

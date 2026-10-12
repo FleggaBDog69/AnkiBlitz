@@ -49,6 +49,7 @@ def _on_profile_close() -> None:
         pace.end_session()
     except Exception:
         pass
+    injection.clear_pause()
 
 
 gui_hooks.profile_did_open.append(_on_profile_open)
