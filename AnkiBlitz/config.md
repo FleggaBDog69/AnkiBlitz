@@ -53,6 +53,18 @@ clamped to `[min_delay_seconds, max_delay_seconds]`.
   (image cards have nothing to read). Matched like the exclusion lists. **These
   four keys live outside the profile system — the choice of which cards are
   "visual" endures across every profile.**
+- `one_by_one_mode` — cloze one-by-one cards (AnKing "One by one" field):
+  `"per_cloze"` gives each cloze its own short timer, and each firing uncovers
+  the next cloze; `"multiplier"` keeps one whole-card timer, scaled by
+  `one_by_one_multiplier`; `"off"` times them like any other card. Per-cloze
+  needs the AnKing template to do its one-by-one on the front; with the stock
+  auto-flip template it falls back to one whole-card timer.
+- `one_by_one_seconds_per_cloze` / `one_by_one_seconds_per_word` — per cloze,
+  this many seconds plus this many per word of that cloze's answer, then the
+  card's familiarity / difficulty modifiers. The first cloze also gets the
+  normal question-reading time.
+- `one_by_one_max_cloze_seconds` — the longest any single cloze waits.
+- `one_by_one_multiplier` — multiplier mode: the whole-card delay × this.
 
 > Word count counts only the text a reviewer actually *sees*: hidden fields,
 > `display:none` content and the tag chips (`{{clickable::Tags}}`) common on

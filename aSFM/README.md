@@ -18,6 +18,8 @@ Focus Mode*, extracted from the **AnkiBlitz** suite so you can use just this pie
   chips don't inflate the timer.
 - Treats new and learning/relearning cards as needing more time (tunable).
 - Nudges the delay by the card's **FSRS difficulty** (harder = longer), bounded.
+  Not on FSRS? It works with the classic SM-2 scheduler too, reading the
+  card's ease and lapses instead; calibration works with either.
 - Optional thin **countdown bar** and a **warning sound** before the reveal. The
   bar can also turn from blue to red at the warning point — a silent heads-up.
 - A **“More time” button** on the card, and a **pause key** (default `p`) — both
@@ -31,6 +33,9 @@ Focus Mode*, extracted from the **AnkiBlitz** suite so you can use just this pie
   from your own data, shown side by side before anything changes.
 - **Picture-card mode:** chosen note types / decks use a set time instead of a
   word count (there's nothing to read).
+- **A welcome window on first run** that explains the basics and can
+  calibrate the timer to your speed in one click. Reopen it any time from
+  **Tools ▸ Adaptive Speed Focus ▸ Welcome & calibration…**.
 
 ## Install
 

@@ -30,29 +30,21 @@ see the class docstring.
 
 Both trackers share ``_PaceStats``, which carries the two things the bar needs
 beyond a raw count: the **grade split** (how much of the work done so far was
-clean vs. had to be repeated, drawn as the green/red segments) and a **rolling
-pace** the time estimate is built from. They live together because an honest
-estimate needs both — see ``eta_seconds``.
+clean vs. had to be repeated, drawn as the green/red segments) and the session's
+**press gaps**, which the time estimate (``forecast.py``) blends with your
+history for its seconds-per-press.
 """
 
 import time
 from collections import deque
 from typing import Optional, Set
 
-# Pace is a rolling mean of the last N answer-to-answer gaps rather than
-# elapsed/answers: one interruption shouldn't poison the estimate for the rest
-# of the session, and the pace you're working at now is what predicts the rest.
+# The last few answer-to-answer gaps, kept for a band's width when a card was
+# graded without a flip we saw.
 PACE_WINDOW = 10
 # Each gap is clamped rather than dropped, so a genuinely hard card still counts
 # as a slow card while a walk-away can't count as a 20-minute one.
 PACE_CAP = 120.0
-# Nothing is estimated from one or two data points — the bar says nothing at all
-# until it can say something true.
-MIN_PACE_GAPS = 3
-MIN_RATE_ANSWERS = 5
-# An Again rate of 1.0 would forecast an infinite session; cap the repeat factor
-# somewhere blunt but survivable (0.75 -> "expect 4 presses per card").
-MAX_AGAIN_RATE = 0.75
 
 # Segment widths are clamped against the session's OWN median rather than
 # against absolute seconds, so the bar reads the same whether you're doing
@@ -89,6 +81,10 @@ class _PaceStats:
         self.segments: list = []
         self._q_shown_at: Optional[float] = None
         self._pending_think: Optional[float] = None
+        # Every gap this session (clamped like the pace), for the estimate's
+        # seconds-per-press — see forecast.seconds_per_press.
+        self.gap_sum = 0.0
+        self.gap_n = 0
 
     # ----- the thinking window (what a segment's width measures) -----
 
@@ -110,7 +106,10 @@ class _PaceStats:
     def _note_pace(self, card_id, ease: int, now: Optional[float] = None) -> None:
         now = time.time() if now is None else now
         if self._pace_last is not None:
-            self._gaps.append(min(now - self._pace_last, PACE_CAP))
+            gap = min(now - self._pace_last, PACE_CAP)
+            self._gaps.append(gap)
+            self.gap_sum += gap
+            self.gap_n += 1
         self._pace_last = now
         if ease == 1:
             self.again_count += 1
@@ -180,83 +179,6 @@ class _PaceStats:
     @property
     def done_good(self) -> int:
         return max(0, self.cards_done - self.done_again)
-
-    # ----- pace and the estimate -----
-
-    def again_rate(self) -> Optional[float]:
-        """Share of grade presses that were Again, or None before it means
-        anything. This is the repeat rate the estimate inflates by."""
-        total = self.again_count + self.correct_count
-        if total < MIN_RATE_ANSWERS:
-            return None
-        return self.again_count / total
-
-    def seconds_per_answer(self) -> Optional[float]:
-        """Rolling seconds per grade press, or None until there's enough to go on."""
-        if len(self._gaps) < MIN_PACE_GAPS:
-            return None
-        return sum(self._gaps) / len(self._gaps)
-
-    def repeat_factor(self, error_adjust: bool = True) -> float:
-        """Grade presses each remaining card will cost, repeats included.
-
-        With an Again rate p, a card needs one press plus another with
-        probability p, and so on: 1/(1-p) presses. At p = 0.1 that's 1.11 —
-        every tenth card comes back — which is exactly the intuition, and it
-        also charges for the cards that lapse twice.
-        """
-        if not error_adjust:
-            return 1.0
-        p = self.again_rate()
-        if p is None:
-            return 1.0
-        return 1.0 / (1.0 - min(p, MAX_AGAIN_RATE))
-
-    def per_min(self, error_adjust: bool = True) -> Optional[float]:
-        """Throughput in the unit the counter shows, per minute.
-
-        In `answers` mode that's presses/min straight off the pace. In `unique`
-        mode repeats don't move the counter, so the honest figure is the share
-        of presses that land on a card for the first time.
-        """
-        spa = self.seconds_per_answer()
-        if not spa:
-            return None
-        rate = 60.0 / spa
-        if getattr(self, "count_mode", "unique") == "unique":
-            rate /= self.repeat_factor(error_adjust)
-        return rate
-
-    def eta_seconds(self, remaining: int, counts_repeats: bool,
-                    error_adjust: bool = True) -> Optional[float]:
-        """Wall-clock seconds to work through `remaining` more.
-
-        ``counts_repeats`` says what `remaining` is measured in: True when it
-        already counts every press still to come (`answers` mode, where a repeat
-        is a unit in its own right), False when it counts distinct cards still
-        to clear and the repeats they'll buy have yet to be charged for.
-
-        None until there's a pace to work from — no estimate beats a wrong one.
-        """
-        spa = self.seconds_per_answer()
-        if spa is None or remaining <= 0:
-            return None
-        presses = float(remaining)
-        if not counts_repeats:
-            presses *= self.repeat_factor(error_adjust)
-        return presses * spa
-
-    def projected_cards(self, seconds_left: float,
-                        error_adjust: bool = True) -> Optional[int]:
-        """Time mode, the estimate run backwards: how many more of the counter's
-        unit this pace gets through in the time that's left."""
-        spa = self.seconds_per_answer()
-        if spa is None or seconds_left <= 0:
-            return None
-        presses = seconds_left / spa
-        if getattr(self, "count_mode", "unique") == "unique":
-            presses /= self.repeat_factor(error_adjust)
-        return int(presses)
 
 
 class BlitzSession(_PaceStats):

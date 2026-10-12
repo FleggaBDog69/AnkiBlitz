@@ -12,6 +12,7 @@ from aqt import gui_hooks
 from . import config
 from .engine import injection, pace
 from .menu import build_menu
+from .welcome import maybe_show_welcome
 
 _initialized = False
 
@@ -24,6 +25,7 @@ def _on_profile_open() -> None:
     injection.register()
     build_menu()
     _initialized = True
+    maybe_show_welcome()
 
 
 def _on_profile_close() -> None:

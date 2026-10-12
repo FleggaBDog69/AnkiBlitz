@@ -26,6 +26,11 @@
     if (node.nodeType !== Node.ELEMENT_NODE) return false;
     var tag = node.tagName || "";
     if (tag === "SCRIPT" || tag === "STYLE") return true;
+    // Controls aren't text to read: a note type's own buttons (AnKing's
+    // Reveal Next / Reveal All, hint buttons) should be usable straight away,
+    // not fade in word by word.
+    if (tag === "BUTTON" || tag === "INPUT" || tag === "SELECT" ||
+        tag === "TEXTAREA") return true;
     if (tag.indexOf("MJX") === 0) return true; // MathJax v3
     var id = node.id || "";
     if (id.indexOf("pwr-") === 0) return true; // our own UI

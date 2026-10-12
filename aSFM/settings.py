@@ -8,6 +8,7 @@ Settings are read live per card, so saving takes effect on the next card.
 from aqt import mw
 from aqt.qt import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -39,6 +40,8 @@ _PREVIEW_CARDS = [
     ("New", dict(ease=0, lapses=0, reps=0, unfamiliar=True, is_new=True, difficulty=None)),
 ]
 _PREVIEW_WORDS = (15, 25)
+_ANKIWEB_URL = "https://ankiweb.net/shared/info/1148593203"
+_ISSUES_URL = "https://github.com/FleggaBDog69/AnkiBlitz/issues"
 _PREVIEW_ANSWERS = (5, 40)   # answer-side words, for the answer-length rows
 
 
@@ -347,6 +350,46 @@ class _Panel(QWidget):
         fixed_lists.addWidget(self.fixed_nt_list)
         fixed_lists.addWidget(self.fixed_deck_list)
         layout.addLayout(fixed_lists)
+
+        # --- Cloze one-by-one cards: per-cloze timers or a multiplier ---
+        layout.addWidget(_hline())
+        layout.addWidget(QLabel("<b>One-by-one cloze cards</b>"))
+        obo_form = QFormLayout()
+        self.obo_mode = QComboBox()
+        for label, value in (("A timer per cloze", "per_cloze"),
+                             ("Whole card × multiplier", "multiplier"),
+                             ("Off — time like any card", "off")):
+            self.obo_mode.addItem(label, value)
+        idx = self.obo_mode.findData(adaptive.one_by_one_mode(cfg))
+        self.obo_mode.setCurrentIndex(max(0, idx))
+        obo_form.addRow("Timing:", self.obo_mode)
+        self.obo_per_cloze = _double(0.0, 30.0, 0.5, 1, " s")
+        self.obo_per_cloze.setValue(float(cfg["one_by_one_seconds_per_cloze"]))
+        obo_form.addRow("Per cloze:", self.obo_per_cloze)
+        self.obo_per_word = _double(0.0, 5.0, 0.05, 2, " s")
+        self.obo_per_word.setValue(float(cfg["one_by_one_seconds_per_word"]))
+        obo_form.addRow("Per answer word:", self.obo_per_word)
+        self.obo_max = _double(0.5, 60.0, 0.5, 1, " s")
+        self.obo_max.setValue(float(cfg["one_by_one_max_cloze_seconds"]))
+        obo_form.addRow("Longest per cloze:", self.obo_max)
+        self.obo_mult = _double(0.5, 5.0, 0.05, 2, "×")
+        self.obo_mult.setValue(float(cfg["one_by_one_multiplier"]))
+        obo_form.addRow("Multiplier:", self.obo_mult)
+        layout.addLayout(obo_form)
+        layout.addWidget(_hint(
+            "For cards with the “One by one” field filled. A timer per "
+            "cloze uncovers the next cloze each time it runs out; uncovering one "
+            "yourself starts the next. The first cloze also gets the normal "
+            "question-reading time. Needs the AnKing template doing one-by-one on "
+            "the front. Not part of profiles."))
+
+        def _obo_mode_changed(*_):
+            mode = self.obo_mode.currentData()
+            for w in (self.obo_per_cloze, self.obo_per_word, self.obo_max):
+                w.setEnabled(mode == "per_cloze")
+            self.obo_mult.setEnabled(mode == "multiplier")
+        self.obo_mode.currentIndexChanged.connect(_obo_mode_changed)
+        _obo_mode_changed()
         layout.addStretch(1)
 
         side.addWidget(QLabel("<b>Preview</b>"))
@@ -433,6 +476,11 @@ class _Panel(QWidget):
             "fixed_time_base_seconds": round(self.fixed_base.value(), 2),
             "fixed_time_note_types": self.fixed_nt_list.checked(),
             "fixed_time_decks": self.fixed_deck_list.checked(),
+            "one_by_one_mode": self.obo_mode.currentData(),
+            "one_by_one_seconds_per_cloze": round(self.obo_per_cloze.value(), 2),
+            "one_by_one_seconds_per_word": round(self.obo_per_word.value(), 2),
+            "one_by_one_max_cloze_seconds": round(self.obo_max.value(), 2),
+            "one_by_one_multiplier": round(self.obo_mult.value(), 2),
         })
         save_config(cfg)
         if self._pace_reset_pending:
@@ -512,9 +560,10 @@ class _CalibrateDialog(QDialog):
     hands them back only if you press Apply. Nothing is saved from here — the
     settings dialog's own Save does that."""
 
-    def __init__(self, parent, cfg):
+    def __init__(self, parent, cfg, saves_directly=False):
         super().__init__(parent)
         self.setWindowTitle("Calibrate from my reviews")
+        self.saves_directly = saves_directly
         self.setMinimumWidth(460)
         self.cfg = cfg
         self.result_values = None
@@ -572,11 +621,16 @@ class _CalibrateDialog(QDialog):
                       "reflects that timer. Once aSFM has watched "
                       f"{pace.MIN_CALIBRATION} cards you reveal yourself, "
                       "calibrating again uses those instead.")
+        if self.saves_directly:
+            outro = ("Apply saves these and resets the learned pace to 1.00×. "
+                     "You can change them any time in Settings.")
+        else:
+            outro = ("Apply fills these into Settings and resets the learned "
+                     "pace to 1.00×. Nothing changes until you save.")
         self.body.setText(
             source + "<br><br><table cellspacing='0' cellpadding='4'>"
             "<tr><th></th><th>Now</th><th>Suggested</th></tr>" + table +
-            "</table><br>Apply fills these into Settings and resets the learned "
-            "pace to 1.00×. Nothing changes until you save.")
+            "</table><br>" + outro)
         self.result_values = r
         self.apply_btn.setEnabled(True)
 
@@ -595,11 +649,20 @@ class SettingsDialog(QDialog):
         area.setWidget(self.panel)
         layout.addWidget(area)
 
+        footer = QHBoxLayout()
+        links = QLabel(
+            f"<a href='{_ANKIWEB_URL}'>Enjoying aSFM? Rate it on AnkiWeb</a>"
+            f" · <a href='{_ISSUES_URL}'>Report a problem</a>")
+        links.setTextFormat(Qt.TextFormat.RichText)
+        links.setOpenExternalLinks(True)
+        footer.addWidget(links)
+        footer.addStretch(1)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._on_save)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        footer.addWidget(buttons)
+        layout.addLayout(footer)
 
     def _on_save(self):
         self.panel.save()

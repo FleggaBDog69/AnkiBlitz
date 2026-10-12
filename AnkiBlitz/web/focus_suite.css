@@ -112,10 +112,8 @@
 }
 
 /* ---- Overlaid layout: the band IS the bar, and the numbers ride on it. ----
-   Three stacked layers in one strip: the band (the fill, turned right down),
-   the rail (the same fill at full strength, 3px along the bottom), and the row
-   of counters on top. Splitting the fill across two layers is what lets the
-   text stay readable over it — see the note in focus_suite.js. */
+   Two stacked layers in one strip: the band (the fill, turned down) and the
+   row of counters on top — see the note in focus_suite.js. */
 #fs-progress .fs-bar-wrap.fs-overlay {
   position: relative;
   display: block;
@@ -130,29 +128,30 @@
   display: flex;
   pointer-events: none;
 }
-/* The band. One text colour that works over the fill AND over the empty track
-   beats two that each work half the time, so the colour goes quiet rather than
-   the text going dark. */
+/* The band: one even band, top to bottom. It used to be a faint band plus a
+   full-strength 3px rail along the bottom, which read as the top of the bar
+   being greyed out rather than as one bar. */
 #fs-progress .fs-overlay .fs-fill {
   top: 0;
   bottom: 0;
-  opacity: 0.30;
+  opacity: 0.5;
 }
-/* The rail keeps the fill edge and the green/red boundary legible at a glance,
-   which a 30% band on its own doesn't. */
+/* The rail is retired; hidden rather than deleted so a stale cached page that
+   still emits one doesn't bring the two-tone look back. */
 #fs-progress .fs-overlay .fs-rail {
-  bottom: 0;
-  height: 3px;
+  display: none;
 }
 /* A 3px cap on a 31px band is invisible anyway, and squaring it keeps the two
-   segments meeting cleanly. The rail keeps its rounded leading edge. */
+   segments meeting cleanly. */
 #fs-progress .fs-overlay .fs-fill .fs-bar {
   border-radius: 0;
 }
 #fs-progress .fs-overlay .fs-row {
   position: relative;
   z-index: 1;
-  padding: 7px 16px 9px;   /* the extra 2px at the bottom clears the rail */
+  padding: 8px 16px;
+  /* Keeps the light text crisp over the stronger fill. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 /* Ambient: the whole strip is already at 0.62, so the band only needs to come
    down far enough that an unasked-for bar never competes with the card. */
@@ -160,10 +159,10 @@
   min-height: 27px;
 }
 #fs-progress.fs-ambient .fs-overlay .fs-fill {
-  opacity: 0.22;
+  opacity: 0.4;
 }
 #fs-progress.fs-ambient .fs-overlay .fs-row {
-  padding: 5px 16px 7px;
+  padding: 6px 16px;
 }
 #fs-progress .fs-counter {
   font-weight: 600;

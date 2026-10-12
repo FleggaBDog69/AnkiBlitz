@@ -58,6 +58,18 @@ DEFAULTS = {
     "fixed_time_base_seconds": 6.0,
     "fixed_time_note_types": [],
     "fixed_time_decks": [],
+    # Cloze one-by-one cards (AnKing "One by one" field). "per_cloze" = a short
+    # timer per cloze, each uncovering the next; "multiplier" = the ordinary
+    # whole-card delay x one_by_one_multiplier; "off" = treat like any other
+    # card. See engine/adaptive.py.
+    "one_by_one_mode": "per_cloze",
+    "one_by_one_seconds_per_cloze": 1.5,   # per cloze, before its words
+    "one_by_one_seconds_per_word": 0.4,    # per word of that cloze's answer
+    "one_by_one_max_cloze_seconds": 8.0,   # ceiling for any single cloze
+    "one_by_one_multiplier": 1.3,          # whole-card delay x this (multiplier mode)
+    # First-run welcome (welcome.py). Flipped to False once it has been seen;
+    # an update that adds this key shows it once to existing users as well.
+    "show_welcome": True,
 }
 
 

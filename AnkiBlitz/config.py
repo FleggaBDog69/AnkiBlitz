@@ -78,6 +78,15 @@ DEFAULTS = {
         "fixed_time_base_seconds": 6.0,  # set thinking time for a visual card
         "fixed_time_note_types": [],     # note types treated as picture cards
         "fixed_time_decks": [],          # decks treated as picture cards
+        # Cloze one-by-one cards (AnKing "One by one" field). "per_cloze" = a
+        # short timer per cloze, each uncovering the next; "multiplier" = the
+        # ordinary whole-card delay x one_by_one_multiplier; "off" = treat
+        # like any other card. See engine/adaptive.py.
+        "one_by_one_mode": "per_cloze",
+        "one_by_one_seconds_per_cloze": 1.5,   # per cloze, before its words
+        "one_by_one_seconds_per_word": 0.4,    # per word of that cloze's answer
+        "one_by_one_max_cloze_seconds": 8.0,   # ceiling for any single cloze
+        "one_by_one_multiplier": 1.3,          # whole-card delay x this (multiplier mode)
     },
 
     # Progressive reveal: words (or fixed-size word chunks) fade in over time.

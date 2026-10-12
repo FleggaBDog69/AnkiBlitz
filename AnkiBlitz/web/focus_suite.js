@@ -41,6 +41,7 @@
   var pauseWarnLeftMs = 0;
   var countdownTotalMs = 0;  // the whole wait the countdown bar stands for
   var warned = false;        // has this card passed its warning point?
+  var obo = null;            // this card's per-cloze one-by-one timers (see below)
 
   function getRoot() {
     return document.getElementById("qa") || document.body;
@@ -59,6 +60,11 @@
     if (node.nodeType !== Node.ELEMENT_NODE) return false;
     var tag = node.tagName || "";
     if (tag === "SCRIPT" || tag === "STYLE") return true;
+    // Controls aren't text to read: a note type's own buttons (AnKing's
+    // Reveal Next / Reveal All, hint buttons) should be usable straight away,
+    // not fade in word by word.
+    if (tag === "BUTTON" || tag === "INPUT" || tag === "SELECT" ||
+        tag === "TEXTAREA") return true;
     if (tag.indexOf("MJX") === 0) return true; // MathJax v3
     var id = node.id || "";
     if (id.indexOf("fs-") === 0) return true;   // our own UI
@@ -169,7 +175,7 @@
     revealDone = true;
     // If the delay already elapsed while words were still fading, the answer was
     // held back until now — show it the moment the question is fully visible.
-    if (autoFired) pycmd("focus:reveal");
+    if (autoFired) { autoFired = false; fireReveal(); }
   }
 
   // `reveal` is the per-card reveal config: { wordsPerSecond, mode, chunkWords }.
@@ -256,8 +262,86 @@
   // The answer never shows before the question is fully revealed.
   function fireReveal() {
     if (!revealDone) { autoFired = true; return; }
+    if (oboActive() && obo.left > 0 && window.revealNextCloze) {
+      // Uncover the next cloze, not the answer. The template answers with an
+      // anking:1b1-reveal event, which arms the next cloze's timer (or, after
+      // the last one, the template flips to the answer itself).
+      window.revealNextCloze();
+      return;
+    }
     pycmd("focus:reveal");
   }
+
+  // ----- cloze one-by-one: a timer per cloze -----
+  //
+  // The AnKing template (patched to do one-by-one on the FRONT) keeps the
+  // question up while you uncover its clozes, and announces itself with
+  // document events. In per_cloze mode Python sends one delay per cloze; each
+  // firing uncovers the next cloze, and uncovering one yourself starts the next
+  // cloze's timer. With a template that never announces itself nothing here
+  // starts, and the ordinary whole-card timer runs.
+  function oboActive() { return !!(obo && obo.active); }
+
+  function oboDelay() {
+    var d = obo.delaysMs;
+    return d[Math.min(Math.max(0, obo.total - obo.left), d.length - 1)] || 0;
+  }
+
+  function oboBegin(total, left) {
+    if (!obo || obo.active || !obo.delaysMs.length) return;
+    obo.active = true;
+    obo.total = total || obo.delaysMs.length;
+    obo.left = (left === undefined) ? obo.total : left;
+    // The whole-card timer may already be running (the template announced
+    // itself after this card's onCard): swap it for the first cloze's.
+    if (autoStarted && pendingAuto) {
+      armClozeTimer(Math.max(oboDelay(), (revealDurationMs || 0) + (minPostMs || 0)));
+    }
+  }
+
+  function oboRevealed(left) {
+    if (!oboActive() || !pendingAuto) return;
+    if (!(left < obo.left)) return;   // another word of the same cloze (Shift+N)
+    obo.left = left;
+    if (left <= 0) {                  // the template flips to the answer now
+      if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+      if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
+      autoDeadline = warnDeadline = 0;
+      removeCountdown();
+      removeMoreTime();
+      return;
+    }
+    // Not started yet (paused launch / held from the start): maybeStartAuto
+    // picks up the right cloze when it does start.
+    if (autoStarted) armClozeTimer(oboDelay());
+  }
+
+  // A fresh wait for the current cloze: new countdown, new warning point.
+  function armClozeTimer(ms) {
+    if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+    if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
+    autoDeadline = warnDeadline = 0;
+    warned = false;
+    removeCountdown();
+    countdownTotalMs = ms;
+    var warnMs = warnPointMs(ms);
+    if (autoPaused) {
+      // Held: resuming (pause key / More time) starts this cloze's full wait.
+      pauseLeftMs = ms;
+      pauseWarnLeftMs = warnMs;
+      return;
+    }
+    if (pendingAuto.showCountdown) showCountdown(ms);
+    showMoreTime();
+    armAutoTimers(ms, warnMs);
+  }
+
+  document.addEventListener("anking:1b1-start", function (e) {
+    oboBegin(e.detail && e.detail.total);
+  });
+  document.addEventListener("anking:1b1-reveal", function (e) {
+    oboRevealed(e.detail ? e.detail.remaining : 0);
+  });
 
   // Started the instant the card shows, in parallel with the word reveal. The
   // wait is stretched to cover the reveal (max of the two) so the bar runs for
@@ -328,6 +412,15 @@
   document.addEventListener("pointerdown", primeAlert, true);
   document.addEventListener("keydown", primeAlert, true);
 
+  // The chime belongs to the reviewer page, not the card, so on its own it
+  // plays on after you flip. Cut it whenever the wait it was warning about
+  // ends: you showed the answer (space mid-chime), the timer did, the card
+  // changed, or you held the timer.
+  function stopAlert() {
+    if (!alertAudio) return;
+    try { alertAudio.pause(); alertAudio.currentTime = 0; } catch (e) {}
+  }
+
   function playAlert() {
     var url = pendingAuto && pendingAuto.alertUrl;
     if (!url) { pycmd("focus:warn"); return; }
@@ -365,7 +458,7 @@
       return;
     }
     autoStarted = true;
-    var delay = pendingAuto.delayMs || 0;
+    var delay = oboActive() ? oboDelay() : (pendingAuto.delayMs || 0);
     // The answer can't show until at least minPostMs after the reveal has
     // finished; the adaptive delay applies on top of that floor.
     var floor = (revealDurationMs || 0) + (minPostMs || 0);
@@ -379,12 +472,15 @@
     // Only once there is a wait to hold: on a zero-delay card the answer is
     // already up, and a button offering to pause it would do nothing.
     showMoreTime();
-    // Heads-up (sound and/or bar colour) once warnPercent% of the wait is gone.
+    armAutoTimers(effective, warnPointMs(effective));
+  }
+
+  // Heads-up (sound and/or bar colour) once warnPercent% of the wait is gone.
+  function warnPointMs(ms) {
     var pct = pendingAuto.warnPercent || 0;
     var wantWarn = pendingAuto.warn
       || (pendingAuto.warnColour && pendingAuto.showCountdown);
-    var warnMs = (wantWarn && pct > 0 && pct < 100) ? effective * (pct / 100) : 0;
-    armAutoTimers(effective, warnMs);
+    return (wantWarn && pct > 0 && pct < 100) ? ms * (pct / 100) : 0;
   }
 
   // ----- pause / resume the auto-reveal timer -----
@@ -410,6 +506,7 @@
       return;
     }
     autoPaused = true;
+    stopAlert();
     var now = Date.now();
     pauseLeftMs = autoDeadline ? Math.max(0, autoDeadline - now) : 0;
     pauseWarnLeftMs = warnDeadline ? Math.max(0, warnDeadline - now) : 0;
@@ -565,7 +662,9 @@
   function onWarn() {
     warned = true;
     if (!pendingAuto) return;
-    if (pendingAuto.warn) playAlert();
+    // One-by-one: colour on every cloze, but the sound only before the last
+    // one — the one that ends in the answer. A chime per cloze is just noise.
+    if (pendingAuto.warn && (!oboActive() || obo.left <= 1)) playAlert();
     if (pendingAuto.warnColour) markWarned();
   }
 
@@ -576,6 +675,7 @@
 
   function cancelTimers() {
     clearRevealTimers();
+    stopAlert();
     if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
     if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
     autoDeadline = warnDeadline = 0;
@@ -589,6 +689,7 @@
   // the answer. Used when a Pomodoro break takes over the screen so Speed Focus
   // doesn't auto-reveal or chime on the card hidden behind the break.
   FS.pauseAuto = function () {
+    stopAlert();
     if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
     if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
     autoDeadline = warnDeadline = 0;
@@ -620,6 +721,18 @@
 
     if (payload.autoReveal && payload.autoReveal.enabled) {
       pendingAuto = payload.autoReveal;
+    }
+    // Per-cloze one-by-one timers. The template may have announced itself
+    // before this onCard arrived; its state is only trusted while its element
+    // is on screen (the reviewer page, and these globals, outlive the card).
+    obo = null;
+    var oboPlan = pendingAuto && pendingAuto.oneByOne;
+    if (oboPlan && oboPlan.mode === "per_cloze" && oboPlan.delaysMs && oboPlan.delaysMs.length) {
+      obo = { delaysMs: oboPlan.delaysMs, active: false, total: 0, left: 0 };
+      var st = window.ankingOneByOne;
+      if (st && st.root && document.body.contains(st.root)) {
+        oboBegin(st.total, st.remaining());
+      }
     }
 
     if (payload.reveal && payload.reveal.enabled) {
@@ -841,10 +954,10 @@
     // Overlaid (the default): one thick band IS the bar, and the counters sit on
     // top of it. The stacked layout spent most of the strip's height on empty
     // surface with a 7px bar underneath it; this spends it on the bar. The fill
-    // goes down twice — once turned right down as the full-height band, once at
-    // full strength as a rail along the bottom edge — so the text stays
-    // light-on-dark whether it's over the fill or over the empty track, while
-    // the fill edge and the green/red boundary stay crisp.
+    // is one even band, turned down just enough that the text stays readable
+    // over it. (It used to go down twice — a faint band plus a full-strength
+    // rail along the bottom — but that read as the top of the bar being greyed
+    // out, not as one bar.)
     //
     // Stacked: the original. Kept because a busy row over a coloured band is a
     // fair thing to not want on every card.
@@ -853,7 +966,6 @@
       bar.innerHTML =
         '<div class="fs-bar-wrap fs-overlay">'
         + '<div class="fs-fill">' + fill + "</div>"
-        + '<div class="fs-rail">' + fill + "</div>"
         + rowHtml + "</div>";
     } else {
       bar.innerHTML = rowHtml

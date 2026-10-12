@@ -32,10 +32,82 @@
   var pauseLeftMs = 0;    // what was left on each when the timer was paused
   var pauseWarnLeftMs = 0;
   var warned = false;     // has this card passed its warning point?
+  var obo = null;         // this card's per-cloze one-by-one timers (see below)
 
   function fire() {
+    if (oboActive() && obo.left > 0 && window.revealNextCloze) {
+      // Uncover the next cloze, not the answer. The template answers with an
+      // anking:1b1-reveal event, which arms the next cloze's timer (or, after
+      // the last one, the template flips to the answer itself).
+      window.revealNextCloze();
+      return;
+    }
     pycmd("asfm:reveal");
   }
+
+  // ----- cloze one-by-one: a timer per cloze -----
+  //
+  // The AnKing template (patched to do one-by-one on the FRONT) keeps the
+  // question up while you uncover its clozes, and announces itself with
+  // document events. In per_cloze mode Python sends one delay per cloze; each
+  // firing uncovers the next cloze, and uncovering one yourself starts the next
+  // cloze's timer. With a template that never announces itself nothing here
+  // starts, and the ordinary whole-card timer runs.
+  function oboActive() { return !!(obo && obo.active); }
+
+  function oboDelay() {
+    var d = obo.delaysMs;
+    return d[Math.min(Math.max(0, obo.total - obo.left), d.length - 1)] || 0;
+  }
+
+  function oboBegin(total, left) {
+    if (!obo || obo.active || !obo.delaysMs.length) return;
+    obo.active = true;
+    obo.total = total || obo.delaysMs.length;
+    obo.left = (left === undefined) ? obo.total : left;
+    // The whole-card timer may already be running (the template announced
+    // itself after this card's onCard): swap it for the first cloze's.
+    if (started && pending) armClozeTimer(oboDelay());
+  }
+
+  function oboRevealed(left) {
+    if (!oboActive() || !pending) return;
+    if (!(left < obo.left)) return;   // another word of the same cloze (Shift+N)
+    obo.left = left;
+    if (left <= 0) {                  // the template flips to the answer now
+      cancel();
+      return;
+    }
+    // Not started yet (held from the start): start() picks up the right cloze.
+    if (started) armClozeTimer(oboDelay());
+  }
+
+  // A fresh wait for the current cloze: new countdown, new warning point.
+  function armClozeTimer(ms) {
+    if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+    if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
+    autoDeadline = warnDeadline = 0;
+    warned = false;
+    removeCountdown();
+    obo.waitMs = ms;       // the whole wait this cloze's bar stands for
+    var warnMs = warnPointMs(ms);
+    if (autoPaused) {
+      // Held: resuming (pause key / More time) starts this cloze's full wait.
+      pauseLeftMs = ms;
+      pauseWarnLeftMs = warnMs;
+      return;
+    }
+    if (pending.showCountdown) showCountdown(ms);
+    showMoreTime();
+    armAutoTimers(ms, warnMs);
+  }
+
+  document.addEventListener("anking:1b1-start", function (e) {
+    oboBegin(e.detail && e.detail.total);
+  });
+  document.addEventListener("anking:1b1-reveal", function (e) {
+    oboRevealed(e.detail ? e.detail.remaining : 0);
+  });
 
   // ----- the pause key -----
 
@@ -75,6 +147,7 @@
       return;
     }
     autoPaused = true;
+    stopAlert();
     var now = Date.now();
     pauseLeftMs = autoDeadline ? Math.max(0, autoDeadline - now) : 0;
     pauseWarnLeftMs = warnDeadline ? Math.max(0, warnDeadline - now) : 0;
@@ -189,7 +262,7 @@
     if (!fill) {
       // The paused badge took the bar down; rebuild it at the length that was
       // actually left, not at full, so it doesn't overstate the wait.
-      var total = (pending && pending.delayMs) || ms;
+      var total = (oboActive() && obo.waitMs) || (pending && pending.delayMs) || ms;
       showCountdown(ms, Math.min(1, ms / total));
       return;
     }
@@ -230,7 +303,9 @@
   function onWarn() {
     warned = true;
     if (!pending) return;
-    if (pending.warn) playAlert();
+    // One-by-one: colour on every cloze, but the sound only before the last
+    // one — the one that ends in the answer. A chime per cloze is just noise.
+    if (pending.warn && (!oboActive() || obo.left <= 1)) playAlert();
     if (pending.warnColour) markWarned();
   }
 
@@ -240,6 +315,7 @@
   }
 
   function cancel() {
+    stopAlert();
     if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
     if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }
     autoDeadline = warnDeadline = 0;
@@ -292,6 +368,15 @@
   document.addEventListener("pointerdown", primeAlert, true);
   document.addEventListener("keydown", primeAlert, true);
 
+  // The chime belongs to the reviewer page, not the card, so on its own it
+  // plays on after you flip. Cut it whenever the wait it was warning about
+  // ends: you showed the answer (space mid-chime), the timer did, the card
+  // changed, or you held the timer.
+  function stopAlert() {
+    if (!alertAudio) return;
+    try { alertAudio.pause(); alertAudio.currentTime = 0; } catch (e) {}
+  }
+
   function playAlert() {
     var url = pending && pending.alertUrl;
     if (!url) { pycmd("asfm:warn"); return; }
@@ -328,7 +413,8 @@
       return;
     }
     started = true;
-    var delay = pending.delayMs || 0;
+    var delay = oboActive() ? oboDelay() : (pending.delayMs || 0);
+    if (oboActive()) obo.waitMs = delay;
     if (pending.showCountdown && delay > 0) showCountdown(delay);
     if (delay <= 0) {
       fire();
@@ -337,11 +423,14 @@
     // Only once there is a wait to hold: on a zero-delay card the answer is
     // already up, and a button offering to pause it would do nothing.
     showMoreTime();
-    // Heads-up (sound and/or bar colour) once warnPercent% of the wait is gone.
+    armAutoTimers(delay, warnPointMs(delay));
+  }
+
+  // Heads-up (sound and/or bar colour) once warnPercent% of the wait is gone.
+  function warnPointMs(ms) {
     var pct = pending.warnPercent || 0;
     var wantWarn = pending.warn || (pending.warnColour && pending.showCountdown);
-    var warnMs = (wantWarn && pct > 0 && pct < 100) ? delay * (pct / 100) : 0;
-    armAutoTimers(delay, warnMs);
+    return (wantWarn && pct > 0 && pct < 100) ? ms * (pct / 100) : 0;
   }
 
   // Public: stop the timer/countdown for the current card without showing the
@@ -363,6 +452,20 @@
     A._moreTime = !!payload.moreTimeButton;
     // Python owns the sticky pause, so it survives re-injection of this bundle.
     autoPaused = !!payload.autoPaused;
+    // Per-cloze one-by-one timers. The template may have announced itself
+    // before this onCard arrived; its state is only trusted while its element
+    // is on screen (the reviewer page, and these globals, outlive the card).
+    obo = null;
+    var plan = payload.enabled && payload.oneByOne;
+    if (plan && plan.mode === "per_cloze" && plan.delaysMs && plan.delaysMs.length) {
+      obo = { delaysMs: plan.delaysMs, active: false, total: 0, left: 0, waitMs: 0 };
+      var st = window.ankingOneByOne;
+      if (st && st.root && document.body.contains(st.root)) {
+        obo.active = true;
+        obo.total = st.total;
+        obo.left = st.remaining();
+      }
+    }
     if (payload.enabled) {
       pending = payload;
       start();

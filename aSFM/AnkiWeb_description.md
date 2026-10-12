@@ -9,7 +9,7 @@ After the question shows, aSFM waits a delay computed from the card's length and
 - Waits `(base + per-word × question words + per-answer-word × answer words) × familiarity × difficulty`, clamped between a minimum and a maximum, then auto-reveals. The answer term is capped, and setting it to `0.0` turns it off.
 - Counts only the text you actually **see** — hidden fields and AnKing-style tag chips don't inflate the timer.
 - Gives new and learning/relearning cards more time (tunable).
-- Nudges the delay by the card's **FSRS difficulty** — harder cards get longer, bounded so it stays a gentle shift rather than a cliff.
+- Nudges the delay by the card's **FSRS difficulty** — harder cards get longer, bounded so it stays a gentle shift rather than a cliff. **Not on FSRS?** It works with the classic SM-2 scheduler too, using the card's ease and lapses instead.
 - Optional thin **countdown bar** and a **warning sound** before the reveal.
 - A **“More time” button** on the card, and a **pause key** (default `P`) — either one holds the countdown where it stands so you can sit on a card, then picks it up where it stopped. The hold sticks across cards, and every card it applies to says so on screen. The button stays faint until you hover it.
 - **Picture-card mode:** chosen note types or decks use a set time instead of a word count, since there's nothing to read.
@@ -28,6 +28,8 @@ Existing setups are untouched — an update only fills in settings you don't alr
 If you run **Glutanimate's Speed Focus Mode**, disable it so the two timers don't double up. If you run the full **AnkiBlitz** suite, this feature is already in it — don't install both.
 
 ## Using it
+
+On first run a welcome window explains the basics and offers to **calibrate the timer to your speed** from your review history. Reopen it any time from **Tools ▸ Adaptive Speed Focus ▸ Welcome & calibration…**.
 
 **Tools ▸ Adaptive Speed Focus ▸ Settings…** — every timing knob, the exclusions, picture-card mode, and a live preview table that always agrees with the runtime.
 

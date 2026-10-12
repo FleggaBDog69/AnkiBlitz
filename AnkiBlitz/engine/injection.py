@@ -21,7 +21,7 @@ from aqt.sound import av_player
 from aqt.utils import tooltip
 
 from ..config import PACKAGE, get_section
-from . import pace, reveal, session, topbar
+from . import forecast, pace, reveal, session, topbar
 
 PYCMD_PREFIX = "focus:"
 
@@ -303,18 +303,17 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
 def _estimate_fields(s, cfg: dict, hide_acc: bool, remaining=None) -> dict:
     """The grade split and the time estimate, for either tracker.
 
-    ``remaining`` is what's left to clear, in cards (the ambient bar passes the
-    live due count); leave it None for a Blitz and it comes off the target. The
-    Blitz's own target is in the counter's unit, so in ``answers`` mode it
-    already counts the repeats and the estimate must not charge for them twice —
-    that is what ``counts_repeats`` tells ``eta_seconds``.
+    ``remaining`` is passed (the live due count) by the ambient bar, whose
+    estimate is the whole pile; leave it None for a Blitz and the estimate
+    covers what's left of its target. The Blitz's target is in the counter's
+    unit, so in ``answers`` mode it already counts the repeats and isn't
+    charged for them again.
 
     Split colours are an accuracy display, so the anti-pressure switch takes
     them with everything else. The estimate isn't: it says how long you'll be
     sitting there, not how well you're doing, and the Again rate only ever
     reaches it as arithmetic you don't see.
     """
-    error_adjust = bool(cfg.get("eta_error_adjust", True))
     split = bool(cfg.get("split_bar_by_grade", True)) and not hide_acc
     out = {
         "overlayStats": bool(cfg.get("overlay_stats_on_bar", True)),
@@ -331,23 +330,36 @@ def _estimate_fields(s, cfg: dict, hide_acc: bool, remaining=None) -> dict:
         "projCards": None,
         "perMin": None,
     }
-    per_min = s.per_min(error_adjust)
-    out["perMin"] = round(per_min, 1) if per_min else None
+    # The estimate prices what's left in the pile off your own history — see
+    # forecast.py. It has a number from the first card and doesn't need the
+    # pile to be visibly shrinking: learning cards waiting on a step timer are
+    # charged for even while Anki's counts leave them out.
+    try:
+        pl = forecast.pile()
+        spp = forecast.seconds_per_press(s)
+    except Exception:
+        pl, spp = None, None
+    if not pl or not spp:
+        return out
+    unique = getattr(s, "count_mode", "unique") == "unique"
+    per_unit = pl["per_card"] if unique else 1.0
+    out["perMin"] = round(60.0 / (spp * per_unit), 1)
 
     if getattr(s, "mode", None) == session.MODE_TIME:
         # Time mode runs the estimate backwards: the minutes are fixed, so what
         # you don't know is how much of the pile they'll buy.
-        out["projCards"] = s.projected_cards(s.remaining_seconds(), error_adjust)
+        left = s.remaining_seconds()
+        out["projCards"] = int(left / (spp * per_unit)) if left > 0 else None
         return out
 
     if remaining is None:
-        remaining = max(0, int(getattr(s, "target_cards", 0)) - s.cards_done)
-        counts_repeats = (s.count_mode == "answers")
+        # A Blitz: what's left of its target, in the counter's unit. It can't
+        # cost more than the whole pile does.
+        left = max(0, int(getattr(s, "target_cards", 0)) - s.cards_done)
+        presses = min(left * per_unit, pl["presses"]) if left else 0.0
     else:
-        # The due count is a count of cards however the counter is labelled.
-        counts_repeats = False
-    eta = s.eta_seconds(int(remaining), counts_repeats, error_adjust)
-    out["etaSeconds"] = int(eta) if eta else None
+        presses = pl["presses"]
+    out["etaSeconds"] = int(presses * spp) if presses > 0 else None
     return out
 
 

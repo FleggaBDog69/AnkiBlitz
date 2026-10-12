@@ -23,7 +23,7 @@ delay = clamp(delay, min_delay_seconds, max_delay_seconds)
 | `unfamiliar_multiplier` | Multiplier for learning / relearning cards. |
 | `new_multiplier` | Multiplier for genuinely new cards. |
 | `enable_on_new` | Run the timer on new cards at all. |
-| `difficulty_weight` | Max ± swing applied from the card's FSRS difficulty (0 = ignore difficulty). |
+| `difficulty_weight` | Max ± swing applied from the card's FSRS difficulty, or its ease and lapses on SM-2 (0 = ignore difficulty). |
 | `show_countdown` | Show the thin depleting countdown bar while waiting. |
 | `countdown_warning_colour` | Run the bar in Anki's blue, then turn it red at the warning point. Off = the original amber-to-red gradient. |
 | `warning_sound` | Play an alert before the answer auto-shows. |
@@ -37,6 +37,11 @@ delay = clamp(delay, min_delay_seconds, max_delay_seconds)
 | `fixed_time_enabled` | Use a set time (no word count) for picture / visual cards. |
 | `fixed_time_base_seconds` | The set time for a picture card (difficulty still applies). |
 | `fixed_time_note_types` / `fixed_time_decks` | Which cards count as picture cards. |
+| `one_by_one_mode` | Cloze one-by-one cards (AnKing "One by one" field): `"per_cloze"` = a short timer per cloze, each uncovering the next; `"multiplier"` = the normal whole-card delay × `one_by_one_multiplier`; `"off"` = time them like any other card. Per-cloze needs the AnKing template to do its one-by-one on the front; with the stock auto-flip template it falls back to one whole-card timer. |
+| `one_by_one_seconds_per_cloze` / `one_by_one_seconds_per_word` | Per cloze: this many seconds, plus this many per word of that cloze's answer, then the card's familiarity / difficulty modifiers. The first cloze also gets the normal question-reading time. |
+| `one_by_one_max_cloze_seconds` | The longest any single cloze waits. |
+| `one_by_one_multiplier` | Multiplier mode: the whole-card delay × this. |
+| `show_welcome` | Show the welcome / calibration window on the next start. Set back to `true` to see it again (or use the Tools menu). |
 
 ### Learn my pace
 

@@ -90,15 +90,15 @@ did — this much of the pile is done — because the bands are normalised acros
 the fill rather than added to it. `18 good · 2 again` sits in words beside it so
 the colours never carry the meaning on their own.
 
-Beside it is an **estimate of the time left** — `~14 min left` — built from your
-pace over the last several cards rather than the whole session, so one
-interruption doesn't wreck it. It folds in your live Again rate, because a card
-you press Again on comes back and that costs time: at a 90% good rate roughly
-every tenth card returns, and the estimate buys the time for it. In a *timed*
-Blitz the estimate runs the other way — the clock is the part you already know,
-so it tells you how many cards you should get through instead (`~89 more
-cards`). Nothing is shown until there are enough cards behind it to mean
-something. All of this works on an ordinary review session too; the question
+Beside it is an **estimate of the time left** — `~14 min left` — priced off
+your own review history: how many presses a new card, a due review and a card
+mid-step have actually cost you over the last 90 days (misses and learning
+steps included), times your usual time per press, pulled toward today's pace
+as the session goes. It has a number from the first card, one slow card barely
+moves it, and learning cards waiting on a step timer are counted even before
+Anki's counts show them. In a *timed* Blitz the estimate runs the other way —
+the clock is the part you already know, so it tells you how many cards you
+should get through instead (`~89 more cards`). All of this works on an ordinary review session too; the question
 "how long is this pile going to take" is the same either way.
 
 Starting a Blitz from **Start Blitz…** also lets you pick a **Focus lock** level

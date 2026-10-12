@@ -390,6 +390,46 @@ class SpeedFocusPanel(QWidget):
         fixed_lists.addWidget(self.fixed_deck_list)
         layout.addLayout(fixed_lists)
 
+        # --- Cloze one-by-one cards: per-cloze timers or a multiplier ---
+        layout.addWidget(_hline())
+        layout.addWidget(QLabel("<b>One-by-one cloze cards</b>"))
+        obo_form = QFormLayout()
+        self.obo_mode = QComboBox()
+        for label, value in (("A timer per cloze", "per_cloze"),
+                             ("Whole card × multiplier", "multiplier"),
+                             ("Off — time like any card", "off")):
+            self.obo_mode.addItem(label, value)
+        idx = self.obo_mode.findData(adaptive.one_by_one_mode(cfg))
+        self.obo_mode.setCurrentIndex(max(0, idx))
+        obo_form.addRow("Timing:", self.obo_mode)
+        self.obo_per_cloze = _double(0.0, 30.0, 0.5, 1, " s")
+        self.obo_per_cloze.setValue(float(cfg["one_by_one_seconds_per_cloze"]))
+        obo_form.addRow("Per cloze:", self.obo_per_cloze)
+        self.obo_per_word = _double(0.0, 5.0, 0.05, 2, " s")
+        self.obo_per_word.setValue(float(cfg["one_by_one_seconds_per_word"]))
+        obo_form.addRow("Per answer word:", self.obo_per_word)
+        self.obo_max = _double(0.5, 60.0, 0.5, 1, " s")
+        self.obo_max.setValue(float(cfg["one_by_one_max_cloze_seconds"]))
+        obo_form.addRow("Longest per cloze:", self.obo_max)
+        self.obo_mult = _double(0.5, 5.0, 0.05, 2, "×")
+        self.obo_mult.setValue(float(cfg["one_by_one_multiplier"]))
+        obo_form.addRow("Multiplier:", self.obo_mult)
+        layout.addLayout(obo_form)
+        layout.addWidget(_hint(
+            "For cards with the “One by one” field filled. A timer per "
+            "cloze uncovers the next cloze each time it runs out; uncovering one "
+            "yourself starts the next. The first cloze also gets the normal "
+            "question-reading time. Needs the AnKing template doing one-by-one on "
+            "the front. Not part of profiles."))
+
+        def _obo_mode_changed(*_):
+            mode = self.obo_mode.currentData()
+            for w in (self.obo_per_cloze, self.obo_per_word, self.obo_max):
+                w.setEnabled(mode == "per_cloze")
+            self.obo_mult.setEnabled(mode == "multiplier")
+        self.obo_mode.currentIndexChanged.connect(_obo_mode_changed)
+        _obo_mode_changed()
+
         layout.addStretch(1)
 
         # --- live preview: right column, pinned to the top so it stays in
@@ -481,6 +521,11 @@ class SpeedFocusPanel(QWidget):
             "fixed_time_base_seconds": round(self.fixed_base.value(), 2),
             "fixed_time_note_types": self.fixed_nt_list.checked(),
             "fixed_time_decks": self.fixed_deck_list.checked(),
+            "one_by_one_mode": self.obo_mode.currentData(),
+            "one_by_one_seconds_per_cloze": round(self.obo_per_cloze.value(), 2),
+            "one_by_one_seconds_per_word": round(self.obo_per_word.value(), 2),
+            "one_by_one_max_cloze_seconds": round(self.obo_max.value(), 2),
+            "one_by_one_multiplier": round(self.obo_mult.value(), 2),
         })
         save_section(self.SECTION, cfg)
         if self._pace_reset_pending:
@@ -1432,13 +1477,11 @@ class SprintPanel(QWidget):
         self.split_bar.setChecked(bool(cfg.get("split_bar_by_grade", True)))
         self.show_eta = QCheckBox("Estimated time left (cards left, in a timed Blitz)")
         self.show_eta.setChecked(bool(cfg.get("show_eta", True)))
-        self.eta_error = QCheckBox("Include your Again rate in the estimate")
-        self.eta_error.setChecked(bool(cfg.get("eta_error_adjust", True)))
         self.show_pace = QCheckBox("Current pace (cards/min)")
         self.show_pace.setChecked(bool(cfg.get("show_pace", False)))
         for w in (self.show_bar, self.show_counter, self.show_elapsed,
                   self.overlay_stats, self.flush_top, self.split_bar,
-                  self.show_eta, self.eta_error, self.show_pace):
+                  self.show_eta, self.show_pace):
             dnl.addWidget(w)
         dnl.addWidget(_hint(
             "The bar is a single thick band with the counters sitting on it, "
@@ -1456,12 +1499,13 @@ class SprintPanel(QWidget):
             "words next to it, so you never have to guess what a colour means. "
             "(It's an accuracy display, so the anti-pressure switch below hides "
             "it with the rest.)\n\n"
-            "The estimate comes off your pace over the last several cards, not "
-            "the whole session, so one interruption doesn't wreck it. With the "
-            "Again rate included, a 90% good rate means roughly every tenth card "
-            "comes back, and the estimate buys the time for it — leave it on "
-            "unless you want the raw first-pass figure. Nothing is shown until "
-            "there are enough cards behind it to mean anything."))
+            "The estimate prices what's left off your own review history: how "
+            "many presses a new card, a review and a card mid-step have "
+            "actually cost you (misses and learning steps included), times your "
+            "usual time per press, nudged toward today's pace as you go. It "
+            "shows from the first card, one slow card barely moves it, and "
+            "learning cards waiting on a step timer are counted even before "
+            "Anki's counts show them."))
         self.bar_outside = QCheckBox("Keep the bar up outside a Blitz (all due cards)")
         self.bar_outside.setChecked(bool(cfg.get("show_bar_outside_blitz", True)))
         dnl.addWidget(self.bar_outside)
@@ -1553,7 +1597,6 @@ class SprintPanel(QWidget):
             "bar_flush_with_top": self.flush_top.isChecked(),
             "split_bar_by_grade": self.split_bar.isChecked(),
             "show_eta": self.show_eta.isChecked(),
-            "eta_error_adjust": self.eta_error.isChecked(),
             "show_pace": self.show_pace.isChecked(),
             "show_live_accuracy": self.show_acc.isChecked(),
             "show_again_count": self.show_again.isChecked(),

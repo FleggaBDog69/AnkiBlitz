@@ -380,3 +380,114 @@ def card_inputs(card, cfg: dict) -> dict:
 def reveal_delay_seconds(card, cfg: dict, pace: float = 1.0) -> float:
     """Seconds to wait (after the reveal finishes) before showing the answer."""
     return delay_for(cfg, pace=pace, **card_inputs(card, cfg))
+
+
+# ----- cloze one-by-one ------------------------------------------------------
+#
+# AnKing-style cloze notes can be uncovered one cloze at a time: the note's
+# "One by one" field turns it on (optionally for listed cloze numbers only).
+# With one-by-one on the FRONT, the question stays up while you uncover the
+# clozes, so the timer has two ways to treat such a card (one_by_one_mode):
+#
+#   per_cloze   one short timer per cloze. Each firing uncovers the next cloze
+#               (the template flips to the answer after the last one); pressing
+#               the reveal key early starts the next cloze's timer.
+#   multiplier  the ordinary whole-card delay, scaled by one_by_one_multiplier,
+#               because uncovering takes longer than the word count suggests.
+#
+# Per cloze:  (seconds_per_cloze + seconds_per_word * that answer's words)
+#             * the card's familiarity / difficulty / pace modifiers,
+#             clamped to [0.5, max_cloze_seconds]. The first cloze also gets the
+#             ordinary question-reading delay (answer term left out).
+
+ONE_BY_ONE_FIELD = "One by one"
+ONE_BY_ONE_MODES = ("per_cloze", "multiplier", "off")
+_MIN_CLOZE_SECONDS = 0.5
+# Anki ships each hidden answer on the question side, in the active cloze's
+# data-cloze attribute (inactive clozes carry class="cloze-inactive").
+_DATA_CLOZE_RE = re.compile(r'<span\b[^>]*\bclass="cloze"[^>]*\bdata-cloze="([^"]*)"')
+
+
+def one_by_one_mode(cfg: dict) -> str:
+    mode = str(cfg.get("one_by_one_mode", DEFAULTS["one_by_one_mode"]))
+    return mode if mode in ONE_BY_ONE_MODES else "off"
+
+
+def one_by_one_cloze_words(card) -> list:
+    """Word count of each cloze this card hides, in reveal order — or [] when
+    the card isn't one-by-one. Mirrors the AnKing template's own rule: the
+    "One by one" field is filled, lists this card's cloze number (or no
+    numbers at all), and there are at least two clozes to uncover."""
+    try:
+        note = card.note()
+        if ONE_BY_ONE_FIELD not in note.keys():
+            return []
+        field = _TAG_RE.sub("", note[ONE_BY_ONE_FIELD]).strip()
+    except Exception:
+        return []
+    if not field:
+        return []
+    numbers = [int(n) for n in re.findall(r"\d+", field)]
+    if numbers and (card.ord + 1) not in numbers:
+        return []
+    try:
+        raw = card.render_output(reload=False).question_text
+    except Exception:
+        return []
+    answers = [_html.unescape(a) for a in _DATA_CLOZE_RE.findall(raw or "")]
+    if len(answers) < 2:
+        return []
+    return [_visible_words(a) for a in answers]
+
+
+def _card_multiplier(cfg: dict, inputs: dict, pace: float) -> float:
+    """The familiarity x difficulty x pace factor ``delay_for`` applies."""
+    def knob(key):
+        return float(cfg.get(key, DEFAULTS[key]))
+    mult = 1.0
+    if inputs["is_new"]:
+        mult *= knob("new_multiplier")
+    elif inputs["unfamiliar"]:
+        mult *= knob("unfamiliar_multiplier")
+    mult *= _difficulty_multiplier(inputs["difficulty"], inputs["ease"],
+                                   inputs["lapses"], inputs["reps"],
+                                   knob("difficulty_weight"))
+    return mult * pace
+
+
+def cloze_delays(cfg: dict, inputs: dict, cloze_words: list,
+                 pace: float = 1.0) -> list:
+    """Per-cloze delays in seconds, in reveal order (see the block comment)."""
+    def knob(key):
+        return float(cfg.get(key, DEFAULTS[key]))
+    per_cloze = knob("one_by_one_seconds_per_cloze")
+    per_word = knob("one_by_one_seconds_per_word")
+    hi = max(_MIN_CLOZE_SECONDS, knob("one_by_one_max_cloze_seconds"))
+    mult = _card_multiplier(cfg, inputs, pace)
+    delays = [max(_MIN_CLOZE_SECONDS, min((per_cloze + per_word * w) * mult, hi))
+              for w in cloze_words]
+    reading = delay_for(cfg, pace=pace, **dict(inputs, answer_words=0))
+    delays[0] += reading
+    return delays
+
+
+def one_by_one_plan(cfg: dict, card, inputs: dict, pace: float = 1.0):
+    """How the timer should run this card if it's one-by-one, else None.
+
+    ``{"mode": "per_cloze", "delays": [s, ...], "delay": total s}`` or
+    ``{"mode": "multiplier", "delay": s}``. ``delay`` is the whole-card wait:
+    in per_cloze mode it's only the fallback for a template that never
+    announces its one-by-one engine (an unpatched AnKing template).
+    """
+    mode = one_by_one_mode(cfg)
+    if mode == "off" or inputs.get("fixed_time"):
+        return None
+    words = one_by_one_cloze_words(card)
+    if not words:
+        return None
+    if mode == "multiplier":
+        mult = max(0.1, float(cfg.get("one_by_one_multiplier",
+                                      DEFAULTS["one_by_one_multiplier"])))
+        return {"mode": mode, "delay": delay_for(cfg, pace=pace, **inputs) * mult}
+    delays = cloze_delays(cfg, inputs, words, pace)
+    return {"mode": mode, "delays": delays, "delay": sum(delays)}

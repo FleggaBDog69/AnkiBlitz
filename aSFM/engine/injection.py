@@ -180,13 +180,25 @@ def question_payload(card) -> dict:
                                                   DEFAULTS["enable_on_new"]):
         return off
     inputs = adaptive.card_inputs(card, cfg)
-    delay_s = adaptive.delay_for(cfg, pace=pace.current(cfg), **inputs)
+    cur_pace = pace.current(cfg)
+    delay_s = adaptive.delay_for(cfg, pace=cur_pace, **inputs)
+    track = {"inputs": inputs, "delay": delay_s}
+    one_by_one = None
+    plan = adaptive.one_by_one_plan(cfg, card, inputs, cur_pace)
+    if plan:
+        # A one-by-one card's wait isn't a read-the-question wait, so it
+        # stays out of the pace tracker.
+        delay_s = plan["delay"]
+        track = None
+        one_by_one = {"mode": plan["mode"],
+                      "delaysMs": [int(d * 1000) for d in plan.get("delays", [])]}
     return {
         "enabled": True,
         # Stripped before the payload goes to the webview; the pace tracker
         # needs the card's inputs and doesn't want to measure them twice.
-        "_track": {"inputs": inputs, "delay": delay_s},
+        "_track": track,
         "delayMs": int(delay_s * 1000),
+        "oneByOne": one_by_one,
         "showCountdown": bool(cfg.get("show_countdown", True)),
         "warnColour": bool(cfg.get("countdown_warning_colour",
                                    DEFAULTS["countdown_warning_colour"])),
