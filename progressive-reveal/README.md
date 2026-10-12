@@ -19,6 +19,10 @@ extracted from the **AnkiBlitz** suite so you can use just this piece.
   `{{tts}}` voice so the words finish in step with the audio.
 - Optional reveal on the **answer** side too.
 - Per-note-type / per-deck **exclusions**.
+- **Pairs with Adaptive Speed Focus (aSFM).** Run both and the auto-reveal
+  waits for the fade to finish, the two can share the `p` key (first press
+  finishes the fade, the next pauses the timer), and clicking aSFM's **More
+  time** doesn't skip the fade.
 
 ## Install
 

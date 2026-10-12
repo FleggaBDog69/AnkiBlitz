@@ -20,6 +20,7 @@ from aqt.qt import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QPalette,
     QScrollArea,
     QSpinBox,
     QVBoxLayout,
@@ -72,7 +73,9 @@ class _KeyCaptureEdit(QLineEdit):
 
     def keyPressEvent(self, event):
         text = event.text()
-        if text and text.strip() and len(text) == 1:
+        # Esc and other control keys carry a one-character text too ("\x1b"),
+        # so test for a printable, non-space character rather than any text.
+        if len(text) == 1 and text.isprintable() and not text.isspace():
             self.setText(text)
         else:
             super().keyPressEvent(event)
@@ -268,14 +271,23 @@ class _Panel(QWidget):
 
     def _update_preview(self):
         wps = self.wps.value() or 6.0
+        # No grid: a quiet header and banded rows, in the theme's own colours
+        # so it reads the same in light and dark mode.
+        pal = self.palette()
+        band = pal.color(QPalette.ColorRole.AlternateBase).name()
+        rule = pal.color(QPalette.ColorRole.Mid).name()
+        th = (f"style='color: gray; font-size: 11px; font-weight: 600;"
+              f" border-bottom: 1px solid {rule};'")
         rows = ""
-        for words in _PREVIEW_WORDS:
+        for i, words in enumerate(_PREVIEW_WORDS):
+            bg = f" bgcolor='{band}'" if i % 2 else ""
             rows += (
-                f"<tr><td>{words} words</td>"
-                f"<td align='center'>{words / wps:.1f} s</td></tr>")
+                f"<tr{bg}><td>{words} words</td>"
+                f"<td align='right'><b>{words / wps:.1f}</b> s</td></tr>")
         self.preview.setText(
-            "<table border='1' cellspacing='0' cellpadding='5'>"
-            "<tr><th>Card</th><th>Reveal time</th></tr>"
+            "<table cellspacing='0' cellpadding='6'>"
+            f"<tr><th align='left' {th}>Words</th>"
+            f"<th align='right' {th}>Reveal time</th></tr>"
             f"{rows}</table>")
 
     def save(self):

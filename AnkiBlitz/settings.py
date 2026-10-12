@@ -27,6 +27,7 @@ from aqt.qt import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QPalette,
     QPushButton,
     QScrollArea,
     QSpinBox,
@@ -80,6 +81,52 @@ def _hline() -> QFrame:
     return line
 
 
+def _section(title: str, sub: str = "") -> QLabel:
+    """A section heading, with an optional one-line explanation under it."""
+    html = f"<div style='font-size: 13px; font-weight: 600;'>{title}</div>"
+    if sub:
+        html += f"<div style='color: gray; font-size: 11px;'>{sub}</div>"
+    lbl = QLabel(html)
+    lbl.setTextFormat(Qt.TextFormat.RichText)
+    lbl.setWordWrap(True)
+    lbl.setContentsMargins(0, 10, 0, 2)
+    return lbl
+
+
+def _form() -> QFormLayout:
+    form = QFormLayout()
+    form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+    form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.FieldsStayAtSizeHint)
+    form.setHorizontalSpacing(12)
+    return form
+
+
+def _preview_card(title: str, sub: str):
+    """The bordered panel a live preview sits in; returns (frame, layout)."""
+    card = QFrame()
+    card.setObjectName("abPreview")
+    card.setStyleSheet(
+        "#abPreview { border: 1px solid palette(mid); border-radius: 8px;"
+        " background: palette(base); }")
+    inner = QVBoxLayout(card)
+    inner.setContentsMargins(14, 12, 14, 12)
+    lbl = _section(title, sub)
+    lbl.setContentsMargins(0, 0, 0, 2)
+    inner.addWidget(lbl)
+    return card, inner
+
+
+def _table_style(widget: QWidget):
+    """(band colour, header-cell attributes) for a gridless preview table in
+    the theme's own colours, so it reads the same in light and dark mode."""
+    pal = widget.palette()
+    band = pal.color(QPalette.ColorRole.AlternateBase).name()
+    rule = pal.color(QPalette.ColorRole.Mid).name()
+    th = (f"style='color: gray; font-size: 11px; font-weight: 600;"
+          f" border-bottom: 1px solid {rule};'")
+    return band, th
+
+
 def _scroll(inner: QWidget) -> QScrollArea:
     """Wrap a tall panel so dense tabs stay usable on small screens."""
     area = QScrollArea()
@@ -96,13 +143,17 @@ class _KeyCaptureEdit(QLineEdit):
         super().__init__(parent)
         self.setReadOnly(True)
         self.setMaxLength(1)
-        self.setFixedWidth(140)
-        self.setPlaceholderText("click, then press a key")
+        self.setFixedWidth(56)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setPlaceholderText("key")
+        self.setToolTip("Click here, then press the key you want")
         self.setText(str(key or ""))
 
     def keyPressEvent(self, event):
         text = event.text()
-        if text and text.strip() and len(text) == 1:
+        # Esc and other control keys carry a one-character text too ("\x1b"),
+        # so test for a printable, non-space character rather than any text.
+        if len(text) == 1 and text.isprintable() and not text.isspace():
             self.setText(text)
         else:
             super().keyPressEvent(event)
@@ -182,13 +233,20 @@ class SpeedFocusPanel(QWidget):
         super().__init__()
         cfg = get_section(self.SECTION)
 
+        # The knobs scroll in their own column, so the preview beside them
+        # stays in view however far down you are. (The dialog doesn't wrap
+        # this tab in a scroll area of its own — see SettingsDialog.)
         outer = QHBoxLayout(self)
-        layout = QVBoxLayout()        # left column: the knobs
-        outer.addLayout(layout, 3)
-        side = QVBoxLayout()          # right column: the live table (stays in view)
-        outer.addLayout(side, 2)
+        outer.setSpacing(14)
+        knobs = QWidget()
+        layout = QVBoxLayout(knobs)   # left column: the knobs
+        layout.setContentsMargins(0, 0, 10, 0)
+        outer.addWidget(_scroll(knobs), 1)
 
         self.enabled = QCheckBox("Enable adaptive auto-reveal")
+        font = self.enabled.font()
+        font.setBold(True)
+        self.enabled.setFont(font)
         self.enabled.setChecked(bool(cfg["enabled"]))
         layout.addWidget(self.enabled)
         layout.addWidget(_hint(
@@ -196,7 +254,9 @@ class SpeedFocusPanel(QWidget):
             "delay, then shows the answer automatically. It never grades the "
             "card for you."))
 
-        form = QFormLayout()
+        layout.addWidget(_section("How long to wait",
+                                  "Base time plus reading time, then clamped."))
+        form = _form()
 
         self.base = _double(0.0, 60.0, 0.5, 1, " s")
         self.base.setValue(float(cfg["base_seconds"]))
@@ -204,7 +264,7 @@ class SpeedFocusPanel(QWidget):
 
         self.per_word = _double(0.0, 5.0, 0.05, 2, " s")
         self.per_word.setValue(float(cfg["seconds_per_word"]))
-        form.addRow("Per word:", self.per_word)
+        form.addRow("Per question word:", self.per_word)
 
         # --- answer length: 0 s per answer word is the off switch ---
         self.per_answer_word = _double(0.0, 5.0, 0.05, 2, " s")
@@ -217,11 +277,11 @@ class SpeedFocusPanel(QWidget):
 
         self.min_delay = _double(0.0, 120.0, 0.5, 1, " s")
         self.min_delay.setValue(float(cfg["min_delay_seconds"]))
-        form.addRow("Minimum delay:", self.min_delay)
+        form.addRow("Shortest wait:", self.min_delay)
 
         self.max_delay = _double(0.0, 300.0, 1.0, 1, " s")
         self.max_delay.setValue(float(cfg["max_delay_seconds"]))
-        form.addRow("Maximum delay:", self.max_delay)
+        form.addRow("Longest wait:", self.max_delay)
         # A maximum under the minimum is clamped up to it at runtime anyway, so
         # don't let the spin box show a number that never applies.
         self.min_delay.valueChanged.connect(self.max_delay.setMinimum)
@@ -233,17 +293,16 @@ class SpeedFocusPanel(QWidget):
         layout.addLayout(form)
 
         layout.addWidget(_hint(
-            "Adds time for the answer side's words (on cloze, the hidden text). "
-            "Hidden fields and tags don't count. The cap is the most it can add; "
-            "0 = off."))
+            "Only words you can see count — hidden fields and tags don't. Answer "
+            "words are the answer side's (on cloze, the hidden text); the cap is "
+            "the most they can add, and 0 s per answer word turns them off."))
 
-        layout.addWidget(_hline())
-        layout.addWidget(QLabel("<b>Modifiers (weighted)</b>"))
-
-        mod = QFormLayout()
+        layout.addWidget(_section("Adjustments",
+                                  "Extra time for cards you don't know well yet."))
+        mod = _form()
         self.unfamiliar = _double(1.0, 5.0, 0.1, 2, "×")
         self.unfamiliar.setValue(float(cfg["unfamiliar_multiplier"]))
-        mod.addRow("Learning / relearning cards:", self.unfamiliar)
+        mod.addRow("Learning / relearning:", self.unfamiliar)
 
         # New-card multiplier with its own enable toggle right beside it.
         self.new_mult = _double(1.0, 5.0, 0.1, 2, "×")
@@ -266,10 +325,11 @@ class SpeedFocusPanel(QWidget):
         layout.addWidget(_hint(
             "Time = base + per word × question words + answer time, × the new or "
             "learning modifier, nudged by up to ± the difficulty weight (0 = "
-            "ignore difficulty), then clamped to the min and max."))
+            "ignore difficulty), then clamped to the shortest and longest wait. "
+            "Difficulty comes from FSRS, or from ease and lapses on SM-2."))
 
-        layout.addWidget(_hline())
-        self.show_countdown = QCheckBox("Show countdown bar while waiting")
+        layout.addWidget(_section("Countdown and heads-up"))
+        self.show_countdown = QCheckBox("Show a countdown bar along the bottom")
         self.show_countdown.setChecked(bool(cfg["show_countdown"]))
         layout.addWidget(self.show_countdown)
 
@@ -283,12 +343,12 @@ class SpeedFocusPanel(QWidget):
         self.warning_sound.setChecked(bool(cfg["warning_sound"]))
         layout.addWidget(self.warning_sound)
 
-        warn_form = QFormLayout()
+        warn_form = _form()
         self.warn_pct = QSpinBox()
         self.warn_pct.setRange(5, 95)
-        self.warn_pct.setSuffix(" %")
+        self.warn_pct.setSuffix(" % of the wait")
         self.warn_pct.setValue(int(cfg["warning_at_percent"]))
-        warn_form.addRow("Warn after:", self.warn_pct)
+        warn_form.addRow("Warning point:", self.warn_pct)
 
         def _sync_warn(*_):
             colour = self.show_countdown.isChecked() and self.warn_colour.isChecked()
@@ -307,31 +367,34 @@ class SpeedFocusPanel(QWidget):
             "user_files.\n\n“Hold after reveal”: the answer never shows sooner "
             "than this after the words finish revealing."))
 
-        layout.addWidget(_hline())
-        self.pause_key_enabled = QCheckBox("Pause key: hold the timer on the current card")
-        self.pause_key_enabled.setChecked(bool(cfg["pause_key_enabled"]))
-        layout.addWidget(self.pause_key_enabled)
-        pause_form = QFormLayout()
-        self.pause_key = _KeyCaptureEdit(cfg["pause_key"])
-        pause_form.addRow("Pause key:", self.pause_key)
-        layout.addLayout(pause_form)
-        self.pause_key_enabled.toggled.connect(self.pause_key.setEnabled)
-        self.pause_key.setEnabled(self.pause_key_enabled.isChecked())
-        layout.addWidget(_hint(
-            "Freezes the countdown; press again to carry on. The pause sticks "
-            "across cards until you release it. It can share the reveal key: the "
-            "first press finishes the reveal, the next one pauses."))
-
+        layout.addWidget(_section("Need longer on a card?",
+                                  "Hold the timer, then carry on where it stopped."))
         self.more_time_button = QCheckBox("Show a “More time” button on the card")
         self.more_time_button.setChecked(bool(cfg["more_time_button"]))
         layout.addWidget(self.more_time_button)
         layout.addWidget(_hint(
-            "The pause key as a button. Faint until you hover it; click the "
-            "paused badge to resume."))
+            "Faint until you hover it. While the timer is held, a “paused” badge "
+            "takes its place — click it to resume."))
 
-        layout.addWidget(_hline())
-        layout.addWidget(QLabel("<b>Learn my pace</b>"))
-        target_form = QFormLayout()
+        self.pause_key_enabled = QCheckBox("Pause key")
+        self.pause_key_enabled.setChecked(bool(cfg["pause_key_enabled"]))
+        self.pause_key = _KeyCaptureEdit(cfg["pause_key"])
+        key_row = QHBoxLayout()
+        key_row.setContentsMargins(0, 0, 0, 0)
+        key_row.addWidget(self.pause_key_enabled)
+        key_row.addWidget(self.pause_key)
+        key_row.addStretch(1)
+        layout.addLayout(key_row)
+        self.pause_key_enabled.toggled.connect(self.pause_key.setEnabled)
+        self.pause_key.setEnabled(self.pause_key_enabled.isChecked())
+        layout.addWidget(_hint(
+            "Press once to hold, again to carry on. The hold sticks across cards "
+            "until you release it. It can share the reveal key: the first press "
+            "finishes the reveal, the next one pauses."))
+
+        layout.addWidget(_section("Learn my pace",
+                                  "Let AnkiBlitz fit the timer to how fast you really are."))
+        target_form = _form()
         self.target = QSpinBox()
         self.target.setRange(5, 50)
         self.target.setSuffix(" % of cards")
@@ -372,24 +435,25 @@ class SpeedFocusPanel(QWidget):
         self.auto_tune.toggled.connect(self._refresh_pace)
         self._refresh_pace()
 
-        layout.addWidget(_hline())
-        layout.addWidget(QLabel("Skip the auto-reveal timer for these (review normally):"))
+        layout.addWidget(_section("Skip these",
+                                  "No timer at all — review them normally."))
         notetypes, decks = _collect_names()
         self.nt_list = _FilterList("Note types", notetypes, cfg["excluded_note_types"])
         self.deck_list = _FilterList(
             "Decks (a parent also covers its subdecks)", decks, cfg["excluded_decks"])
         sf_lists = QHBoxLayout()
-        sf_lists.addWidget(self.nt_list)
-        sf_lists.addWidget(self.deck_list)
+        sf_lists.addWidget(self.nt_list, 1)
+        sf_lists.addWidget(self.deck_list, 1)
         layout.addLayout(sf_lists)
 
         # --- Picture / visual cards: set time, no word count ---
-        layout.addWidget(_hline())
-        self.fixed_enabled = QCheckBox("Picture cards: use a set time (ignore word count)")
+        layout.addWidget(_section("Picture cards",
+                                  "Nothing to read, so a set time instead of a word count."))
+        self.fixed_enabled = QCheckBox("Use a set time for these note types and decks")
         self.fixed_enabled.setChecked(bool(cfg["fixed_time_enabled"]))
         layout.addWidget(self.fixed_enabled)
 
-        fixed_form = QFormLayout()
+        fixed_form = _form()
         self.fixed_base = _double(0.5, 60.0, 0.5, 1, " s")
         self.fixed_base.setValue(float(cfg["fixed_time_base_seconds"]))
         fixed_form.addRow("Set time:", self.fixed_base)
@@ -405,17 +469,17 @@ class SpeedFocusPanel(QWidget):
             "Picture decks (a parent also covers its subdecks)",
             decks, cfg["fixed_time_decks"])
         fixed_lists = QHBoxLayout()
-        fixed_lists.addWidget(self.fixed_nt_list)
-        fixed_lists.addWidget(self.fixed_deck_list)
+        fixed_lists.addWidget(self.fixed_nt_list, 1)
+        fixed_lists.addWidget(self.fixed_deck_list, 1)
         layout.addLayout(fixed_lists)
         for w in (self.fixed_base, self.fixed_nt_list, self.fixed_deck_list):
             self.fixed_enabled.toggled.connect(w.setEnabled)
             w.setEnabled(self.fixed_enabled.isChecked())
 
         # --- Cloze one-by-one cards: per-cloze timers or a multiplier ---
-        layout.addWidget(_hline())
-        layout.addWidget(QLabel("<b>One-by-one cloze cards</b>"))
-        obo_form = QFormLayout()
+        layout.addWidget(_section("One-by-one cloze cards",
+                                  "Cards with the AnKing “One by one” field filled."))
+        obo_form = _form()
         self.obo_mode = QComboBox()
         for label, value in (("A timer per cloze", "per_cloze"),
                              ("Whole card × multiplier", "multiplier"),
@@ -456,8 +520,9 @@ class SpeedFocusPanel(QWidget):
 
         # --- live preview: right column, pinned to the top so it stays in
         # view while you adjust the knobs on the left ---
-        side.addWidget(QLabel("<b>Preview</b>"))
-        side.addWidget(_hint("Seconds until the answer auto-shows:"))
+        card, side = _preview_card("Preview", "Seconds until the answer shows")
+        card.setFixedWidth(300)
+        outer.addWidget(card, 0)
         self.preview = QLabel()
         self.preview.setTextFormat(Qt.TextFormat.RichText)
         side.addWidget(self.preview)
@@ -497,22 +562,24 @@ class SpeedFocusPanel(QWidget):
     def _update_preview(self):
         cfg = self._current_cfg()
         p = self._preview_pace()
-        header = "<tr><th>Card</th>" + "".join(
-            f"<th>{name}</th>" for name, _ in _PREVIEW_CARDS) + "</tr>"
+        band, th = _table_style(self)
+        header = f"<tr><th align='left' {th}>Words</th>" + "".join(
+            f"<th align='right' {th}>{name}</th>" for name, _ in _PREVIEW_CARDS) + "</tr>"
         rows = ""
         new_on = self.enable_on_new.isChecked()
 
         def cell(card, words, answer_words):
             if card["is_new"] and not new_on:
-                return "<td align='center' style='color: gray;'>off</td>"
+                return "<td align='right' style='color: gray;'>off</td>"
             d = adaptive.delay_for(cfg, words=words, answer_words=answer_words,
                                    pace=p, **card)
-            return f"<td align='center'>{d:.1f} s</td>"
+            return f"<td align='right'><b>{d:.1f}</b> s</td>"
 
-        for label, words, answer_words in self._preview_rows():
+        for i, (label, words, answer_words) in enumerate(self._preview_rows()):
             cells = "".join(cell(card, words, answer_words)
                             for _, card in _PREVIEW_CARDS)
-            rows += f"<tr><td>{label}</td>{cells}</tr>"
+            bg = f" bgcolor='{band}'" if i % 2 else ""
+            rows += f"<tr{bg}><td>{label}</td>{cells}</tr>"
         self.preview_hint.setText(
             ("Rows are question + answer words. " if self.per_answer_word.value() > 0
              else "Rows are question words. ")
@@ -521,7 +588,7 @@ class SpeedFocusPanel(QWidget):
             + (f" Includes your learned pace ({p:.2f}×)." if abs(p - 1.0) >= 0.005
                else ""))
         self.preview.setText(
-            "<table border='1' cellspacing='0' cellpadding='5'>"
+            "<table width='100%' cellspacing='0' cellpadding='6'>"
             f"{header}{rows}</table>"
         )
 
@@ -787,14 +854,12 @@ class WordRevealPanel(QWidget):
         # Reading-speed knob on the left, live reveal-time table on the right.
         speed_row = QHBoxLayout()
         speed_row.addLayout(form, 1)
-        side = QVBoxLayout()
-        side.addWidget(QLabel("<b>Preview</b>"))
-        side.addWidget(_hint("Time to fully reveal the question:"))
+        card, side = _preview_card("Preview", "Time to fully reveal the question")
         self.preview = QLabel()
         self.preview.setTextFormat(Qt.TextFormat.RichText)
         side.addWidget(self.preview)
         side.addStretch(1)
-        speed_row.addLayout(side, 1)
+        speed_row.addWidget(card, 1)
         layout.addLayout(speed_row)
 
         layout.addWidget(self.stop_audio)
@@ -871,15 +936,18 @@ class WordRevealPanel(QWidget):
 
     def _update_preview(self):
         wps = self.wps.value() or 6.0
+        band, th = _table_style(self)
         rows = ""
-        for words in _PREVIEW_WORDS:
+        for i, words in enumerate(_PREVIEW_WORDS):
+            bg = f" bgcolor='{band}'" if i % 2 else ""
             rows += (
-                f"<tr><td>{words} words</td>"
-                f"<td align='center'>{words / wps:.1f} s</td></tr>"
+                f"<tr{bg}><td>{words} words</td>"
+                f"<td align='right'><b>{words / wps:.1f}</b> s</td></tr>"
             )
         self.preview.setText(
-            "<table border='1' cellspacing='0' cellpadding='5'>"
-            "<tr><th>Card</th><th>Reveal time</th></tr>"
+            "<table width='100%' cellspacing='0' cellpadding='6'>"
+            f"<tr><th align='left' {th}>Words</th>"
+            f"<th align='right' {th}>Reveal time</th></tr>"
             f"{rows}</table>"
         )
 
@@ -2131,7 +2199,8 @@ class SettingsDialog(QDialog):
         # Profiles front-and-centre, then the per-feature tabs.
         self.tabs.addTab(_scroll(self.presets), "Profiles")
         self.tabs.addTab(_scroll(self.sprint), "Blitz")
-        self.tabs.addTab(_scroll(self.speed_focus), "Speed Focus")
+        # Not wrapped: the panel scrolls its own knobs so its preview stays put.
+        self.tabs.addTab(self.speed_focus, "Speed Focus")
         self.tabs.addTab(_scroll(self.word_reveal), "Word Reveal")
         self.tabs.addTab(_scroll(self.focus), "Focus")
         self.tabs.addTab(_scroll(self.quick_start), "Quick Start")

@@ -22,7 +22,7 @@ Focus Mode*, extracted from the **AnkiBlitz** suite so you can use just this pie
   card's ease and lapses instead; calibration works with either.
 - Optional thin **countdown bar** and a **warning sound** before the reveal. The
   bar can also turn from blue to red at the warning point — a silent heads-up.
-- A **“More time” button** on the card, and a **pause key** (default `p`) — both
+- A **“More time” button** on the card (showing its key as a keycap), and a **pause key** (default `p`) — both
   freeze the countdown on the card you're on and pick it up where it stopped. The
   hold sticks across cards, and every card it applies to says so on screen. The
   button stays faint until you hover it; the “paused” badge is clickable to
@@ -51,14 +51,20 @@ If you also run **Glutanimate's Speed Focus Mode**, disable it so the two timers
 don't double up. (If you run the full **AnkiBlitz** suite, you already have this
 feature — don't install both.)
 
+**Pairs with Progressive Word Reveal.** Install both and they cooperate: the
+answer waits for the question to finish fading in, the two can share the `p`
+key (first press finishes the fade, the next one pauses), and clicking **More
+time** never skips the fade.
+
 ## Using it
 
 Everything is under **Tools ▸ Adaptive Speed Focus**:
 
 | Item | What it does |
 |------|--------------|
-| Settings… | The timing knobs, exclusions, picture-card mode, live preview. |
+| Settings… | Four tabs — **Timing**, **On screen**, **Your pace**, **Cards** — with a live preview beside them. |
 | Enabled | Master on/off. |
+| Welcome & calibration… | The first-run window again, with one-click calibration. |
 
 The live preview table in Settings always agrees with the runtime — both compute
 the delay the same way.

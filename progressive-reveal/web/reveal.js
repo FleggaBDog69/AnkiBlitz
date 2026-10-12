@@ -4,6 +4,12 @@
  * all DOM + timing. Purely visual — no callback into Python. Click or the reveal
  * key shows everything at once.
  *
+ * Running beside Adaptive Speed Focus, the two share a key by default ("p") and
+ * a timer that mustn't show the answer mid-fade. Neither imports the other: this
+ * bundle publishes PWReveal.isRevealing() / claimsKey(e) and fires a
+ * "pwr:revealed" document event when the fade is done, and aSFM looks for them
+ * if they're there.
+ *
  * Injected once per webview; guarded so re-injection keeps one instance.
  */
 (function () {
@@ -17,6 +23,7 @@
   var keyHandler = null;
   var revealKey = "p";
   var stopAudioOnReveal = true;
+  var revealing = false;      // words still fading in on this card
 
   function getRoot() {
     return document.getElementById("qa") || document.body;
@@ -107,16 +114,27 @@
     clickHandler = keyHandler = null;
   }
 
+  // The fade is over (it ran out, or you skipped it). Announced so a timer
+  // add-on waiting on the question can carry on.
+  function markRevealed() {
+    if (!revealing) return;
+    revealing = false;
+    try {
+      document.dispatchEvent(new CustomEvent("pwr:revealed"));
+    } catch (e) {}
+  }
+
   function revealAllWords() {
     clearTimers();
     var hidden = document.querySelectorAll(".pwr-word.pwr-hidden");
     // Already fully shown: a later click or key press is not a skip, so it must
     // not cut the card's audio (the listeners stay up until the next card).
-    if (!hidden.length) return;
+    if (!hidden.length) { markRevealed(); return; }
     Array.prototype.forEach.call(hidden, function (el) {
       el.classList.remove("pwr-hidden");
     });
     stopCardAudio();
+    markRevealed();
   }
 
   // Skipping the reveal means you've read it — the voice reading it to you is
@@ -137,6 +155,26 @@
     return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
   }
 
+  // An on-screen control (another add-on's "More time" button, say) is not
+  // the card: clicking it mustn't also skip the reveal and cut the audio. The
+  // click listener is on document in the capture phase, so the control's own
+  // stopPropagation can't keep the click from reaching it.
+  function isControl(node) {
+    for (var el = node; el && el !== document.body; el = el.parentElement) {
+      if (el.getAttribute && el.getAttribute("role") === "button") return true;
+    }
+    return false;
+  }
+
+  // Would this key press skip the fade? Marked on the event once handled, so
+  // the answer is the same whichever listener runs first.
+  function isRevealKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (e.repeat) return false;
+    if (isTypingTarget(e.target)) return false;
+    return (e.key || "").toLowerCase() === revealKey;
+  }
+
   // `reveal` is the per-card config: { wordsPerSecond, mode, chunkWords }.
   function startReveal(reveal) {
     var root = getRoot();
@@ -150,6 +188,7 @@
     var total = words.length;
     var wps = (reveal.wordsPerSecond > 0) ? reveal.wordsPerSecond : 6;
     var durationMs = (total / wps) * 1000;
+    revealing = true;
 
     // The reveal index a word belongs to: every word in word mode; its chunk in
     // chunk mode. Spans sharing an index fade in together.
@@ -172,16 +211,23 @@
       }, t));
     });
 
+    wordTimeouts.push(setTimeout(markRevealed, durationMs));
+
     // Escape hatch: click or the reveal key shows everything at once.
-    clickHandler = function () { revealAllWords(); };
+    clickHandler = function (e) {
+      if (e && isControl(e.target)) return;
+      revealAllWords();
+    };
     keyHandler = function (e) {
-      // A bare key match isn't enough: without these two guards, "p" typed into
+      // A bare key match isn't enough: without these guards, "p" typed into
       // Anki's type-in-the-answer box reveals the question, and any shortcut
       // using the key as a modifier combination triggers it too.
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.repeat) return;
-      if (isTypingTarget(e.target)) return;
-      if ((e.key || "").toLowerCase() === revealKey) revealAllWords();
+      if (!isRevealKey(e)) return;
+      // Once the fade is done the key belongs to whoever else wants it (aSFM's
+      // pause key shares it by default).
+      if (!revealing) return;
+      e._pwrRevealed = true;
+      revealAllWords();
     };
     document.addEventListener("click", clickHandler, true);
     document.addEventListener("keydown", keyHandler, true);
@@ -191,12 +237,19 @@
   R.onCard = function (payload) {
     clearTimers();
     removeListeners();
+    revealing = false;
     var reveal = payload && payload.reveal;
     revealKey = (reveal && reveal.revealKey) || "p";
     stopAudioOnReveal = !!(reveal && reveal.stopAudio);
     if (reveal && reveal.enabled) {
       startReveal(reveal);
     }
+  };
+
+  // Public, for a timer add-on running alongside (see the header).
+  R.isRevealing = function () { return revealing; };
+  R.claimsKey = function (e) {
+    return !!(e && (e._pwrRevealed || (revealing && isRevealKey(e))));
   };
 
   window.PWReveal = R;

@@ -5,19 +5,26 @@
   position: fixed;
   left: 0;
   bottom: 0;
-  height: 3px;
+  height: 4px;
   width: 100%;
   /* Neutral grey so the emptied part of the track shows in light mode too
      (a white tint vanished on a white card). */
-  background: rgba(128, 128, 128, 0.18);
+  background: rgba(128, 128, 128, 0.16);
   z-index: 99998;
   pointer-events: none;
+  /* Fades in rather than snapping on with every card. */
+  animation: asfm-fade-in 0.25s ease-out;
 }
 #asfm-countdown > .asfm-countdown-fill {
+  /* The bar's colour, named once so the glow can follow it. */
+  --asfm-bar: #f59e0b;
   height: 100%;
   width: 100%;
   transform-origin: left center;
+  border-radius: 0 2px 2px 0;
   background: linear-gradient(90deg, #f59e0b, #ef4444);
+  /* A soft glow, so the bar reads as light rather than as a hairline. */
+  box-shadow: 0 0 10px 0 var(--asfm-bar);
 }
 
 /* Warning colour shift (countdown_warning_colour): the bar runs in Anki's own
@@ -25,61 +32,103 @@
    warning point, then turns red — a silent heads-up. Solid colours rather than
    the gradient above, because a gradient can't fade. */
 #asfm-countdown.asfm-shift > .asfm-countdown-fill {
-  background: var(--button-primary-bg, #3b82f6);
+  --asfm-bar: var(--button-primary-bg, #3b82f6);
+  background: var(--asfm-bar);
 }
 #asfm-countdown.asfm-shift.asfm-warned > .asfm-countdown-fill {
-  background: #ef4444;
+  --asfm-bar: #ef4444;
+}
+
+/* ---- The on-card pill: "More time", and the paused badge in its place ----
+   The two share a slot and a shape; they are mutually exclusive, since
+   pressing one is what swaps it for the other, so the card never has to make
+   room for both. */
+#asfm-moretime,
+#asfm-paused {
+  position: fixed;
+  left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 99998;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px 6px 10px;
+  border-radius: 999px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  animation: asfm-pop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+#asfm-moretime svg,
+#asfm-paused svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  fill: currentColor;
+}
+#asfm-paused .asfm-sep {
+  opacity: 0.45;
+}
+/* The pause key, shown as a keycap: you learn the shortcut by seeing it. */
+.asfm-kbd {
+  display: inline-block;
+  min-width: 9px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  text-transform: uppercase;
+  background: rgba(128, 128, 128, 0.22);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+}
+
+/* "More time": the pause key made visible. Deliberately quiet. It is on screen
+   for the whole wait on every card, so it has to be findable without being
+   something you keep noticing; it comes up to full strength on hover, when
+   you're already looking for it. */
+#asfm-moretime {
+  background: rgba(128, 128, 128, 0.16);
+  color: inherit;
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.22);
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+#asfm-moretime:hover {
+  opacity: 1;
+  background: rgba(128, 128, 128, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.3),
+              0 6px 18px rgba(0, 0, 0, 0.16);
+}
+#asfm-moretime:active {
+  transform: translateX(-50%) scale(0.96);
 }
 
 /* Pause badge. It says "paused" in words rather than relying on the countdown
    bar having stopped — a frozen bar on its own reads as a bug. */
 #asfm-paused {
-  position: fixed;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
-  z-index: 99998;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(245, 158, 11, 0.92);
+  background: rgba(245, 158, 11, 0.94);
   color: #1b1b1b;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.32),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.25);
   pointer-events: none;
-  user-select: none;
 }
-
-/* "More time" button: the pause key made visible. Sits in the same slot as the
-   paused badge — the two are mutually exclusive, since pressing this is what
-   swaps one for the other — so the card never has to make room for both.
-
-   Deliberately quiet. It is on screen for the whole wait on every card, so it
-   has to be findable without being something you keep noticing; it comes up to
-   full strength on hover, when you're already looking for it. */
-#asfm-moretime {
-  position: fixed;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
-  z-index: 99998;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(120, 120, 120, 0.22);
-  color: inherit;
-  opacity: 0.55;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-  transition: opacity 0.15s ease, background 0.15s ease;
+#asfm-paused .asfm-kbd {
+  background: rgba(0, 0, 0, 0.14);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.2);
 }
-#asfm-moretime:hover {
-  opacity: 1;
-  background: rgba(120, 120, 120, 0.38);
+#asfm-paused svg {
+  animation: asfm-breathe 1.6s ease-in-out infinite;
 }
 
 /* The paused badge is clickable whenever the button is on, so whatever paused
@@ -88,4 +137,29 @@
 #asfm-paused.asfm-clickable {
   pointer-events: auto;
   cursor: pointer;
+}
+#asfm-paused.asfm-clickable:hover {
+  background: rgba(251, 176, 36, 0.98);
+}
+
+@keyframes asfm-pop {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.96); }
+  to { transform: translateX(-50%); }
+}
+@keyframes asfm-fade-in {
+  from { opacity: 0; }
+}
+@keyframes asfm-breathe {
+  50% { opacity: 0.45; }
+}
+
+/* Anyone who has asked the system for less motion gets none of the flourish:
+   the bar still depletes (that IS the information), nothing else moves. */
+@media (prefers-reduced-motion: reduce) {
+  #asfm-countdown,
+  #asfm-moretime,
+  #asfm-paused,
+  #asfm-paused svg {
+    animation: none;
+  }
 }

@@ -15,6 +15,7 @@ from aqt.qt import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -40,8 +41,8 @@ def _hold_line(cfg: dict) -> str:
         how = "Click <b>More time</b>"
     else:
         return ""
-    return (f"• Need longer on a card? {how} to hold the timer, and do the "
-            "same again to carry on.<br>")
+    return (f"Need longer on a card? {how} to hold the timer, and do the "
+            "same again to carry on.")
 
 
 def _label(html: str) -> QLabel:
@@ -55,48 +56,75 @@ class WelcomeDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent or mw)
         self.setWindowTitle("Welcome to Adaptive Speed Focus")
-        self.setMinimumWidth(480)
+        self.setMinimumWidth(520)
         cfg = get_config()
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(22, 20, 22, 14)
+        layout.setSpacing(10)
 
+        title = QLabel("Adaptive Speed Focus is on")
+        font = title.font()
+        font.setPointSizeF(font.pointSizeF() * 1.5)
+        font.setBold(True)
+        title.setFont(font)
+        layout.addWidget(title)
         layout.addWidget(_label(
-            "<h3>aSFM is on</h3>"
-            "When a question shows, aSFM waits a delay based on how long the "
+            "When a question shows, aSFM waits a delay matched to how long the "
             "card is and how hard it is for you, then shows the answer. "
-            "<b>It never grades the card</b>, so you still press the button "
-            "yourself.<br><br>"
-            + _hold_line(cfg) +
-            ("• A thin bar along the bottom counts down to the reveal.<br>"
-             if cfg.get("show_countdown", True) else "") +
-            "• Everything is under <b>Tools ▸ Adaptive Speed Focus</b>."))
+            "<b>It never grades the card</b> — you still press the button "
+            "yourself."))
+
+        points = []
+        hold = _hold_line(cfg)
+        if hold:
+            points.append(hold)
+        if cfg.get("show_countdown", True):
+            points.append("A thin bar along the bottom counts down to the reveal.")
+        points.append("Everything is under <b>Tools ▸ Adaptive Speed Focus</b>.")
+        layout.addWidget(_label(
+            "<table cellspacing='0' cellpadding='3'>" + "".join(
+                f"<tr><td valign='top' style='color: gray;'>•</td><td>{p}</td></tr>"
+                for p in points) + "</table>"))
 
         self.on_new = QCheckBox("Also run the timer on new cards")
         self.on_new.setChecked(bool(cfg["enable_on_new"]))
         layout.addWidget(self.on_new)
         layout.addWidget(_label(
             "<span style='color: gray; font-size: 11px;'>Off by default: new "
-            "cards usually need time to read, not just to recall. Leave this "
-            "off and the timer starts on cards you've already seen.</span>"))
+            "cards usually need time to read, not just to recall.</span>"))
 
-        layout.addWidget(_label("<h3>Tune it to your speed</h3>"
-                                "aSFM can set its timings from your own review "
-                                "history, so the answer shows just after you'd "
-                                "usually have got there. It takes a few seconds, "
-                                "and you can see the numbers before anything changes."))
+        # The one thing worth doing on day one, set apart in its own panel.
+        box = QFrame()
+        box.setObjectName("asfmCalibrate")
+        box.setStyleSheet(
+            "#asfmCalibrate { border: 1px solid palette(mid); border-radius: 8px;"
+            " background: palette(base); }")
+        inner = QVBoxLayout(box)
+        inner.setContentsMargins(14, 12, 14, 12)
+        inner.addWidget(_label(
+            "<span style='font-size: 13px; font-weight: 600;'>Tune it to your "
+            "speed</span>"))
+        inner.addWidget(_label(
+            "aSFM can set its timings from your own review history, so the "
+            "answer shows just after you'd usually have got there. It takes a "
+            "few seconds, and you see the numbers before anything changes."))
         row = QHBoxLayout()
         self.calibrate_btn = QPushButton("Calibrate to my speed…")
         self.calibrate_btn.clicked.connect(self._on_calibrate)
         row.addWidget(self.calibrate_btn)
         row.addStretch(1)
-        layout.addLayout(row)
+        inner.addLayout(row)
         self.calib_result = _label("")
         self.calib_result.hide()     # shown once there's a result to report
-        layout.addWidget(self.calib_result)
+        inner.addWidget(self.calib_result)
         if cfg["auto_tune_enabled"]:
-            layout.addWidget(_label(
+            inner.addWidget(_label(
                 "<span style='color: gray; font-size: 11px;'>Skipping this is "
                 "fine too: aSFM also adjusts itself a little as you review.</span>"))
+        layout.addSpacing(4)
+        layout.addWidget(box)
 
+        layout.addStretch(1)     # any spare height goes here, not between lines
         buttons = QDialogButtonBox()
         settings_btn = buttons.addButton(
             "Open Settings…", QDialogButtonBox.ButtonRole.ActionRole)
@@ -104,7 +132,9 @@ class WelcomeDialog(QDialog):
         done = buttons.addButton("Done", QDialogButtonBox.ButtonRole.AcceptRole)
         done.setDefault(True)
         buttons.accepted.connect(self.accept)
+        layout.addSpacing(4)
         layout.addWidget(buttons)
+        self.adjustSize()
 
     def _save_on_new(self) -> None:
         cfg = get_config()

@@ -21,6 +21,12 @@ Three built-ins — **Default** (everyday), **Blitz** (a committed, locked-in ru
 
 They deliberately leave your session shape alone (you pick mode and target at each launch), along with word-reveal speed and music. The picker shows each profile's key settings before you apply it. Save your own too — your current setup is kept as a *My setup* profile, so nothing is lost.
 
+## New in this update
+
+- **A fresh look on the card.** The auto-reveal countdown now has a soft glow, and the More time button and paused badge are a redesigned frosted pill that shows the pause key as a keycap.
+- **Tidier Speed Focus settings.** Clear section headings and plainer labels, and the live preview stays in view while you scroll.
+- **Fixed:** pressing Esc in a key box (pause key, reveal key) no longer sets Esc as the key.
+
 ## New in 1.3.0
 
 - **Long answers can get more time.** The delay now also scales with the **answer's** length, not just the question's — for the cards where the question is one line but the answer is a list of five things. Works on cloze and front/back alike. Set *Per answer word* to `0.0` to switch it off.

@@ -529,6 +529,26 @@
     pycmd("focus:autopause:1");
   }
 
+  // ----- the on-card pill -----
+  //
+  // Static markup only: the one variable part (the key) goes in as text.
+  var ICON_PAUSE = '<svg viewBox="0 0 12 12" aria-hidden="true">'
+    + '<rect x="2" y="1.5" width="3" height="9" rx="1"/>'
+    + '<rect x="7" y="1.5" width="3" height="9" rx="1"/></svg>';
+  var ICON_PLAY = '<svg viewBox="0 0 12 12" aria-hidden="true">'
+    + '<path d="M3 1.8v8.4a.8.8 0 0 0 1.2.7l7-4.2a.8.8 0 0 0 0-1.4l-7-4.2A.8.8 0 0 0 3 1.8z"/></svg>';
+
+  function pillText(text, cls) {
+    var el = document.createElement("span");
+    if (cls) el.className = cls;
+    el.textContent = text;
+    return el;
+  }
+
+  function keycap() {
+    return pillText((FS._pauseKey || "p").toUpperCase(), "fs-kbd");
+  }
+
   // The badge is deliberately worded, not just coloured: a paused timer that
   // only looked different would read as "Speed Focus is broken".
   function showPausedBadge() {
@@ -541,7 +561,21 @@
     if (document.getElementById("fs-paused")) return;
     var b = document.createElement("div");
     b.id = "fs-paused";
-    b.textContent = "⏸ Speed Focus paused · " + resumeHint();
+    b.innerHTML = ICON_PLAY;
+    b.appendChild(pillText("Speed Focus paused"));
+    b.appendChild(pillText("·", "fs-sep"));
+    // "click or press [P] to resume": the key as a keycap, like the button.
+    var how = resumeHint();
+    var cut = how.indexOf("{key}");
+    if (cut < 0) {
+      b.appendChild(pillText(how));
+    } else {
+      b.appendChild(pillText(how.slice(0, cut).replace(/\s+$/, "")));
+      b.appendChild(keycap());
+      b.appendChild(pillText(how.slice(cut + 5).replace(/^\s+/, "")));
+    }
+    b.setAttribute("aria-label", "Speed Focus paused, "
+      + how.replace("{key}", (FS._pauseKey || "p").toUpperCase()));
     if (FS._moreTime) {
       // Resuming has to be possible with the same input that paused it: a mouse
       // user who pressed the button and can't press the key would otherwise be
@@ -584,7 +618,9 @@
     // Announced as a button, but deliberately not focusable: a focused button
     // would take Space, which is Anki's show-answer key.
     b.setAttribute("role", "button");
-    b.textContent = "⏸ More time";
+    b.innerHTML = ICON_PAUSE;
+    b.appendChild(pillText("More time"));
+    if (FS._pauseEnabled) b.appendChild(keycap());
     b.title = FS._pauseEnabled
       ? "Hold the auto-reveal (or press "
         + (FS._pauseKey || "p").toUpperCase() + ")"
@@ -600,11 +636,11 @@
 
   // What the paused badge tells you to do to get going again — only ever
   // offering something that is actually switched on.
+  // {key} marks where the key goes, so the badge can draw it as a keycap.
   function resumeHint() {
-    var key = (FS._pauseKey || "p").toUpperCase();
-    if (FS._moreTime && FS._pauseEnabled) return "click or press " + key + " to resume";
+    if (FS._moreTime && FS._pauseEnabled) return "click or press {key} to resume";
     if (FS._moreTime) return "click to resume";
-    return "press " + key + " to resume";
+    return "press {key} to resume";
   }
 
   function countdownFill() {

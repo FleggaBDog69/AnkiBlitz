@@ -5,7 +5,10 @@
  * delay elapses it asks Python to show the answer. It NEVER grades the card.
  *
  * Standalone: it does not depend on any word-reveal add-on. The delay is whatever
- * Python computed; the answer shows when it elapses.
+ * Python computed; the answer shows when it elapses. If Progressive Word Reveal
+ * is running too, it is honoured through the small API that add-on publishes on
+ * window.PWReveal (see wordsStillFading / onKeyDown): the answer waits for the
+ * question to finish fading in, and a key the two share goes to the fade first.
  *
  * The wait can be held indefinitely — by the pause key, or by the "More time"
  * button that sits above the countdown while it runs. Both call the same
@@ -33,8 +36,34 @@
   var pauseWarnLeftMs = 0;
   var warned = false;     // has this card passed its warning point?
   var obo = null;         // this card's per-cloze one-by-one timers (see below)
+  var waitingOnWords = false;  // timer ran out mid-fade; reveal when it's done
+
+  // ----- Progressive Word Reveal, if it's there -----
+  //
+  // A soft bridge: nothing here assumes the add-on is installed. The answer
+  // never shows while the question is still fading in — the wait was timed
+  // for reading it, and an answer over half a question is worse than a late
+  // one. PWR fires "pwr:revealed" when the fade ends (or you skip it).
+  function wordsStillFading() {
+    var pwr = window.PWReveal;
+    try {
+      return !!(pwr && typeof pwr.isRevealing === "function" && pwr.isRevealing());
+    } catch (e) {
+      return false;
+    }
+  }
+
+  document.addEventListener("pwr:revealed", function () {
+    if (!waitingOnWords) return;
+    waitingOnWords = false;
+    if (pending && started && !autoPaused) fire();
+  });
 
   function fire() {
+    if (wordsStillFading()) {
+      waitingOnWords = true;
+      return;
+    }
     if (oboActive() && obo.left > 0 && window.revealNextCloze) {
       // Uncover the next cloze, not the answer. The template answers with an
       // anking:1b1-reveal event, which arms the next cloze's timer (or, after
@@ -125,6 +154,14 @@
     if (e.repeat) return;
     if (isTypingTarget(e.target)) return;   // e.g. Anki's type-in-the-answer box
     if ((e.key || "").toLowerCase() !== A._pauseKey) return;
+    // Both add-ons default to "p". While the question is still fading in, the
+    // press belongs to Progressive Word Reveal (it finishes the fade); once
+    // there's nothing left to reveal, the same key pauses. The full AnkiBlitz
+    // does the same.
+    var pwr = window.PWReveal;
+    try {
+      if (pwr && typeof pwr.claimsKey === "function" && pwr.claimsKey(e)) return;
+    } catch (err) {}
     e.preventDefault();
     toggleAutoPause();
   }
@@ -150,6 +187,7 @@
       return;
     }
     autoPaused = true;
+    waitingOnWords = false;   // resuming re-checks the fade
     stopAlert();
     var now = Date.now();
     pauseLeftMs = autoDeadline ? Math.max(0, autoDeadline - now) : 0;
@@ -160,6 +198,26 @@
     removeMoreTime();     // the paused badge takes its place
     showPausedBadge();
     pycmd("asfm:autopause:1");
+  }
+
+  // ----- the on-card pill -----
+  //
+  // Static markup only: the one variable part (the key) goes in as text.
+  var ICON_PAUSE = '<svg viewBox="0 0 12 12" aria-hidden="true">'
+    + '<rect x="2" y="1.5" width="3" height="9" rx="1"/>'
+    + '<rect x="7" y="1.5" width="3" height="9" rx="1"/></svg>';
+  var ICON_PLAY = '<svg viewBox="0 0 12 12" aria-hidden="true">'
+    + '<path d="M3 1.8v8.4a.8.8 0 0 0 1.2.7l7-4.2a.8.8 0 0 0 0-1.4l-7-4.2A.8.8 0 0 0 3 1.8z"/></svg>';
+
+  function span(text, cls) {
+    var el = document.createElement("span");
+    if (cls) el.className = cls;
+    el.textContent = text;
+    return el;
+  }
+
+  function keycap() {
+    return span((A._pauseKey || "p").toUpperCase(), "asfm-kbd");
   }
 
   // The badge is deliberately worded, not just coloured: a paused timer that
@@ -174,7 +232,21 @@
     if (document.getElementById("asfm-paused")) return;
     var b = document.createElement("div");
     b.id = "asfm-paused";
-    b.textContent = "⏸ Auto-reveal paused · " + resumeHint();
+    b.innerHTML = ICON_PLAY;
+    b.appendChild(span("Auto-reveal paused"));
+    b.appendChild(span("·", "asfm-sep"));
+    // "click or press [P] to resume": the key as a keycap, like the button.
+    var how = resumeHint();
+    var cut = how.indexOf("{key}");
+    if (cut < 0) {
+      b.appendChild(span(how));
+    } else {
+      b.appendChild(span(how.slice(0, cut).replace(/\s+$/, "")));
+      b.appendChild(keycap());
+      b.appendChild(span(how.slice(cut + 5).replace(/^\s+/, "")));
+    }
+    b.setAttribute("aria-label", "Auto-reveal paused, "
+      + how.replace("{key}", (A._pauseKey || "p").toUpperCase()));
     if (A._moreTime) {
       // Resuming has to be possible with the same input that paused it: a
       // mouse user who pressed the button and can't press the key would
@@ -217,7 +289,9 @@
     // Announced as a button, but deliberately not focusable: a focused button
     // would take Space, which is Anki's show-answer key.
     b.setAttribute("role", "button");
-    b.textContent = "⏸ More time";
+    b.innerHTML = ICON_PAUSE;
+    b.appendChild(span("More time"));
+    if (A._pauseEnabled) b.appendChild(keycap());
     b.title = A._pauseEnabled
       ? "Hold the auto-reveal (or press "
         + (A._pauseKey || "p").toUpperCase() + ")"
@@ -233,11 +307,11 @@
 
   // What the paused badge tells you to do to get going again — only ever
   // offering something that is actually switched on.
+  // {key} marks where the key goes, so the badge can draw it as a keycap.
   function resumeHint() {
-    var key = (A._pauseKey || "p").toUpperCase();
-    if (A._moreTime && A._pauseEnabled) return "click or press " + key + " to resume";
+    if (A._moreTime && A._pauseEnabled) return "click or press {key} to resume";
     if (A._moreTime) return "click to resume";
-    return "press " + key + " to resume";
+    return "press {key} to resume";
   }
 
   function countdownFill() {
@@ -322,6 +396,7 @@
   }
 
   function cancel() {
+    waitingOnWords = false;
     stopAlert();
     if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
     if (warnTimer) { clearTimeout(warnTimer); warnTimer = null; }

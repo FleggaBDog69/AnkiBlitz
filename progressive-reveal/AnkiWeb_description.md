@@ -12,6 +12,12 @@ Fades the card's question in one word at a time at a reading pace you set, so a 
 - **Revealing early stops the card's audio** — you've read it, so the voice still reading it to you is just noise. Optional.
 - Optional reveal on the answer side too.
 - Per-note-type and per-deck exclusions.
+- **Pairs with [Adaptive Speed Focus](https://ankiweb.net/shared/info/1148593203).** Run both and its auto-reveal waits for the fade to finish, the two can share the `P` key (first press finishes the fade, the next pauses the timer), and clicking its **More time** button doesn't skip the fade.
+
+## New in this update
+
+- **Works better with Adaptive Speed Focus.** Its auto-reveal now waits for the fade to finish, the two can share the **P** key, and clicking its More time button no longer skips the fade or cuts the audio.
+- **Fixed:** pressing Esc in the reveal-key box no longer sets Esc as the key.
 
 ## New in 1.2.0
 

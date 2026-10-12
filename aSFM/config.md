@@ -29,10 +29,10 @@ delay = clamp(delay, min_delay_seconds, max_delay_seconds)
 | `warning_sound` | Play an alert before the answer auto-shows. |
 | `warning_at_percent` | Warn (sound and/or colour) once this % of the delay has elapsed. |
 | `pause_key_enabled` | A key that freezes the timer on the current card. |
-| `pause_key` | Which key that is (default `p`). Give it a different key from Progressive Word Reveal's if you run both. |
+| `pause_key` | Which key that is (default `p`). It can be the same key as Progressive Word Reveal's reveal key: while the question is still fading in, the press finishes the fade; after that it pauses. |
 | `auto_tune_enabled` | Learn a personal pace multiplier (0.85–2×) from how you actually reveal cards. See *Learn my pace* below. |
 | `target_timer_wins_percent` | How often the answer should appear before you've revealed it yourself (default 10%). Drives both auto-tune and calibration. |
-| `more_time_button` | Show a small **More time** button above the countdown. Same hold as the pause key, but visible — click it and the timer stops until you click (or press the key) again. Faint until hovered. |
+| `more_time_button` | Show a small **More time** button above the countdown (with the pause key shown on it as a keycap). Same hold as the pause key, but visible — click it and the timer stops until you click (or press the key) again. Faint until hovered. |
 | `excluded_note_types` / `excluded_decks` | Skip the timer for these (a parent deck covers its subdecks). |
 | `fixed_time_enabled` | Use a set time (no word count) for picture / visual cards. |
 | `fixed_time_base_seconds` | The set time for a picture card (difficulty still applies). |
@@ -74,3 +74,16 @@ The bundled alert is `sounds/alert.flac`. To use your own, drop an `alert.flac`,
 `.ogg`, `.opus` or `.wav` into the add-on's `user_files/` folder — it overrides
 the bundled one and survives updates. An `alert.mp3` works too, but only where
 Anki's external media player (mpv) runs: the reviewer can't decode MP3 itself.
+
+### Running alongside Progressive Word Reveal
+
+aSFM and Progressive Word Reveal don't depend on each other, but when both are
+installed they cooperate the way the full AnkiBlitz does:
+
+- **The answer waits for the question.** If the timer runs out while words are
+  still fading in, the answer shows as soon as the fade finishes, never over a
+  half-shown question.
+- **One key can do both.** With the default `p` for both, the first press
+  finishes the fade and the next one pauses the timer.
+- **Clicking More time is not a click on the card.** It holds the timer without
+  also skipping the fade or cutting the card's audio.
