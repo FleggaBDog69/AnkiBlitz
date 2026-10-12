@@ -66,9 +66,14 @@ The **progress bar** stays up outside a Blitz too, dimmed and labelled *All due*
 filling against everything you have due rather than a session target. Its target
 is live rather than fixed at the start — a card that comes back in learning
 pushes it out by one — so it reaches the end exactly when your queue empties,
-never before. It shows nothing but the count and the clock: no accuracy, no
-Again count, no streak. Turn it off under **Settings ▸ Blitz ▸ Show during
-Blitz**.
+never before. It shows no accuracy %, no Again tally, no streak. Turn it off
+under **Settings ▸ Blitz ▸ Show during Blitz**.
+
+The bar is a single **thick band with the counters on it** rather than a row of
+text stacked above a thin bar — the same numbers, without spending most of the
+strip on the gap between them. (`Settings ▸ Blitz` has a toggle back to the
+stacked layout.) The card scrolls in its own area beneath the bar, so nothing
+on it can slide up behind the strip.
 
 The bar sits **flush with the top of the window**. Anki's *hide top bar during
 review* doesn't remove the toolbar — it only fades it out, and the empty band it
@@ -76,6 +81,27 @@ leaves behind is what otherwise makes the bar look like it's floating below the
 top of the screen. AnkiBlitz Core closes that band up while the bar is showing
 and gives it back the moment you move the mouse to the top of the window, or
 leave the reviewer. With the top bar kept visible it changes nothing.
+
+The fill is **split by grade, card by card, in the order you did them** — green
+for a clean pass, red for an Again, so a good/again/good run reads
+green-red-green. Each band is **as wide as the time that card took**, from the
+question appearing to the answer being shown; the answer side is reading rather
+than working, so it isn't charged for. The fill edge still means what it always
+did — this much of the pile is done — because the bands are normalised across
+the fill rather than added to it. `18 good · 2 again` sits in words beside it so
+the colours never carry the meaning on their own.
+
+Beside it is an **estimate of the time left** — `~14 min left` — priced off
+your own review history: how many presses a new card, a due review and a card
+mid-step have actually cost you over the last 90 days (misses and learning
+steps included), times your usual time per press, pulled toward today's pace
+as the session goes. It has a number from the first card, one slow card barely
+moves it, and learning cards waiting on a step timer are counted even before
+Anki's counts show them. In a *timed* Blitz the estimate runs the other way —
+the clock is the part you already know, so it tells you how many cards you
+should get through instead (`~89 more cards`). All of this works on an ordinary
+review session too; the question "how long is this pile going to take" is the
+same either way.
 
 Starting a Blitz from **Start Blitz…** also lets you pick a **Focus lock** level
 for that one session — commit hard to a session you need to finish, or let

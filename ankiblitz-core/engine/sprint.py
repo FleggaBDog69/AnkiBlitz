@@ -446,7 +446,7 @@ def on_review_did_answer(reviewer, card, ease):
             _review_guard.cards_done += 1
         amb = session.get_ambient()
         if amb is not None:
-            amb.record_answer(getattr(card, "id", None))
+            amb.record_answer(getattr(card, "id", None), ease)
             injection.push_progress()
         return
     s.record_answer(getattr(card, "id", None), ease)
@@ -607,7 +607,10 @@ def ambient_payload() -> dict:
     # your choice; this one you never asked for.)
     if not (show_bar or show_counter or show_elapsed):
         return {}
-    return {
+    hide_acc = bool(cfg.get("hide_all_accuracy_stats", True))
+    payload = injection._estimate_fields(amb, cfg, hide_acc,
+                                         remaining=amb.remaining_due)
+    payload.update({
         "mode": MODE_CARDS,
         "ambient": True,
         "label": "All due",
@@ -622,8 +625,12 @@ def ambient_payload() -> dict:
         "showBar": show_bar,
         "showCounter": show_counter,
         "showElapsed": show_elapsed,
-        # No accuracy / again / streak outside a Blitz: an ambient bar you never
-        # opted into is the last place to put grading pressure.
+        # No accuracy % / Again tally / streak outside a Blitz: an ambient bar
+        # you never opted into is the last place to put grading pressure. The
+        # red/green split is the one exception, and a deliberate one — it isn't
+        # a score, it's the shape of the pile you're actually working through,
+        # and it's what the time estimate is built on. It still answers to the
+        # anti-pressure switch (see injection._estimate_fields).
         "showAccuracy": False,
         "showAgain": False,
         "showStreak": False,
@@ -631,7 +638,8 @@ def ambient_payload() -> dict:
         "again": 0,
         "streak": 0,
         "streakAnim": False,
-    }
+    })
+    return payload
 
 
 def _locked() -> bool:

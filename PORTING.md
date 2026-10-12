@@ -327,22 +327,29 @@ Four decisions worth keeping:
 
 ---
 
-## Outstanding (found 2026-10-12) — 16: the bar's grade split and time estimate
+## Cleared 2026-10-12 — 16: the bar's grade split and time estimate
 
 | #  | Change | Core | aSFM | PWR |
 |----|--------|:----:|:----:|:---:|
-| 16 | Grade-split bands, time-left estimate, pace, stats overlaid on the bar | ❌ | n/a | n/a |
+| 16 | Grade-split bands, time-left estimate, pace, stats overlaid on the bar | ✅ | n/a | n/a |
 
-Commit `1257cc4` says it brought these to Core, but only `topbar.py` and the
-flush-with-top key actually landed. Core has **none** of the `sprint` keys
-`split_bar_by_grade`, `overlay_stats_on_bar`, `show_eta`, `eta_error_adjust`,
-`show_pace`, nor the code behind them. Its docs don't claim them, so nothing
-is misadvertised; it's a gap, not a bug. Porting means `engine/session.py`
-(`_PaceStats`, now copyable wholesale from AnkiBlitz), `engine/forecast.py`
-(new, verbatim), `injection._estimate_fields`, `sprint.ambient_payload` and the
-`record_answer(..., ease)` call, the bar rendering in `focus_suite.js` /
-`focus_suite.css` (literal colours, not `--ab-*` vars), the five config keys,
-the Blitz-tab settings and the docs.
+Found missing and ported the same day. Commit `1257cc4` said it brought these
+to Core, but only `topbar.py` and the flush-with-top key had landed.
+
+Copied wholesale (now byte-identical to AnkiBlitz): `engine/session.py`,
+`engine/sprint.py`, and the new `engine/forecast.py`. Hand-merged:
+`injection.py` (`_tracker`, the thinking-window calls in the show-question /
+show-answer hooks, `_estimate_fields`, and the mtime cache-busting on the CSS
+and JS links), the progress-bar half of `focus_suite.js` (taken whole from
+the `public: Blitz progress bar` marker down — it also brought `reserveStrip`,
+the card-scrolls-beneath-the-bar fix that had never reached Core), and
+`focus_suite.css`, generated from AnkiBlitz's bar rules with every
+`var(--ab-x, fallback)` collapsed to its fallback, so Core's colours are
+unchanged. Config: `overlay_stats_on_bar`, `split_bar_by_grade`, `show_eta`,
+`show_pace` added (not `eta_error_adjust`, which nothing reads). The Blitz
+tab's "Show during Blitz (neutral)" block is now identical in both, and the
+README / `config.md` sections came across with it. Verified by rendering both
+bundles in QtWebEngine with the same payload: pixel-identical.
 
 Everything else was re-checked the same day: `focus.py`, `quickstart.py`,
 `stats.py` and `topbar.py` are byte-identical to AnkiBlitz; `widgets.py`,

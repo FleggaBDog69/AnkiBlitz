@@ -304,11 +304,9 @@ no record.
   does nothing.
 - `overlay_stats_on_bar` — draw the bar as one thick band with the counters
   sitting **on** it, rather than a row of text stacked above a 7px bar. Same
-  numbers, less of the screen spent on the surface between them. The fill goes
-  down twice: turned right down as the full-height band, so the text stays
-  light-on-dark whether it's over the fill or over the empty track, and at full
-  strength as a 3px rail along the bottom edge, so the fill edge and the
-  green/red boundary stay crisp. Off returns the stacked layout.
+  numbers, less of the screen spent on the surface between them. The fill is
+  one even band, turned down just enough that the text stays readable over it.
+  Off returns the stacked layout.
 - `split_bar_by_grade` — colour the filled part of the bar **card by card, in
   the order you did them**: green for a clean pass, red for an Again, so a
   good/again/good run reads green-red-green. Each band is **as wide as the time

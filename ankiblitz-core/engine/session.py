@@ -27,17 +27,161 @@ Alongside the Blitz there is an ``AmbientSession`` (``_ambient``): the tracker
 for an ordinary review session with no Blitz running, so the bar can still show
 how far through the due pile you are. It records nothing and completes nothing —
 see the class docstring.
+
+Both trackers share ``_PaceStats``, which carries the two things the bar needs
+beyond a raw count: the **grade split** (how much of the work done so far was
+clean vs. had to be repeated, drawn as the green/red segments) and the session's
+**press gaps**, which the time estimate (``forecast.py``) blends with your
+history for its seconds-per-press.
 """
 
 import time
+from collections import deque
 from typing import Optional, Set
+
+# The last few answer-to-answer gaps, kept for a band's width when a card was
+# graded without a flip we saw.
+PACE_WINDOW = 10
+# Each gap is clamped rather than dropped, so a genuinely hard card still counts
+# as a slow card while a walk-away can't count as a 20-minute one.
+PACE_CAP = 120.0
+
+# Segment widths are clamped against the session's OWN median rather than
+# against absolute seconds, so the bar reads the same whether you're doing
+# 3-second clozes or 40-second cases: twice your typical card is twice as wide,
+# and no single card can swallow the bar.
+SEG_MIN_RATIO = 0.25
+SEG_MAX_RATIO = 4.0
+# Ceiling on how many bands to ship and draw. Adjacent same-grade cards merge
+# first, which costs nothing to look at — two touching bands of one colour are
+# already indistinguishable from one.
+MAX_SEGMENTS = 240
 
 MODE_CARDS = "cards"
 MODE_TIME = "time"
 MODE_FRACTION = "fraction"
 
 
-class BlitzSession:
+class _PaceStats:
+    """The grade split and the rolling pace, shared by both trackers.
+
+    Subclasses supply ``count_mode``, ``cards_done`` and ``_seen_ids``; this
+    supplies what the bar draws on top of them. Call ``_init_pace()`` from
+    ``__init__`` and ``_note_pace()`` from ``record_answer``.
+    """
+
+    def _init_pace(self) -> None:
+        self._gaps = deque(maxlen=PACE_WINDOW)
+        self._pace_last: Optional[float] = None
+        self.again_count = 0
+        self.correct_count = 0
+        self._lapsed_ids: Set[int] = set()   # cards that got Again at least once
+        # One [seconds, is_again] per answer, in the order you did them — the
+        # bar's texture. See segment_weights().
+        self.segments: list = []
+        self._q_shown_at: Optional[float] = None
+        self._pending_think: Optional[float] = None
+        # Every gap this session (clamped like the pace), for the estimate's
+        # seconds-per-press — see forecast.seconds_per_press.
+        self.gap_sum = 0.0
+        self.gap_n = 0
+
+    # ----- the thinking window (what a segment's width measures) -----
+
+    def note_question_shown(self) -> None:
+        self._q_shown_at = time.time()
+
+    def note_answer_shown(self) -> None:
+        """Close the thinking window: question shown -> answer shown.
+
+        Only the question side counts toward a card's width. The answer side is
+        reading, not working — it's where you sit with a card you already knew,
+        or where you go and make a coffee — so counting it would make the widest
+        bands the ones you thought about least.
+        """
+        if self._q_shown_at is not None:
+            self._pending_think = min(time.time() - self._q_shown_at, PACE_CAP)
+            self._q_shown_at = None
+
+    def _note_pace(self, card_id, ease: int, now: Optional[float] = None) -> None:
+        now = time.time() if now is None else now
+        if self._pace_last is not None:
+            gap = min(now - self._pace_last, PACE_CAP)
+            self._gaps.append(gap)
+            self.gap_sum += gap
+            self.gap_n += 1
+        self._pace_last = now
+        if ease == 1:
+            self.again_count += 1
+            if card_id is not None:
+                self._lapsed_ids.add(int(card_id))
+        else:
+            self.correct_count += 1
+        think = self._pending_think
+        self._pending_think = None
+        if think is None:
+            # Graded without a flip we saw — the bar armed mid-card, or an undo.
+            # Fall back to the answer-to-answer gap so the band still has a
+            # width rather than collapsing to nothing.
+            think = self._gaps[-1] if self._gaps else 0.0
+        self.segments.append([think, 1 if ease == 1 else 0])
+
+    def segment_weights(self, limit: int = MAX_SEGMENTS) -> list:
+        """The bar's texture as ``[[weight, is_again], ...]``, oldest first.
+
+        Weights are clamped into [SEG_MIN_RATIO, SEG_MAX_RATIO] × the session's
+        own median, so a fast card can't vanish and a slow one can't take the
+        bar over. The caller normalises them across the filled region — the fill
+        edge keeps meaning "this much of the pile is done"; the texture inside
+        it is the rhythm of how it went.
+        """
+        segs = self.segments
+        if not segs:
+            return []
+        ordered = sorted(s[0] for s in segs)
+        med = ordered[len(ordered) // 2] or 1.0
+        lo, hi = med * SEG_MIN_RATIO, med * SEG_MAX_RATIO
+        out = [[min(max(s[0], lo), hi), s[1]] for s in segs]
+        if len(out) > limit:
+            merged: list = []
+            for w, a in out:
+                if merged and merged[-1][1] == a:
+                    merged[-1][0] += w
+                else:
+                    merged.append([w, a])
+            out = merged
+        if len(out) > limit:
+            # Still too many colour changes to draw honestly. Roll the oldest
+            # into one band — the near past is what you can still act on.
+            cut = len(out) - limit + 1
+            head = out[:cut]
+            out = [[sum(w for w, _ in head), head[-1][1]]] + out[cut:]
+        return [[round(w, 2), a] for w, a in out]
+
+    # ----- the grade split (the red / green segments) -----
+    #
+    # Both parts are in the unit the counter shows, and they always sum to
+    # exactly cards_done — the bar must not lie applies to its colours too.
+
+    @property
+    def done_again(self) -> int:
+        """The red part: in `unique` mode, cards that needed a repeat at all;
+        in `answers` mode, the Again presses themselves.
+
+        A card that lapsed and was later got right stays red. It cost the extra
+        pass and it is the reason the estimate moved, so folding it back into
+        the green would hide exactly what the split is there to show.
+        """
+        if getattr(self, "count_mode", "unique") == "unique":
+            return len(self._lapsed_ids)
+        return self.again_count
+
+    @property
+    def done_good(self) -> int:
+        return max(0, self.cards_done - self.done_again)
+
+
+class BlitzSession(_PaceStats):
     def __init__(self, mode: str, target_cards: int = 0, target_seconds: float = 0.0,
                  count_mode: str = "unique", deck_id: Optional[int] = None,
                  label: str = "", is_quick_start: bool = False,
@@ -62,9 +206,9 @@ class BlitzSession:
         self.clock_started_at: Optional[float] = None
         self.first_answer_at: Optional[float] = None  # for the launch -> first-answer metric
         self.answers = 0                             # total grade presses
-        self.again_count = 0
-        self.correct_count = 0                       # graded > 1 (Hard/Good/Easy)
         self._seen_ids: Set[int] = set()             # distinct cards touched
+        # again_count / correct_count / the rolling pace / the lapsed set.
+        self._init_pace()
         self.completed = False
         self.end_reason = ""                         # "target" | "time" | "exhausted"
 
@@ -101,11 +245,10 @@ class BlitzSession:
         self.answers += 1
         if card_id is not None:
             self._seen_ids.add(int(card_id))
+        self._note_pace(card_id, ease, now)
         if ease == 1:
-            self.again_count += 1
             self.current_streak = 0
         else:
-            self.correct_count += 1
             self.current_streak += 1
             if self.current_streak > self.best_streak:
                 self.best_streak = self.current_streak
@@ -135,6 +278,9 @@ class BlitzSession:
         if self.paused:
             self.paused = False
             self.started_at = time.time()
+            # The card has been on screen since before you engaged; start its
+            # thinking window now rather than banking the away time into it.
+            self._q_shown_at = time.time()
 
     def start_clock(self) -> None:
         """Begin the time-mode countdown (called on the first card flip). No-op
@@ -203,13 +349,19 @@ class BlitzSession:
         return self.target_cards > 0 and self.cards_done >= self.target_cards
 
 
-class AmbientSession:
+class AmbientSession(_PaceStats):
     """The whole-pile tracker for an ordinary review session — no Blitz running.
 
     This is deliberately NOT a Blitz: nothing is recorded, nothing completes,
     no Focus Lock hangs off it, and it never reaches stats. It exists so that
     just working through your dues still gets an honest progress bar instead of
     a blank screen.
+
+    It does keep the grade split and the pace (via ``_PaceStats``) — the bar's
+    red/green segments and its time estimate are the same on an ordinary session
+    as in a Blitz, because the question "how long is this pile going to take" is
+    the same question either way. Those live only for the session; nothing is
+    written anywhere.
 
     The target is live rather than snapshotted: ``cards_done + remaining_due``,
     with ``remaining_due`` refreshed from the scheduler on every push. A
@@ -225,11 +377,13 @@ class AmbientSession:
         self.answers = 0
         self.remaining_due = 0
         self._seen_ids: Set[int] = set()
+        self._init_pace()
 
-    def record_answer(self, card_id) -> None:
+    def record_answer(self, card_id, ease: int = 0) -> None:
         self.answers += 1
         if card_id is not None:
             self._seen_ids.add(int(card_id))
+        self._note_pace(card_id, ease)
 
     def set_remaining(self, n: int) -> None:
         self.remaining_due = max(0, int(n))

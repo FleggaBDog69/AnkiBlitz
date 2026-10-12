@@ -4,6 +4,9 @@
 
 /* Sprint progress bar: fixed strip at the top of the reviewer. */
 #fs-progress {
+  /* The split's palette, hoisted so the JS can name it inside a gradient. */
+  --fs-good-c: #22c55e;
+  --fs-again-c: #ef4444;
   position: fixed;
   top: 0;
   left: 0;
@@ -25,10 +28,12 @@
   padding-top: 6px;
   padding-bottom: 6px;
 }
-#fs-progress.fs-ambient .fs-bar-wrap {
+#fs-progress.fs-ambient .fs-bar-wrap:not(.fs-overlay) {
   height: 4px;
 }
-#fs-progress.fs-ambient .fs-bar {
+/* Turned down, but not repainted: the split's whole job is its two colours, so
+   the dim skin only takes over the plain single fill. */
+#fs-progress.fs-ambient .fs-bar:not(.fs-seg) {
   background: rgba(255, 255, 255, 0.45);
 }
 #fs-progress .fs-label {
@@ -41,6 +46,52 @@
   flex-wrap: wrap;
   gap: 14px;
   padding: 9px 16px;
+}
+
+/* ---- Overlaid layout: the band IS the bar, and the numbers ride on it. ----
+   Two stacked layers in one strip: the band (the fill, turned down) and the
+   row of counters on top — see the note in focus_suite.js. */
+#fs-progress .fs-bar-wrap.fs-overlay {
+  position: relative;
+  display: block;
+  height: auto;
+  min-height: 31px;
+}
+#fs-progress .fs-overlay .fs-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  pointer-events: none;
+}
+/* The band: one even band, top to bottom. */
+#fs-progress .fs-overlay .fs-fill {
+  top: 0;
+  bottom: 0;
+  opacity: 0.5;
+}
+/* A 3px cap on a 31px band is invisible anyway, and squaring it keeps the two
+   segments meeting cleanly. */
+#fs-progress .fs-overlay .fs-fill .fs-bar {
+  border-radius: 0;
+}
+#fs-progress .fs-overlay .fs-row {
+  position: relative;
+  z-index: 1;
+  padding: 8px 16px;
+  /* Keeps the light text crisp over the stronger fill. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+/* Ambient: the whole strip is already at 0.62, so the band only needs to come
+   down far enough that an unasked-for bar never competes with the card. */
+#fs-progress.fs-ambient .fs-overlay {
+  min-height: 27px;
+}
+#fs-progress.fs-ambient .fs-overlay .fs-fill {
+  opacity: 0.4;
+}
+#fs-progress.fs-ambient .fs-overlay .fs-row {
+  padding: 6px 16px;
 }
 #fs-progress .fs-counter {
   font-weight: 600;
@@ -57,6 +108,33 @@
   opacity: 0.7;
   font-variant-numeric: tabular-nums;
 }
+/* The bar's colours, named in words. Same hues as the segments below, so the
+   legend reads as a key rather than as one more number. */
+#fs-progress .fs-split {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+}
+#fs-progress .fs-good-txt {
+  color: #22c55e;
+}
+#fs-progress .fs-again-txt {
+  color: #ef4444;
+}
+#fs-progress .fs-split-sep {
+  opacity: 0.4;
+}
+/* The estimate is a forecast, not a measurement: quieter than the counter it
+   sits beside, so it never reads as a number you have to hit. */
+#fs-progress .fs-eta {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+#fs-progress .fs-pace {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
 #fs-progress .fs-streak {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -69,15 +147,28 @@
   40% { transform: scale(1.35); color: #fbbf24; }
   100% { transform: scale(1); }
 }
+/* The progress fill: a broad, solid track that grows left to right. */
 #fs-progress .fs-bar-wrap {
   height: 7px;
   width: 100%;
+  display: flex;
   background: rgba(255, 255, 255, 0.10);
 }
 #fs-progress .fs-bar {
   height: 100%;
   background: linear-gradient(90deg, #4ade80, #22d3ee);
+  transition: width 0.3s ease;
+}
+/* Split fill: a single element whose background-image the JS builds as a
+   gradient of hard stops, one band per card. Solid stops rather than blends —
+   a gradient across two meanings would blur the very boundary the split exists
+   to draw. The width transition has to go: it animates the fill edge, and with
+   the bands normalised across that width every band would slide with it. */
+#fs-progress .fs-bar.fs-seg {
+  transition: none;
+}
+#fs-progress .fs-bar.fs-cap,
+#fs-progress .fs-bar:not(.fs-seg) {
   border-top-right-radius: 3px;
   border-bottom-right-radius: 3px;
-  transition: width 0.3s ease;
 }

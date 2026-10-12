@@ -688,18 +688,43 @@ class SprintPanel(QWidget):
         self.show_counter.setChecked(bool(cfg.get("show_card_counter", True)))
         self.show_elapsed = QCheckBox("Elapsed time")
         self.show_elapsed.setChecked(bool(cfg.get("show_elapsed_time", True)))
+        self.overlay_stats = QCheckBox("Thick bar with the counters on it")
+        self.overlay_stats.setChecked(bool(cfg.get("overlay_stats_on_bar", True)))
         self.flush_top = QCheckBox("Sit the bar at the very top of the window")
         self.flush_top.setChecked(bool(cfg.get("bar_flush_with_top", True)))
+        self.split_bar = QCheckBox("Colour the bar by grade (green done, red to repeat)")
+        self.split_bar.setChecked(bool(cfg.get("split_bar_by_grade", True)))
+        self.show_eta = QCheckBox("Estimated time left (cards left, in a timed Blitz)")
+        self.show_eta.setChecked(bool(cfg.get("show_eta", True)))
+        self.show_pace = QCheckBox("Current pace (cards/min)")
+        self.show_pace.setChecked(bool(cfg.get("show_pace", False)))
         for w in (self.show_bar, self.show_counter, self.show_elapsed,
-                  self.flush_top):
+                  self.overlay_stats, self.flush_top, self.split_bar,
+                  self.show_eta, self.show_pace):
             dnl.addWidget(w)
         dnl.addWidget(_hint(
+            "The bar is a single thick band with the counters sitting on it, "
+            "rather than a row of text stacked above a thin bar — same numbers, "
+            "less of the screen spent on the gap between them. Turn it off for "
+            "the stacked layout.\n\n"
             "With Anki set to hide the top bar during review it doesn't remove "
             "the toolbar, only fade it out — the empty band it leaves is why the "
             "bar can look like it's floating below the top of the screen. Turned "
             "on, that band is closed up while the bar is showing and given back "
             "the moment you move the mouse to the top of the window (or leave "
-            "the reviewer). Nothing happens if you keep the top bar visible."))
+            "the reviewer). Nothing happens if you keep the top bar visible.\n\n"
+            "The filled part of the bar splits into what you got through cleanly "
+            "and what you pressed Again on and will see again — both named in "
+            "words next to it, so you never have to guess what a colour means. "
+            "(It's an accuracy display, so the anti-pressure switch below hides "
+            "it with the rest.)\n\n"
+            "The estimate prices what's left off your own review history: how "
+            "many presses a new card, a review and a card mid-step have "
+            "actually cost you (misses and learning steps included), times your "
+            "usual time per press, nudged toward today's pace as you go. It "
+            "shows from the first card, one slow card barely moves it, and "
+            "learning cards waiting on a step timer are counted even before "
+            "Anki's counts show them."))
         self.bar_outside = QCheckBox("Keep the bar up outside a Blitz (all due cards)")
         self.bar_outside.setChecked(bool(cfg.get("show_bar_outside_blitz", True)))
         dnl.addWidget(self.bar_outside)
@@ -708,7 +733,8 @@ class SprintPanel(QWidget):
             "filling against everything you have due rather than a Blitz target. "
             "It counts down live — a card that comes back in learning pushes the "
             "target out by one — so it reaches the end exactly when your queue "
-            "empties. Accuracy, Again and streak are never shown on it."))
+            "empties. It gets the grade colours and the time estimate too; the "
+            "accuracy %, Again tally and streak are never shown on it."))
         layout.addWidget(dn)
 
         # --- During Blitz (pressure) ---
@@ -783,7 +809,11 @@ class SprintPanel(QWidget):
             "fraction_quick_picks": frac_picks,
             "card_source": self.source.currentData(),
             "show_bar_outside_blitz": self.bar_outside.isChecked(),
+            "overlay_stats_on_bar": self.overlay_stats.isChecked(),
             "bar_flush_with_top": self.flush_top.isChecked(),
+            "split_bar_by_grade": self.split_bar.isChecked(),
+            "show_eta": self.show_eta.isChecked(),
+            "show_pace": self.show_pace.isChecked(),
             "show_progress_bar": self.show_bar.isChecked(),
             "show_card_counter": self.show_counter.isChecked(),
             "show_elapsed_time": self.show_elapsed.isChecked(),

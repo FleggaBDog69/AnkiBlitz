@@ -3,7 +3,9 @@
 # One session of truth, one reviewer injection point, one JS/CSS bundle.
 # Submodules:
 #   session.py    - the single source-of-truth Blitz session
+#   forecast.py   - the bar's time estimate, priced off your review history
 #   adaptive.py   - Python adaptive auto-reveal delay calculator
+#   pace.py       - learns your reveal pace: auto-tune and calibration
 #   reveal.py     - builds the per-card payload pushed to the JS bundle
 #   tts_sync.py   - matches reveal speed to native/AnKing {{tts}} playback rate
 #   injection.py  - the ONE webview injection + per-card eval bridge + pycmd
@@ -17,5 +19,10 @@
 #   music.py      - embedded SoundCloud/YouTube player: break panel + review dock
 #   widgets.py    - deck-browser / overview on-screen launch panels
 #   stats.py      - persistent Blitz stats
+#   focus.py      - Focus Lock (how hard leaving is) and the Focus Score
+#   presets.py    - profiles: named snapshots of the whole config
+#   onboarding.py - one-time first-run wizard
+#   panel.py      - the AnkiBlitz panel behind SynapsePro's sidebar button
+#   synapse_sidebar.py - AnkiBlitz's buttons in SynapsePro's launcher strip
 #   theme_bridge.py - the only module that knows the SynapsePro add-on exists:
 #                   borrows its palette, and stands its music player down

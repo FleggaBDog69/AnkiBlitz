@@ -19,17 +19,34 @@ Bridge messages (pycmd) use the ``focus:`` namespace:
 """
 
 import json
+import os
 
 from aqt import gui_hooks, mw
 from aqt.reviewer import Reviewer
 
 from ..config import PACKAGE, get_section
-from . import session, topbar
+from . import forecast, session, topbar
 
 PYCMD_PREFIX = "focus:"
 
-_CSS_HREF = f"/_addons/{PACKAGE}/web/focus_suite.css"
-_JS_SRC = f"/_addons/{PACKAGE}/web/focus_suite.js"
+# Cache-bust both files on their own mtime. Anki's webview caches add-on assets
+# hard, and a restart doesn't clear it — so an edit to the CSS could land while
+# the JS was still the old one (or the reverse), which shows up as a bar that
+# renders into a layout the stylesheet doesn't know about. The version has to
+# come off the file, not the add-on version, or editing during development
+# reintroduces exactly that.
+_WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web")
+
+
+def _stamp(name: str) -> str:
+    try:
+        return str(int(os.path.getmtime(os.path.join(_WEB_DIR, name))))
+    except Exception:
+        return "0"
+
+
+_CSS_HREF = f"/_addons/{PACKAGE}/web/focus_suite.css?v={_stamp('focus_suite.css')}"
+_JS_SRC = f"/_addons/{PACKAGE}/web/focus_suite.js?v={_stamp('focus_suite.js')}"
 
 # The external bundle loads async, so the first call can arrive before it is
 # ready. This inline shim buffers calls; the real bundle flushes them on load.
@@ -64,10 +81,32 @@ def _on_will_set_content(web_content, context, *args, **kwargs) -> None:
 
 # ----- Per-card payload push -----
 
+def _tracker():
+    """The live tracker: the Blitz if one is running, else the ambient one.
+
+    Arms the ambient tracker if it isn't up yet. The first card's thinking
+    window opens before anything has been graded, so leaving the arming to
+    push_progress would lose exactly one band at the start of every session.
+    """
+    s = session.get_active()
+    if s is not None and not s.completed:
+        return s
+    from . import sprint  # lazy: sprint imports injection at module load
+    try:
+        sprint._maybe_arm_ambient()
+    except Exception:
+        return None
+    return session.get_ambient()
+
+
 def _on_show_question(*args, **kwargs) -> None:
     card = mw.reviewer.card if mw.reviewer else None
     if not card:
         return
+    # Open this card's thinking window — question up, answer not yet shown.
+    t = _tracker()
+    if t is not None:
+        t.note_question_shown()
     payload = {}
     # Paused launch: hold the session clock until the user engages (the JS arms a
     # one-shot click/key listener; see focus:engaged).
@@ -86,6 +125,11 @@ def _on_show_answer(*args, **kwargs) -> None:
     s = session.get_active()
     if s is not None:
         s.start_clock()
+    # Close the thinking window: everything from here to the grade press is the
+    # answer side, which no band is charged for.
+    t = _tracker()
+    if t is not None:
+        t.note_answer_shown()
     push_progress()
 
 
@@ -112,6 +156,69 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
 
 # ----- Sprint progress bar -----
 
+def _estimate_fields(s, cfg: dict, hide_acc: bool, remaining=None) -> dict:
+    """The grade split and the time estimate, for either tracker.
+
+    ``remaining`` is passed (the live due count) by the ambient bar, whose
+    estimate is the whole pile; leave it None for a Blitz and the estimate
+    covers what's left of its target. The Blitz's target is in the counter's
+    unit, so in ``answers`` mode it already counts the repeats and isn't
+    charged for them again.
+
+    Split colours are an accuracy display, so the anti-pressure switch takes
+    them with everything else. The estimate isn't: it says how long you'll be
+    sitting there, not how well you're doing, and the Again rate only ever
+    reaches it as arithmetic you don't see.
+    """
+    split = bool(cfg.get("split_bar_by_grade", True)) and not hide_acc
+    out = {
+        "overlayStats": bool(cfg.get("overlay_stats_on_bar", True)),
+        "splitBar": split,
+        "doneGood": s.done_good,
+        "doneAgain": s.done_again,
+        # One band per answer, in order, weighted by thinking time. Only shipped
+        # when the split is actually being drawn — it is the largest thing in
+        # this payload and it goes out on every card.
+        "segs": s.segment_weights() if split else [],
+        "showEta": bool(cfg.get("show_eta", True)),
+        "showPace": bool(cfg.get("show_pace", False)),
+        "etaSeconds": None,
+        "projCards": None,
+        "perMin": None,
+    }
+    # The estimate prices what's left in the pile off your own history — see
+    # forecast.py. It has a number from the first card and doesn't need the
+    # pile to be visibly shrinking: learning cards waiting on a step timer are
+    # charged for even while Anki's counts leave them out.
+    try:
+        pl = forecast.pile()
+        spp = forecast.seconds_per_press(s)
+    except Exception:
+        pl, spp = None, None
+    if not pl or not spp:
+        return out
+    unique = getattr(s, "count_mode", "unique") == "unique"
+    per_unit = pl["per_card"] if unique else 1.0
+    out["perMin"] = round(60.0 / (spp * per_unit), 1)
+
+    if getattr(s, "mode", None) == session.MODE_TIME:
+        # Time mode runs the estimate backwards: the minutes are fixed, so what
+        # you don't know is how much of the pile they'll buy.
+        left = s.remaining_seconds()
+        out["projCards"] = int(left / (spp * per_unit)) if left > 0 else None
+        return out
+
+    if remaining is None:
+        # A Blitz: what's left of its target, in the counter's unit. It can't
+        # cost more than the whole pile does.
+        left = max(0, int(getattr(s, "target_cards", 0)) - s.cards_done)
+        presses = min(left * per_unit, pl["presses"]) if left else 0.0
+    else:
+        presses = pl["presses"]
+    out["etaSeconds"] = int(presses * spp) if presses > 0 else None
+    return out
+
+
 def push_progress() -> None:
     s = session.get_active()
     if s is None:
@@ -128,7 +235,9 @@ def push_progress() -> None:
     cfg = get_section("sprint")
     # The anti-pressure master switch hides every accuracy / streak / again figure.
     hide_acc = bool(cfg.get("hide_all_accuracy_stats", True))
-    payload = {
+    payload = {}
+    payload.update(_estimate_fields(s, cfg, hide_acc))
+    payload.update({
         "mode": s.mode,
         "cardsDone": s.cards_done,
         "target": s.target_cards,
@@ -152,7 +261,7 @@ def push_progress() -> None:
         "streak": s.current_streak,
         "streakAnim": bool(cfg.get("streak_animations", False)),
         "ambient": False,
-    }
+    })
     _eval(f"window.FocusSuite && FocusSuite.setProgress({json.dumps(payload)});")
     topbar.claim()
 

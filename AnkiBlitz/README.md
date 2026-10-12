@@ -98,8 +98,9 @@ as the session goes. It has a number from the first card, one slow card barely
 moves it, and learning cards waiting on a step timer are counted even before
 Anki's counts show them. In a *timed* Blitz the estimate runs the other way —
 the clock is the part you already know, so it tells you how many cards you
-should get through instead (`~89 more cards`). All of this works on an ordinary review session too; the question
-"how long is this pile going to take" is the same either way.
+should get through instead (`~89 more cards`). All of this works on an ordinary
+review session too; the question "how long is this pile going to take" is the
+same either way.
 
 Starting a Blitz from **Start Blitz…** also lets you pick a **Focus lock** level
 for that one session — commit hard to a session you need to finish, or let

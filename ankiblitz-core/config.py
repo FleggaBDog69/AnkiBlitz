@@ -170,6 +170,19 @@ DEFAULTS = {
         # strip is up, and gives it straight back on hover or on leaving the
         # reviewer. Does nothing when the toolbar is visible.
         "bar_flush_with_top": True,
+        # One thick band that IS the bar, with the counters sitting on it,
+        # instead of a text row stacked above a 7px bar with dead surface
+        # between them. Off goes back to the stacked layout.
+        "overlay_stats_on_bar": True,
+        # The bar's fill splits into what went clean (green) and what had to be
+        # repeated (red), always labelled in words beside it. Counts as an
+        # accuracy display, so hide_all_accuracy_stats takes it too.
+        "split_bar_by_grade": True,
+        # The estimate: time left in card/fraction modes and on the ambient bar,
+        # cards left in time mode, priced off your review history (forecast.py).
+        "show_eta": True,
+        # The pace the estimate is built from, if you want to see the working.
+        "show_pace": False,
         "show_progress_bar": True,
         "show_card_counter": True,
         "show_elapsed_time": True,

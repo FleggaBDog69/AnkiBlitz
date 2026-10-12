@@ -796,9 +796,9 @@
   }
 
   // The estimate is rendered coarse on purpose. It is a forecast off your
-  // review history (forecast.py), so "~14 min" is the whole of what it knows; a seconds digit ticking
-  // down would claim a precision it doesn't have, and would pull the eye off
-  // the card every second to do it.
+  // review history (forecast.py), so "~14 min" is the whole of what it knows;
+  // a seconds digit ticking down would claim a precision it doesn't have, and
+  // would pull the eye off the card every second to do it.
   function fmtEta(sec) {
     if (sec < 90) return "~1 min left";
     var m = Math.round(sec / 60);
