@@ -9,7 +9,7 @@ It keeps a review session moving without rushing you. You stop sitting on cards 
 ## Why it's different
 
 - **A different wait for every card.** A two-word card and a five-line clinical vignette shouldn't get the same timer. aSFM counts the words you can actually **see**, adds time for long answers, and adjusts the wait using the card's **FSRS difficulty** (or its ease and lapses on the classic scheduler).
-- **It learns your speed, if you let it.** Opt-in and local only: nothing is recorded until you tick "Learn my pace". Auto-tune slowly adjusts the timer to how fast you really answer. **One-click calibration** can also set your timings from your review history, and you see the numbers before anything changes.
+- **It learns your speed, if you let it.** Opt-in and local only: nothing is recorded until you tick "Learn my pace". Auto-tune slowly adjusts the timer to how fast you really answer, with a **separate pace for review, learning, new, picture and one-by-one cards**. **One-click calibration** sets your timings from your own reveals, and you see the numbers before anything changes.
 - **Easy to hold.** Click **More time**, or press **P**, to stop the countdown on the card you're on. Do it again and it carries on from where it stopped. The pause sticks across cards, and every card says so while it's on.
 - **It never grades.** That's the main change from Glutanimate's original Speed Focus Mode: aSFM only shows the answer, and you still decide how well you knew it.
 
@@ -23,18 +23,22 @@ It keeps a review session moving without rushing you. You stop sitting on cards 
 ## Built for real decks
 
 - **AnKing-friendly.** Hidden fields, tag lists and hint buttons don't count towards the word count.
-- **Picture cards** (anatomy, histology, images) can get a set time instead of a word count, since there's little text to read.
-- **One-by-one cloze cards** can run a short timer for each cloze.
+- **Picture cards** (anatomy, histology, image occlusion) can get a set time instead of a word count, since there's little text to read. Common picture note types are **picked for you** the first time.
+- **One-by-one cloze cards** run a short timer for each cloze, spotted automatically from the "One by one" field.
 - **Skip lists** for any note types or decks you'd rather review untimed.
 - **New cards are left alone by default**, because they need time to read, not just to recall. You can switch them on.
 
-## New in this update
+## New in 1.4.0
 
-- **A fresh look on the card.** The countdown bar now has a soft glow, and the More time button and paused badge are a redesigned frosted pill that shows the pause key as a keycap.
-- **Redesigned Settings.** Four tabs (**Timing**, **On screen**, **Your pace**, **Cards**) with the live preview always in view beside them.
-- **A cleaner welcome window**, with calibration set apart so it's easy to find.
-- **Works better with Progressive Word Reveal.** The answer now waits for the question to finish fading in, the two add-ons can share the **P** key (the first press finishes the fade, the next one pauses the timer), and clicking More time no longer skips the fade or cuts the card's audio.
-- **Fixed:** pressing Esc in the pause-key box no longer sets Esc as the key.
+- **Learn my pace is now opt-in.** Nothing about your reviews is recorded until you tick it on the welcome screen or in Settings, and it all stays on your computer. **If you used auto-tune before, tick "Learn my pace" (Settings ▸ Your pace) to keep it.**
+- **A pace for each kind of card.** Review, learning, new, picture and one-by-one cards each learn their own speed, so reading a new card doesn't skew your review timing. A kind with no data yet follows your review pace.
+- **One-by-one cards are tracked per cloze.** Each cloze you uncover counts on its own, so one-by-one cards now teach the timer properly.
+- **Calibrate does more.** Alongside your base timing, tick any of the other settings (difficulty weight, picture-card time, one-by-one timing) for it to fit from your history.
+- **Picture note types picked for you,** with a "Tick picture types" button to change the list.
+- **Simpler Settings.** Three tabs (**Timing**, **On screen**, **Your pace**). The note-type lists and the detailed per-kind numbers live in pop-ups, and the preview shows your most common card lengths with a "You" column for your learned timing.
+- **A fresh look on the card.** A glowing countdown bar, and a redesigned frosted More time / paused pill that shows the pause key as a keycap.
+- **Works better with Progressive Word Reveal.** The answer waits for the question to finish fading in, the two can share the **P** key (the first press finishes the fade, the next one pauses the timer), and clicking More time no longer skips the fade or cuts the card's audio.
+- **Fixed:** word counting dropping words like "stage" or "vintage", and pressing Esc in the pause-key box setting Esc as the key.
 
 Existing setups are untouched. An update only fills in settings you don't have yet, so nothing you've tuned is changed.
 

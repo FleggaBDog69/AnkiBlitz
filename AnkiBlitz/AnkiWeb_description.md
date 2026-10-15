@@ -21,11 +21,15 @@ Three built-ins — **Default** (everyday), **Blitz** (a committed, locked-in ru
 
 They deliberately leave your session shape alone (you pick mode and target at each launch), along with word-reveal speed and music. The picker shows each profile's key settings before you apply it. Save your own too — your current setup is kept as a *My setup* profile, so nothing is lost.
 
-## New in this update
+## New in 1.4.0
 
+- **Learn my pace is now opt-in.** The auto-reveal only records your reviews once you tick "Learn my pace" (Speed Focus settings), and everything stays on your computer. **If you used auto-tune before, tick it to keep it.** Profiles never switch it on or off.
+- **A pace for each kind of card.** Review, learning, new, picture and one-by-one cards each learn their own speed, and Calibrate can fit your other timing settings too, with a tick box for each.
+- **One-by-one cards are tracked per cloze,** and common picture note types are picked for you.
 - **A fresh look on the card.** The auto-reveal countdown now has a soft glow, and the More time button and paused badge are a redesigned frosted pill that shows the pause key as a keycap.
-- **Tidier Speed Focus settings.** Clear section headings and plainer labels, and the live preview stays in view while you scroll.
-- **Fixed:** pressing Esc in a key box (pause key, reveal key) no longer sets Esc as the key.
+- **Tidier Speed Focus settings.** Clear section headings and plainer labels, lists and detailed numbers in pop-ups, and the live preview stays in view while you scroll.
+- **Time left is priced from your review history,** not a rolling window.
+- **Fixed:** word counting dropping words like "stage" or "vintage"; a click after the words finished fading cutting the card's audio; pressing Esc in a key box setting Esc as the key.
 
 ## New in 1.3.0
 

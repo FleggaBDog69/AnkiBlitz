@@ -7,6 +7,7 @@ AnkiBlitz Core is the lean build of AnkiBlitz: focused, timed study with real st
 ## What it does
 
 - **Blitz sessions** — focused, timed runs by card count, time, or a fraction of what's due, with a progress bar and a completion screen. The bar stays up **outside** a Blitz too, dimmed and labelled *All due*, filling against everything you have due — so plain reviewing isn't a blank screen.
+- **Know how long it's going to take** — the bar's fill is coloured card by card in the order you did them (green for a clean pass, red for an Again), each band as wide as the time that card took, and it estimates the time left from your own review history, pulled toward today's pace as you go. In a timed Blitz it tells you how many cards you should get through instead.
 - **Pomodoro** — work blocks chained with short and long breaks, a break screen with journaling, focus ratings and a guided breathing pacer, and configurable auto-return.
 - **Focus Lock** — make leaving a session progressively harder (confirm → clear more cards → finish), with an optional Focus Score. Pick the level per Blitz in the Start dialog without touching your saved default.
 - **In-app music** — a SoundCloud / YouTube Music player on the break screen, as a floating review dock, and on the deck list.
@@ -16,6 +17,11 @@ AnkiBlitz Core is the lean build of AnkiBlitz: focused, timed study with real st
 Three built-ins — **Default** (everyday), **Blitz** (a committed, locked-in run) and **Relaxed** (low friction) — flip the *feel* in one click: Focus Lock, the near-end nudge, the anti-pressure display.
 
 They deliberately leave your session shape alone (you pick mode and target at each launch), and your music too. Save your own as well — your current setup is kept as a *My setup* profile, so nothing is lost.
+
+## New in 1.4.0
+
+- **Know how long it's going to take.** The progress bar now splits by grade, card by card, and estimates the time left from your own review history. Both can be switched off in the Blitz settings.
+- **Fixed:** the card no longer scrolls under the progress bar.
 
 ## New in 1.3.0
 
