@@ -195,6 +195,11 @@ def pace_of(cat: str = "review") -> float:
     review = float(data.get("pace", 1.0))
     if cat == "review" or cat not in TUNED:
         return _clamp(review)
+    # Nothing learned for this kind yet: follow review, whatever a rebase or
+    # reset may have stored for it (a stored value would freeze it in place
+    # while the label still says "follows review").
+    if not int(data.get("pace_counts", {}).get(cat, 0)):
+        return _clamp(review)
     return _clamp(data.get("paces", {}).get(cat, review))
 
 

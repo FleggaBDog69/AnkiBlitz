@@ -841,7 +841,9 @@ class _PickDialog(QDialog):
     def __init__(self, parent, title, intro, names, sel, suggest=None):
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.setMinimumSize(560, 360)
+        # Wide enough for long shared-deck note-type names without a
+        # sideways scroll bar.
+        self.setMinimumSize(820, 420)
         notetypes, decks = names
         layout = QVBoxLayout(self)
         layout.addWidget(_hint(intro))
@@ -924,9 +926,9 @@ class _PaceDetailsDialog(QDialog):
             "about 0.5%; each timeout or More time lengthens it about 5%. It "
             "settles where the timer beats you on your target share of cards, "
             "and never goes more than 15% quicker than your settings. Review, "
-            "learning, new and picture cards each keep their own pace, so one "
-            "kind can't drag another; a kind with nothing learned yet follows "
-            "your review pace."))
+            "learning, new, picture and one-by-one cards each keep their own "
+            "pace (one-by-one is nudged per cloze), so one kind can't drag "
+            "another; a kind with nothing learned yet follows your review pace."))
         layout.addWidget(_hint(
             "Calibrate: fits base and per word to the time you'd revealed your "
             "target share of review cards by, at each length. Once there's "
