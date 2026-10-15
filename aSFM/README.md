@@ -31,7 +31,8 @@ Focus Mode*, extracted from the **AnkiBlitz** suite so you can use just this pie
   welcome screen or in Settings), local only, never sent anywhere. Auto-tune gently adjusts the timer to how fast you
   actually reveal cards (never more than 15% quicker; timeouts back it off
   fast), and **Calibrate from my reviews…** suggests base / per-word timings
-  from your own data, shown side by side before anything changes.
+  (and the other settings) from Anki's review history on day one, or from your
+  own reveals, shown side by side before anything changes.
 - **Picture-card mode:** chosen note types / decks use a set time instead of a
   word count (there's nothing to read).
 - **A welcome window on first run** that explains the basics and can

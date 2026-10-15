@@ -23,6 +23,7 @@ from aqt.qt import (
     QListWidgetItem,
     QPalette,
     QPushButton,
+    QRadioButton,
     QScrollArea,
     QSpinBox,
     QTabWidget,
@@ -935,11 +936,14 @@ class _PaceDetailsDialog(QDialog):
             "enough data it also suggests the learning and new multipliers, "
             "the difficulty weight, the picture time and the one-by-one "
             "timings, each from that kind's own cards. Applying resets the "
-            "paces those settings now carry. Without enough of your own "
-            "reveals it makes a rough estimate from Anki's review history."))
+            "paces those settings now carry. It can also work from Anki's own "
+            "review history, so it's useful from day one: those times run "
+            "until you graded, so the time you spend on the answer comes off "
+            "each (measured from your reveals once there are enough)."))
         layout.addWidget(_hint(
             "What's kept: counts and timings by card length and difficulty, "
-            "never which cards, in one file per profile on this computer. "
+            "and how long the answer is up before you grade, never which "
+            "cards, in one file per profile on this computer. "
             "Nothing is sent anywhere."))
 
         layout.addStretch(1)
@@ -993,25 +997,83 @@ class _CalibrateDialog(QDialog):
         self.buttons.rejected.connect(self.reject)
         layout.addWidget(self.buttons)
 
-        if pace.reveal_data_ready(cfg):
-            self._show(pace.fit_from_reveals(cfg), measured=True)
-        elif mw.col is not None:
-            from aqt.operations import QueryOp
-            QueryOp(
-                parent=self,
-                op=lambda col: pace.fit_from_revlog(col, cfg),
-                success=lambda r: self._show(r, measured=False),
-            ).failure(
-                lambda _exc: self._show(None, measured=False, failed=True)
-            ).with_progress("Reading your review history…").run_in_background()
-        else:
-            self._show(None, measured=False)
+        # Where the numbers come from: the reveals aSFM has watched (exact,
+        # once there are enough), or Anki's review history (works from day one).
+        ready = pace.reveal_data_ready(cfg)
+        self._run_id = 0
+        src_row = QHBoxLayout()
+        src_row.addWidget(QLabel("From:"))
+        self.src_reveals = QRadioButton(self._reveals_label(ready))
+        self.src_history = QRadioButton("Anki's review history")
+        self.src_reveals.setEnabled(ready)
+        src_row.addWidget(self.src_reveals)
+        src_row.addWidget(self.src_history)
+        src_row.addStretch(1)
+        layout.insertLayout(0, src_row)
+        (self.src_reveals if ready else self.src_history).setChecked(True)
+        self.src_reveals.toggled.connect(lambda on: on and self._run(True))
+        self.src_history.toggled.connect(lambda on: on and self._run(False))
+        self._run(ready)
 
-    def _show(self, r, measured: bool, failed: bool = False):
+    def _reveals_label(self, ready: bool) -> str:
+        if ready:
+            n = int(pace.summary().get("self_n", 0.0))
+            return f"What aSFM has seen ({n} cards)"
+        if pace.learning(self.cfg):
+            n = int(pace.summary().get("self_n", 0.0))
+            return f"What aSFM has seen (needs {pace.MIN_CALIBRATION}, {n} so far)"
+        return "What aSFM has seen (turn on Learn my pace)"
+
+    def _run(self, measured: bool):
+        """Work out suggestions from the chosen source. A history read runs in
+        the background; if you switch source meanwhile, its result is dropped."""
+        self._run_id += 1
+        run = self._run_id
+        self.result_values = None
+        self.apply_btn.setEnabled(False)
+        cancel = self.buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        if cancel:
+            cancel.setText("Cancel")
+        self._clear_extras()
+        self.body.setText("Working…")
+        if measured:
+            self._show(pace.fit_from_reveals(self.cfg), True, run=run)
+            return
+        if mw.col is None:
+            self._show(None, False, run=run)
+            return
+        from aqt.operations import QueryOp
+        cfg = self.cfg
+
+        def progress(n):
+            mw.taskman.run_on_main(lambda: mw.progress.update(
+                label=f"Reading your review history… {n} cards"))
+
+        QueryOp(
+            parent=self,
+            op=lambda col: pace.fit_from_history(col, cfg, progress),
+            success=lambda r: self._show(r, False, run=run),
+        ).failure(
+            lambda _exc: self._show(None, False, failed=True, run=run)
+        ).with_progress("Reading your review history…").run_in_background()
+
+    def _show(self, r, measured: bool, failed: bool = False, run=None):
+        if run is not None and run != self._run_id:
+            return      # you switched source while this one was working
         try:
             self._fill(r, measured, failed)
         except RuntimeError:
             pass    # the dialog was closed before the history read finished
+
+    def _clear_extras(self):
+        self._extra_checks = {}
+        while self.extras_grid.count():
+            w = self.extras_grid.takeAt(0).widget()
+            if w:
+                w.hide()            # gone now, not when Qt gets round to it
+                w.setParent(None)
+                w.deleteLater()
+        self.extras_box.hide()
 
     def _fill(self, r, measured: bool, failed: bool):
         target = int(self.cfg["target_timer_wins_percent"])
@@ -1027,8 +1089,8 @@ class _CalibrateDialog(QDialog):
             self.body.setText(
                 "<b>Not enough data yet.</b><br><br>Calibration needs about "
                 f"{pace.MIN_CALIBRATION} cards you revealed yourself, or a few "
-                "hundred passed reviews in Anki's history. Keep reviewing with "
-                "the timer on and try again.")
+                f"hundred reviews in Anki's history (the last "
+                f"{pace.HISTORY_DAYS} days). Keep reviewing and try again.")
             return
         rows = [("Base time", "base_seconds", "s"),
                 ("Per word", "seconds_per_word", "s")]
@@ -1043,15 +1105,19 @@ class _CalibrateDialog(QDialog):
                       "Timed so the answer shows before you've revealed it on "
                       f"about {target}% of cards.")
         else:
-            source = (f"A <b>rough estimate</b> from Anki's review history "
-                      f"({r.get('cards_seen', r['cards'])} cards). That history "
-                      "times the answer side too, so an allowance is taken off, "
-                      "and if you've been reviewing with a timer it partly "
-                      "reflects that timer. "
-                      + (f"Once aSFM has watched {pace.MIN_CALIBRATION} cards "
-                         "you reveal yourself, calibrating again uses those "
-                         "instead." if pace.learning(self.cfg) else
-                         "Turn on “Learn my pace” for a measured fit instead."))
+            hist = r["source"]
+            allowance = (f"{hist['gap']:.1f} s, measured from your own reveals,"
+                         if hist["gap_measured"] else
+                         "a typical allowance (about 1.5 s plus 0.1 s per answer "
+                         "word)")
+            source = (f"From <b>{hist['reviews']}</b> reviews of "
+                      f"{hist['cards']} cards in Anki's history (the last "
+                      f"{hist['days']} days). Anki times each review until you "
+                      f"grade it, so {allowance} is taken off each for reading "
+                      "the answer. Timed so the answer shows before you'd have "
+                      f"revealed it on about {target}% of cards. If you've been "
+                      "reviewing with an auto-reveal timer on, those times "
+                      "partly reflect that timer.")
         reset = (" and resets the learned pace to 1.00×"
                  if pace.learning(self.cfg) else "")
         if self.saves_directly:
@@ -1067,8 +1133,7 @@ class _CalibrateDialog(QDialog):
         self.result_values = r
         self.apply_btn.setEnabled(True)
         _fit_to_content(self)
-        if measured:
-            self._fill_extras(pace.fit_kinds(self.cfg, r))
+        self._fill_extras(pace.fit_kinds(self.cfg, r, None if measured else r["source"]))
 
     _FORMATS = {"difficulty_weight": "{:.2f}", "unfamiliar_multiplier": "{:.2f}×",
                 "new_multiplier": "{:.2f}×", "fixed_time_base_seconds": "{:.1f} s",

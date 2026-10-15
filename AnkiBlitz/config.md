@@ -45,15 +45,17 @@ clamped to `[min_delay_seconds, max_delay_seconds]`.
   can start you again.
 - `learn_my_pace` — **off by default; the consent switch.** While it's off
   AnkiBlitz records nothing about your reviews, writes no pace file, and
-  auto-tune doesn't run; Calibrate can still make a rough estimate from Anki's
-  own review history (read on request, nothing saved). Not part of profiles.
+  auto-tune doesn't run; Calibrate can still work from Anki's own review
+  history (read on request, nothing saved). Not part of profiles.
 - `auto_tune_enabled` / `target_timer_wins_percent` — once learning is on,
   auto-tune nudges a learned pace after every card until the timer beats you on
   about that share of cards. Review, learning, new, picture and one-by-one
   cards each keep **their own pace** (one-by-one is nudged per cloze), and a
   kind with nothing learned yet follows the review pace.
 - **Calibrate** (Settings) fits `base_seconds` / `seconds_per_word` to your
-  reveal times, and — once each kind has enough cards — suggests the learning
+  reveal times or, from day one, to Anki's review history (answer-side time
+  taken off: your own reveal-to-grade gap once measured, else a typical one),
+  and — once each kind has enough cards — suggests the learning
   and new multipliers, `difficulty_weight`, the picture time and the one-by-one
   timings, each as its own tickable row. What's kept, per profile in
   `user_files/pace_<profile>.json`: counts and timings by card length and

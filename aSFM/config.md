@@ -48,8 +48,8 @@ delay = clamp(delay, min_delay_seconds, max_delay_seconds)
 ### Learn my pace
 
 Nothing below happens until you turn on `learn_my_pace`. Without it, aSFM
-times cards from your settings alone, and **Calibrate** can still make a rough
-estimate from Anki's own review history: read on request, nothing saved.
+times cards from your settings alone, and **Calibrate** can still work from
+Anki's own review history: read on request, nothing saved.
 
 Auto-tune scales every delay by a learned pace until the timer beats you on
 about `target_timer_wins_percent` of cards. It is deliberately gentle: each
@@ -66,12 +66,22 @@ paces so their real timings don't jump.
 
 **Calibrate from my reviews…** (in Settings) fits `base_seconds`,
 `seconds_per_word` and, if it's on, `seconds_per_answer_word` to your reveal
-times, and shows the suggestion before anything changes. It uses what aSFM
-has measured once it has seen 150 cards you revealed yourself; before that it
-makes a rough estimate from Anki's review history (and always does, while
-`learn_my_pace` is off).
+times, and shows the suggestion before anything changes. Pick where from:
 
-Once each kind has enough cards, Calibrate also suggests, each as its own
+- **What aSFM has seen** — your measured reveals, once there are 150 you
+  revealed yourself (needs `learn_my_pace`).
+- **Anki's review history** — works from day one. It reads graded reviews from
+  the last 180 days (up to 1,200 cards, skipping excluded note types and
+  decks) and sorts them into review / learning / new / picture / one-by-one by
+  the same rules as the timer. Anki times a review until you grade it, so the
+  answer-side time comes off each: your own median reveal-to-grade gap once
+  `learn_my_pace` has measured 30, else 1.5 s + 0.1 s per answer word. Because
+  the slow tail of the review log is mostly answer-side time, it fits the
+  median and scales it to the target percentile by the usual spread of reveal
+  times (yours once measured). The one-by-one per-cloze settings can't come
+  from history, which only times the whole card.
+
+Once each kind has enough cards (from either source), Calibrate also suggests, each as its own
 tickable row: `unfamiliar_multiplier` and `new_multiplier` (40 cards of that
 kind), `difficulty_weight` (150 review cards spread over difficulties; it fits
 whether harder cards really take you longer, and never goes below 0),
@@ -83,7 +93,8 @@ applying one resets that kind's pace to 1.0×.
 What's learned is kept per profile in `user_files/pace_<profile>.json`:
 the paces, a compact histogram of reveal times, a per-kind tally (by length
 and difficulty, for fitting the learning / new / difficulty / picture settings
-later), and a one-line summary per session. Counts only, never card content or which cards, a few KB at most,
+later), how long the answer is up before you grade (for calibrating from
+Anki's review history), and a one-line summary per session. Counts only, never card content or which cards, a few KB at most,
 and never sent anywhere. Turning learning off stops recording at once; the
 file is left in place so turning it back on picks up where you were.
 

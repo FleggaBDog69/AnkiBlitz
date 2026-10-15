@@ -9,7 +9,7 @@ It keeps a review session moving without rushing you. You stop sitting on cards 
 ## Why it's different
 
 - **A different wait for every card.** A two-word card and a five-line clinical vignette shouldn't get the same timer. aSFM counts the words you can actually **see**, adds time for long answers, and adjusts the wait using the card's **FSRS difficulty** (or its ease and lapses on the classic scheduler).
-- **It learns your speed, if you let it.** Opt-in and local only: nothing is recorded until you tick "Learn my pace". Auto-tune slowly adjusts the timer to how fast you really answer, with a **separate pace for review, learning, new, picture and one-by-one cards**. **One-click calibration** sets your timings from your own reveals, and you see the numbers before anything changes.
+- **It learns your speed, if you let it.** Opt-in and local only: nothing is recorded until you tick "Learn my pace". Auto-tune slowly adjusts the timer to how fast you really answer, with a **separate pace for review, learning, new, picture and one-by-one cards**. **One-click calibration** sets your timings from **Anki's own review history**, so it works on day one, then from your own reveals once aSFM has seen enough. You see the numbers before anything changes.
 - **Easy to hold.** Click **More time**, or press **P**, to stop the countdown on the card you're on. Do it again and it carries on from where it stopped. The pause sticks across cards, and every card says so while it's on.
 - **It never grades.** That's the main change from Glutanimate's original Speed Focus Mode: aSFM only shows the answer, and you still decide how well you knew it.
 
@@ -33,7 +33,8 @@ It keeps a review session moving without rushing you. You stop sitting on cards 
 - **Learn my pace is now opt-in.** Nothing about your reviews is recorded until you tick it on the welcome screen or in Settings, and it all stays on your computer. **If you used auto-tune before, tick "Learn my pace" (Settings ▸ Your pace) to keep it.**
 - **A pace for each kind of card.** Review, learning, new, picture and one-by-one cards each learn their own speed, so reading a new card doesn't skew your review timing. A kind with no data yet follows your review pace.
 - **One-by-one cards are tracked per cloze.** Each cloze you uncover counts on its own, so one-by-one cards now teach the timer properly.
-- **Calibrate does more.** Alongside your base timing, tick any of the other settings (difficulty weight, picture-card time, one-by-one timing) for it to fit from your history.
+- **Calibrate from your review history, from day one.** Calibrate reads a sample of Anki's own review log (nothing is stored), takes off the time you spend on the answer side, and suggests your base and per-word timing plus the difficulty weight, learning and new multipliers and picture-card time. Once Learn my pace has enough of your reveals, you can calibrate from those instead, and it measures your own answer-side time too.
+- **Calibrate does more.** Alongside your base timing, tick any of the other settings (difficulty weight, learning and new cards, picture-card time, one-by-one timing) for it to fit.
 - **Picture note types picked for you,** with a "Tick picture types" button to change the list.
 - **Simpler Settings.** Three tabs (**Timing**, **On screen**, **Your pace**). The note-type lists and the detailed per-kind numbers live in pop-ups, and the preview shows your most common card lengths with a "You" column for your learned timing.
 - **A fresh look on the card.** A glowing countdown bar, and a redesigned frosted More time / paused pill that shows the pause key as a keycap.

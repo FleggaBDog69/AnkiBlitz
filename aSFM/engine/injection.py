@@ -251,6 +251,18 @@ def _on_show_answer(*args, **kwargs) -> None:
     _eval(f"window.ASFM && ASFM.onCard({json.dumps(payload)});")
 
 
+def _on_will_answer(proceed_ease, reviewer, card):
+    """You pressed a grade: note how long the answer was up before you did,
+    which is what calibrating from Anki's review history takes off. A filter
+    hook, so it hands its input straight back; it never changes the grade."""
+    try:
+        if proceed_ease[0]:
+            pace.note_answered(card, get_config())
+    except Exception:
+        pass
+    return proceed_ease
+
+
 def _on_js_message(handled, message: str, context, *args, **kwargs):
     if not isinstance(message, str) or not message.startswith(PYCMD_PREFIX):
         return handled
@@ -296,4 +308,5 @@ def register() -> None:
     gui_hooks.webview_will_set_content.append(_on_will_set_content)
     gui_hooks.reviewer_did_show_question.append(_on_show_question)
     gui_hooks.reviewer_did_show_answer.append(_on_show_answer)
+    gui_hooks.reviewer_will_answer_card.append(_on_will_answer)
     gui_hooks.webview_did_receive_js_message.append(_on_js_message)

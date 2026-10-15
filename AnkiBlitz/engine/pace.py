@@ -39,6 +39,7 @@ import json
 import math
 import os
 import re
+import statistics
 import time
 
 from aqt import mw
@@ -83,12 +84,26 @@ HIST_CAP = 4000.0            # total weight before everything is halved
 MIN_CALIBRATION = 150        # self-revealed cards before calibration uses them
 MIN_CELL = 3.0
 
-# Review-log fallback: that time includes reading the answer and grading, so
-# an allowance is taken off before it is treated as a reveal time.
-REVLOG_DAYS = 90
-REVLOG_MAX_CARDS = 600
+# Calibrating from Anki's review history. That time runs until you graded, so
+# it includes reading the answer and deciding: an allowance comes off each
+# review before it is treated as a reveal time. Your own allowance is measured
+# once "Learn my pace" has seen enough cards (the gap between the reveal and
+# your grade); until then a typical one is used.
+HISTORY_DAYS = 180
+HISTORY_MAX_CARDS = 1200     # distinct cards rendered (each review of one counts)
+HISTORY_MAX_REVIEWS = 20000
 REVLOG_ANSWER_BASE_S = 1.5
 REVLOG_ANSWER_PER_WORD_S = 0.1
+GAP_MIN = 30                 # measured reveal-to-grade gaps before they're used
+GAP_MAX_S = 20.0             # longer = you were doing something else
+# The slow tail of the review log is mostly answer-side time (a failed card
+# stared at, the extra field read, a picture studied), so its 90th percentile
+# says little about reveals. History calibration reads the MEDIAN instead, takes
+# the allowance off, and scales up to the target percentile by the usual spread
+# of reveal times: lognormal, with your own spread once Learn my pace has
+# enough reveals, else REVEAL_SPREAD_SIGMA (measured on a real collection:
+# reveal p90 / p50 = 1.82, and median review time minus ~2 s = median reveal).
+REVEAL_SPREAD_SIGMA = 0.47
 
 _DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "user_files")
 
@@ -97,6 +112,7 @@ _summary_for = None   # which profile _summary belongs to
 _card = None          # the card on screen, while its timer runs
 _session = None
 _unsaved = 0
+_last_reveal = None   # (card id, seconds to reveal) until that card is graded
 
 
 # ----- storage -----
@@ -358,7 +374,8 @@ def _d_bucket(signal: float) -> int:
     return min(D_BUCKETS - 1, max(0, int((signal + 1.0) / 2.0 * D_BUCKETS)))
 
 
-def _tally_add(data: dict, c: dict, seconds: float, censored: bool) -> None:
+def _tally_add(data: dict, c: dict, seconds: float, censored: bool,
+               decay: bool = True) -> None:
     # key = question words : answer words (one-by-one: clozes) : difficulty,
     # and one-by-one also splits by answer words, which its timer uses too.
     one_by_one = c["cat"] == "one_by_one_whole"
@@ -369,7 +386,7 @@ def _tally_add(data: dict, c: dict, seconds: float, censored: bool) -> None:
     if one_by_one:
         key += f":{int(min(c['answer_words'], A_MAX) // A_BUCKET)}"
     _tally_cell_add(data, c["cat"], key, c["words"], second, c["dsig"],
-                    c["answer_words"], seconds, censored)
+                    c["answer_words"], seconds, censored, decay)
 
 
 def _tally_cloze(data: dict, c: dict, index: int, seconds: float,
@@ -387,7 +404,8 @@ def _tally_cloze(data: dict, c: dict, index: int, seconds: float,
                     seconds, censored)
 
 
-def _tally_cell_add(data, cat, key, words, second, dsig, sw, seconds, censored):
+def _tally_cell_add(data, cat, key, words, second, dsig, sw, seconds, censored,
+                    decay=True):
     cell = data.setdefault("tally", {}).setdefault(cat, {}).setdefault(
         key, {"n": 0.0, "sq": 0.0, "sa": 0.0, "sd": 0.0, "sw": 0.0, "t": {}, "c": {}})
     cell["n"] += 1.0
@@ -399,7 +417,9 @@ def _tally_cell_add(data, cat, key, words, second, dsig, sw, seconds, censored):
     side = cell["c" if censored else "t"]
     side[b] = side.get(b, 0.0) + 1.0
     data["tally_n"] = data.get("tally_n", 0.0) + 1.0
-    if data["tally_n"] > HIST_CAP:
+    # A one-off sample (calibrating from history) is not halved: halving is
+    # how the running tally keeps recent habits on top.
+    if decay and data["tally_n"] > HIST_CAP:
         for cat in list(data["tally"]):
             cells = data["tally"][cat]
             for k in list(cells):
@@ -548,6 +568,7 @@ def end_card(card, cfg: dict) -> None:
 
     if not c["held"]:
         _note_outcome(yourself)
+        _remember_reveal(c, elapsed)
 
     # Held cards include however long you sat on them, so they can't calibrate.
     # A timeout only says "you needed longer" if you normally reveal cards
@@ -565,6 +586,55 @@ def end_card(card, cfg: dict) -> None:
     _unsaved += 1
     if _unsaved >= SAVE_EVERY:
         save()
+
+
+# ----- the reveal-to-grade gap -----
+#
+# Anki's review log times each card until you GRADE it. Calibrating from that
+# history needs to know how much of it was the answer side (reading it,
+# deciding): the gap between the reveal and your grade, measured here on
+# cards AnkiBlitz revealed or watched you reveal. Kept as a small histogram.
+
+def _remember_reveal(c: dict, elapsed: float) -> None:
+    global _last_reveal
+    _last_reveal = (c["cid"], elapsed)
+
+
+def note_answered(card, cfg: dict) -> None:
+    """You graded a card. If AnkiBlitz saw its reveal, record the gap."""
+    global _last_reveal, _unsaved
+    seen, _last_reveal = _last_reveal, None
+    if seen is None or card is None or seen[0] != card.id or not learning(cfg):
+        return
+    try:
+        taken_ms = card.time_taken(capped=False)
+        capped = taken_ms >= card.time_limit()
+    except Exception:
+        return
+    gap = taken_ms / 1000.0 - seen[1]
+    # Anki stops its clock at the preset's maximum answer time, so a review
+    # that hit it says nothing; a long gap means you were elsewhere.
+    if capped or not (0.0 < gap <= GAP_MAX_S):
+        return
+    data = summary()
+    g = data.setdefault("answer_gap", {"n": 0.0, "t": {}})
+    g["n"] += 1.0
+    b = str(int(gap // T_BIN))
+    g["t"][b] = g["t"].get(b, 0.0) + 1.0
+    if g["n"] > 2000:                     # keep it about your recent habit
+        g["n"] *= 0.5
+        g["t"] = {k: w * 0.5 for k, w in g["t"].items() if w * 0.5 >= 0.05}
+    _unsaved += 1
+    if _unsaved >= SAVE_EVERY:
+        save()
+
+
+def answer_gap():
+    """Your median reveal-to-grade gap in seconds, or None until measured."""
+    g = summary().get("answer_gap") or {}
+    if g.get("n", 0.0) < GAP_MIN:
+        return None
+    return _percentile({"t": g.get("t", {}), "c": {}}, 0.5)
 
 
 def _end_one_by_one(c: dict, cfg: dict, data: dict, active: bool) -> None:
@@ -670,7 +740,7 @@ def _solve(rows, cols: int):
     return x
 
 
-def fit(hist: dict, cfg: dict):
+def fit(hist: dict, cfg: dict, read=None):
     """Suggested base / per-word / per-answer-word from a histogram, or None.
 
     Fits the target percentile of each cell against its mean word counts. The
@@ -679,12 +749,13 @@ def fit(hist: dict, cfg: dict):
     dropped and the rest refitted, rather than suggesting a nonsense value.
     """
     q = 1.0 - _target(cfg)
+    read = read or (lambda cell: _percentile(cell, q))
     pts = []
     for cell in hist.values():
         n = cell.get("n", 0.0)
         if n < MIN_CELL:
             continue
-        pts.append((n, cell["sq"] / n, cell["sa"] / n, _percentile(cell, q)))
+        pts.append((n, cell["sq"] / n, cell["sa"] / n, read(cell)))
     if len(pts) < 3 or len({round(p[1]) for p in pts}) < 2:
         return None
 
@@ -755,7 +826,7 @@ def _formula(cfg: dict, words: float, answer_words: float) -> float:
     return k("base_seconds") + k("seconds_per_word") * words + answer
 
 
-def _kind_points(cat: str, q: float, dm=None) -> list:
+def _kind_points(cat: str, q: float, dm=None, tally=None, read=None) -> list:
     """(weight, mean q words, mean second slot, mean answer words, mean
     difficulty signal, percentile seconds) per usable cell.
 
@@ -764,7 +835,9 @@ def _kind_points(cat: str, q: float, dm=None) -> list:
     percentile from. Each bucket's times are divided by its own multiplier
     first — pooling raw times would let the hard cards set the percentile —
     so pooled points come back difficulty-neutral (signal 0)."""
-    cells = summary().get("tally", {}).get(cat, {})
+    if tally is None:
+        tally = summary().get("tally", {})
+    cells = tally.get(cat, {})
     if dm is not None:
         pooled = {}
         for key, cell in cells.items():
@@ -789,13 +862,14 @@ def _kind_points(cat: str, q: float, dm=None) -> list:
         if n < MIN_CELL:
             continue
         out.append((n, cell["sq"] / n, cell["sa"] / n, cell.get("sw", 0.0) / n,
-                    cell["sd"] / n, _percentile(cell, q)))
+                    cell["sd"] / n, read(cell) if read else _percentile(cell, q)))
     return out
 
 
-def _cards(cat: str) -> int:
-    return int(sum(cl.get("n", 0.0)
-                   for cl in summary().get("tally", {}).get(cat, {}).values()))
+def _cards(cat: str, tally=None) -> int:
+    if tally is None:
+        tally = summary().get("tally", {})
+    return int(sum(cl.get("n", 0.0) for cl in tally.get(cat, {}).values()))
 
 
 def _ratio(points, ref) -> float:
@@ -805,16 +879,22 @@ def _ratio(points, ref) -> float:
     return num / den if den > 0 else 0.0
 
 
-def fit_kinds(cfg: dict, main=None) -> dict:
+def fit_kinds(cfg: dict, main=None, source=None) -> dict:
     """Suggestions for the settings beyond base / per word. ``main`` is the
     base / per-word fit that Calibrate will apply alongside (or None).
+    ``source`` is a sample from Anki's review history (``history_source``);
+    without it, what "Learn my pace" has tallied is used.
 
     Returns {key: {"label", "value", "cards", "need"}}: ``value`` is None while
     there isn't enough data (``need`` = how many cards it wants), and a
     ``reason`` replaces both when it can't be measured at all.
     """
-    if not learning(cfg):
+    if source is None and not learning(cfg):
         return {}
+    tally = source["tally"] if source is not None else summary().get("tally", {})
+    read = history_reader(cfg) if source is not None else None
+    points = lambda cat, dm=None: _kind_points(cat, q, dm, tally, read)
+    cards = lambda cat: _cards(cat, tally)
     ref_cfg = dict(cfg)
     if main:
         for key in ("base_seconds", "seconds_per_word", "seconds_per_answer_word"):
@@ -826,7 +906,7 @@ def fit_kinds(cfg: dict, main=None) -> dict:
     out = {}
 
     def entry(key, label, cat, value=None, reason=None, need=None):
-        n = _cards(cat)
+        n = cards(cat)
         need = need or MIN_KIND[cat]
         out[key] = {"label": label, "cards": n, "need": need,
                     "unit": UNIT.get(cat, "cards"),
@@ -835,7 +915,7 @@ def fit_kinds(cfg: dict, main=None) -> dict:
 
     # Difficulty weight: on review cards, does the measured / formula ratio
     # climb with difficulty? ratio ~ a + b * signal, weight = b / a.
-    pts = _kind_points("review", q)
+    pts = points("review")
     fitted, reason = None, None
     if len({round(p[4] * 2) for p in pts}) >= 3:
         rows = [(w, [1.0, d], y / max(0.1, _formula(ref_cfg, qw, aw)))
@@ -843,7 +923,7 @@ def fit_kinds(cfg: dict, main=None) -> dict:
         x = _solve(rows, 2)
         if x and x[0] > 0:
             fitted = round(min(1.0, max(0.0, x[1] / x[0])), 2)
-    elif _cards("review") >= MIN_KIND["difficulty"]:
+    elif cards("review") >= MIN_KIND["difficulty"]:
         reason = "cards too alike in difficulty to tell"
     entry("difficulty_weight", "Difficulty weight", "review", fitted, reason,
           need=MIN_KIND["difficulty"])
@@ -855,17 +935,17 @@ def fit_kinds(cfg: dict, main=None) -> dict:
 
     for key, label, cat, lo in (("unfamiliar_multiplier", "Learning cards", "learning", 1.0),
                                 ("new_multiplier", "New cards", "new", 1.0)):
-        pts = _kind_points(cat, q, dm)
+        pts = points(cat, dm)
         value = None
         if pts:
             r = _ratio(pts, lambda p: _formula(ref_cfg, p[1], p[3]) * dm(p[4]))
             value = round(min(5.0, max(lo, r)), 2) if r else None
         entry(key, label, cat, value)
-    if not cfg.get("enable_on_new", DEFAULTS["enable_on_new"]) and _cards("new") == 0:
+    if not cfg.get("enable_on_new", DEFAULTS["enable_on_new"]) and cards("new") == 0:
         out["new_multiplier"]["reason"] = "timer is off on new cards"
 
     if cfg.get("fixed_time_enabled", DEFAULTS["fixed_time_enabled"]):
-        pts = _kind_points("picture", q, dm)
+        pts = points("picture", dm)
         value = None
         if pts:
             r = sum(w * y / dm(d) for w, _, _, _, d, y in pts) / sum(p[0] for p in pts)
@@ -874,7 +954,7 @@ def fit_kinds(cfg: dict, main=None) -> dict:
 
     mode = cfg.get("one_by_one_mode", DEFAULTS["one_by_one_mode"])
     if mode == "multiplier":
-        pts = _kind_points("one_by_one_whole", q, dm)
+        pts = points("one_by_one_whole", dm)
         value = None
         if pts:
             r = _ratio(pts, lambda p: _formula(ref_cfg, p[1], p[3]) * dm(p[4]))
@@ -886,7 +966,7 @@ def fit_kinds(cfg: dict, main=None) -> dict:
         # off first. A part that fits negative is held at 0 and the other
         # refitted on its own.
         rows = []
-        for w, qw, cw, first, _d, y in _kind_points("one_by_one", q, dm):
+        for w, qw, cw, first, _d, y in points("one_by_one", dm):
             reading = _formula(ref_cfg, qw, 0) if first >= 0.5 else 0.0
             rows.append((w, cw, y - reading))
         pc = pw = None
@@ -904,6 +984,11 @@ def fit_kinds(cfg: dict, main=None) -> dict:
               round(min(30.0, pc), 1) if pc is not None else None)
         entry("one_by_one_seconds_per_word", "One-by-one, per answer word", "one_by_one",
               round(min(5.0, pw), 2) if pw is not None else None)
+        if source is not None:
+            # Anki's history only times the whole card, not each cloze.
+            for key in ("one_by_one_seconds_per_cloze", "one_by_one_seconds_per_word"):
+                out[key]["reason"] = "needs AnkiBlitz's own per-cloze timings"
+                out[key]["value"] = None
     return out
 
 
@@ -915,42 +1000,121 @@ def fit_from_reveals(cfg: dict):
     return fit(summary().get("hist", {}), cfg)
 
 
-def fit_from_revlog(col, cfg: dict):
-    """Rough fallback for when AnkiBlitz hasn't watched enough reveals yet.
+def _spread(cfg: dict) -> float:
+    """Target-percentile reveal time / median reveal time."""
+    q = 1.0 - _target(cfg)
+    data = summary()
+    if learning(cfg) and data.get("self_n", 0.0) >= MIN_CALIBRATION:
+        merged = {"t": {}, "c": {}}
+        for cell in data.get("hist", {}).values():
+            for b, w in cell.get("t", {}).items():
+                merged["t"][b] = merged["t"].get(b, 0.0) + w
+        mid = _percentile(merged, 0.5)
+        if mid > 0:
+            return max(1.0, _percentile(merged, q) / mid)
+    z = statistics.NormalDist().inv_cdf(min(0.99, max(0.5, q)))
+    return math.exp(z * REVEAL_SPREAD_SIGMA)
 
-    Runs on the collection thread (it renders cards to count their words).
-    Uses passed reviews under Anki's 60 s cap, takes an answer-reading
-    allowance off each, and fits the same way as the reveal data.
+
+def history_reader(cfg: dict):
+    """How a history cell turns into a reveal time at the target percentile:
+    its median (allowance already off), scaled by the reveal spread."""
+    spread = _spread(cfg)
+    return lambda cell: max(0.5, _percentile(cell, 0.5)) * spread
+
+
+def _allowance(answer_words: float, gap):
+    """Seconds of a review-log time that were the answer side."""
+    if gap is not None:
+        return gap
+    return REVLOG_ANSWER_BASE_S + REVLOG_ANSWER_PER_WORD_S * answer_words
+
+
+def _history_kind(rev_type: int, first: bool, picture: bool, one_by_one: bool) -> str:
+    """Which kind of card a past review was, by the same rules the timer uses
+    (picture and one-by-one by the card; new / learning / review by what the
+    review log says the card was at the time)."""
+    if picture:
+        return "picture"
+    if one_by_one:
+        return "one_by_one_whole"     # the log only times the whole card
+    if rev_type == 0:
+        return "new" if first else "learning"
+    if rev_type == 2:
+        return "learning"
+    return "review"                   # 1 = review, 3 = early review (filtered)
+
+
+def history_source(col, cfg: dict, progress=None) -> dict:
+    """A calibration sample from Anki's review history, shaped like what
+    "Learn my pace" records: {"hist", "tally", "reviews", "cards", "days",
+    "gap", "gap_measured"}.
+
+    Runs on the collection thread: it renders cards to count their visible
+    words, exactly as the timer does. Reads only; nothing is stored. Takes
+    graded reviews of the last HISTORY_DAYS days under Anki's 60 s cap, newest
+    first, until HISTORY_MAX_CARDS different cards have been seen; excluded
+    note types and decks are skipped, as the timer skips them. Each time has
+    the answer-side allowance taken off (yours, if measured).
     """
     from . import adaptive
-    cutoff = int((time.time() - REVLOG_DAYS * 86400) * 1000)
+    cutoff = int((time.time() - HISTORY_DAYS * 86400) * 1000)
     rows = col.db.all(
-        "select cid, time from revlog where type = 1 and ease > 1 "
-        "and time > 0 and time < 59000 and id > ? order by id desc limit 5000",
-        cutoff)
-    hist, cache = {}, {}
-    for cid, ms in rows:
+        "select id, cid, time, type from revlog where ease > 0 and type in "
+        "(0, 1, 2, 3) and time > 300 and time < 59000 and id > ? "
+        "order by id desc limit ?", cutoff, HISTORY_MAX_REVIEWS)
+    gap = answer_gap()
+    excluded_types = cfg.get("excluded_note_types", [])
+    excluded_decks = cfg.get("excluded_decks", [])
+    data = {"hist": {}, "tally": {}, "tally_n": 0.0}
+    cache = {}
+    reviews = 0
+    for rid, cid, ms, rev_type in rows:
         if cid not in cache:
-            if len(cache) >= REVLOG_MAX_CARDS:
+            if len(cache) >= HISTORY_MAX_CARDS:
                 continue
+            cache[cid] = None
             try:
                 card = col.get_card(cid)
-                inputs = adaptive.card_inputs(card, cfg)
-                if inputs["fixed_time"]:
-                    cache[cid] = None
+                if adaptive.card_matches(card, excluded_types, excluded_decks):
                     continue
-                cache[cid] = (inputs, _mult(cfg, inputs))
+                inputs = adaptive.card_inputs(card, cfg)
+                first_id = col.db.scalar(
+                    "select min(id) from revlog where cid = ? and ease > 0", cid)
+                cloze_words = adaptive.one_by_one_cloze_words(card)
+                cache[cid] = (inputs, first_id, len(cloze_words),
+                              _dsig(inputs), _mult(cfg, inputs))
             except Exception:
-                cache[cid] = None
                 continue
-        entry = cache.get(cid)
+            if progress is not None and len(cache) % 100 == 0:
+                progress(len(cache))
+        entry = cache[cid]
         if not entry:
             continue
-        inputs, mult = entry
-        allowance = REVLOG_ANSWER_BASE_S + REVLOG_ANSWER_PER_WORD_S * inputs["answer_words"]
-        seconds = max(0.5, ms / 1000.0 - allowance)
-        _hist_add(hist, inputs["words"], inputs["answer_words"], seconds / mult, False)
-    result = fit(hist, cfg)
+        inputs, first_id, clozes, dsig, mult = entry
+        cat = _history_kind(rev_type, rid == first_id, bool(inputs["fixed_time"]),
+                            clozes > 0)
+        seconds = ms / 1000.0 - _allowance(inputs["answer_words"], gap)
+        if seconds < 0.5:
+            continue
+        c = {"cat": cat, "words": inputs["words"],
+             "answer_words": inputs["answer_words"], "clozes": clozes, "dsig": dsig}
+        _tally_add(data, c, seconds, censored=False, decay=False)
+        if cat == "review":
+            _hist_add(data["hist"], inputs["words"], inputs["answer_words"],
+                      seconds / mult, False)
+        reviews += 1
+    return {"hist": data["hist"], "tally": data["tally"], "reviews": reviews,
+            "cards": len([v for v in cache.values() if v]), "days": HISTORY_DAYS,
+            "gap": gap if gap is not None else None, "gap_measured": gap is not None}
+
+
+def fit_from_history(col, cfg: dict, progress=None):
+    """Base / per-word fitted from Anki's review history, or None. The sample
+    rides along as ``source`` so Calibrate can fit the other settings from it
+    too (``fit_kinds(cfg, result, result["source"])``)."""
+    source = history_source(col, cfg, progress)
+    result = fit(source["hist"], cfg, history_reader(cfg))
     if result is not None:
-        result["cards_seen"] = len([v for v in cache.values() if v])
+        result["source"] = source
     return result
