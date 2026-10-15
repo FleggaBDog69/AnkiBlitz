@@ -117,10 +117,14 @@ class WelcomeDialog(QDialog):
         self.calib_result = _label("")
         self.calib_result.hide()     # shown once there's a result to report
         inner.addWidget(self.calib_result)
-        if cfg["auto_tune_enabled"]:
-            inner.addWidget(_label(
-                "<span style='color: gray; font-size: 11px;'>Skipping this is "
-                "fine too: aSFM also adjusts itself a little as you review.</span>"))
+        self.learn = QCheckBox("Keep learning my pace as I review")
+        self.learn.setChecked(bool(cfg["learn_my_pace"]))
+        inner.addWidget(self.learn)
+        inner.addWidget(_label(
+            "<span style='color: gray; font-size: 11px;'>Off unless you tick "
+            "it. aSFM then keeps a small tally of how quickly you reveal cards, "
+            "in one file on this computer, and nudges the timer to match. "
+            "Nothing is sent anywhere; you can turn it off in Settings.</span>"))
         layout.addSpacing(4)
         layout.addWidget(box)
 
@@ -136,16 +140,20 @@ class WelcomeDialog(QDialog):
         layout.addWidget(buttons)
         self.adjustSize()
 
-    def _save_on_new(self) -> None:
+    def _save_choices(self) -> None:
         cfg = get_config()
-        if bool(cfg["enable_on_new"]) != self.on_new.isChecked():
-            cfg["enable_on_new"] = self.on_new.isChecked()
+        choices = {"enable_on_new": self.on_new.isChecked(),
+                   "learn_my_pace": self.learn.isChecked()}
+        if any(bool(cfg[k]) != v for k, v in choices.items()):
+            cfg.update(choices)
             save_config(cfg)
 
     def _on_calibrate(self) -> None:
         from .settings import _CalibrateDialog
 
-        dlg = _CalibrateDialog(self, get_config(), saves_directly=True)
+        dlg = _CalibrateDialog(
+            self, {**get_config(), "learn_my_pace": self.learn.isChecked()},
+            saves_directly=True)
         if not (dlg.exec() and dlg.result_values):
             return
         r = dlg.result_values
@@ -154,9 +162,11 @@ class WelcomeDialog(QDialog):
         cfg["seconds_per_word"] = round(r["seconds_per_word"], 2)
         if float(cfg["seconds_per_answer_word"]) > 0:
             cfg["seconds_per_answer_word"] = round(r["seconds_per_answer_word"], 2)
+        cfg.update(dlg.extras_chosen)
         save_config(cfg)
         # The new timings already reflect your speed; don't apply it twice.
-        pace.reset_pace()
+        pace.rebase_pace({pace.SETTING_KIND[k] for k in dlg.extras_chosen
+                          if k in pace.SETTING_KIND})
         self.calib_result.setText(
             f"✓ Saved: base {cfg['base_seconds']:.2f} s, "
             f"{cfg['seconds_per_word']:.2f} s per word.")
@@ -171,9 +181,9 @@ class WelcomeDialog(QDialog):
 
     def done(self, r) -> None:
         # Closing the window any way (Done, Esc, the close button) counts as
-        # having seen it, and keeps the new-cards choice: there's no Cancel
+        # having seen it, and keeps the two choices: there's no Cancel
         # here, so nothing reads as "discard".
-        self._save_on_new()
+        self._save_choices()
         _mark_shown()
         super().done(r)
 

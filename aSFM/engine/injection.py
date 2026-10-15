@@ -173,16 +173,19 @@ def question_payload(card) -> dict:
                                                   DEFAULTS["enable_on_new"]):
         return off
     inputs = adaptive.card_inputs(card, cfg)
-    cur_pace = pace.current(cfg)
+    # Each kind of card (review / learning / new / picture) has its own pace.
+    cur_pace = pace.current(cfg, pace.category(inputs))
     delay_s = adaptive.delay_for(cfg, pace=cur_pace, **inputs)
-    track = {"inputs": inputs, "delay": delay_s}
+    track = {"inputs": inputs, "delay": delay_s, "clozes": 0}
     one_by_one = None
     plan = adaptive.one_by_one_plan(cfg, card, inputs, cur_pace)
     if plan:
-        # A one-by-one card's wait isn't a read-the-question wait, so it
-        # stays out of the pace tracker.
+        # A one-by-one card's wait isn't a read-the-question wait: it's
+        # tallied as its own kind, and never moves a pace.
         delay_s = plan["delay"]
-        track = None
+        track = {"inputs": inputs, "delay": delay_s,
+                 "clozes": max(1, len(plan.get("delays") or
+                                      adaptive.one_by_one_cloze_words(card)))}
         one_by_one = {"mode": plan["mode"],
                       "delaysMs": [int(d * 1000) for d in plan.get("delays", [])]}
     return {
@@ -219,7 +222,8 @@ def _on_show_question(*args, **kwargs) -> None:
         # A card that opens with the timer already held never runs one, so
         # there's nothing to learn from it.
         if track and not payload.get("autoPaused"):
-            pace.start_card(card, get_config(), track["inputs"], track["delay"])
+            pace.start_card(card, get_config(), track["inputs"], track["delay"],
+                            clozes=track["clozes"])
         else:
             pace.clear_card()
     except Exception:

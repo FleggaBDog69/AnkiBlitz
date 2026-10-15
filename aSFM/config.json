@@ -17,6 +17,7 @@
   "pause_key_enabled": true,
   "pause_key": "p",
   "more_time_button": true,
+  "learn_my_pace": false,
   "auto_tune_enabled": true,
   "target_timer_wins_percent": 10,
   "excluded_note_types": [],

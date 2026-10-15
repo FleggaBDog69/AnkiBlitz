@@ -9,7 +9,7 @@ It keeps a review session moving without rushing you. You stop sitting on cards 
 ## Why it's different
 
 - **A different wait for every card.** A two-word card and a five-line clinical vignette shouldn't get the same timer. aSFM counts the words you can actually **see**, adds time for long answers, and adjusts the wait using the card's **FSRS difficulty** (or its ease and lapses on the classic scheduler).
-- **It learns your speed.** Auto-tune slowly adjusts the timer to how fast you really answer. **One-click calibration** can also set your timings from your review history, and you see the numbers before anything changes.
+- **It learns your speed, if you let it.** Opt-in and local only: nothing is recorded until you tick "Learn my pace". Auto-tune slowly adjusts the timer to how fast you really answer. **One-click calibration** can also set your timings from your review history, and you see the numbers before anything changes.
 - **Easy to hold.** Click **More time**, or press **P**, to stop the countdown on the card you're on. Do it again and it carries on from where it stopped. The pause sticks across cards, and every card says so while it's on.
 - **It never grades.** That's the main change from Glutanimate's original Speed Focus Mode: aSFM only shows the answer, and you still decide how well you knew it.
 

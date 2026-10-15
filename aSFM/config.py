@@ -47,6 +47,11 @@ DEFAULTS = {
     # multiplier, steering until the timer beats you on about
     # target_timer_wins_percent of cards; calibration fits base / per-word to
     # the same target. The learned pace lives in user_files, not here.
+    # Opt-in: nothing about your reviews is recorded until you tick "Learn my
+    # pace" on the welcome screen or in Settings. While it's off aSFM keeps no
+    # pace file, auto-tune doesn't run, and Calibrate only reads Anki's own
+    # review log, on request, without saving anything.
+    "learn_my_pace": False,
     "auto_tune_enabled": True,
     "target_timer_wins_percent": 10,
     "excluded_note_types": [],    # skip the auto-reveal timer for these note types

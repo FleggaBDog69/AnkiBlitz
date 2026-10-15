@@ -30,7 +30,8 @@ delay = clamp(delay, min_delay_seconds, max_delay_seconds)
 | `warning_at_percent` | Warn (sound and/or colour) once this % of the delay has elapsed. |
 | `pause_key_enabled` | A key that freezes the timer on the current card. |
 | `pause_key` | Which key that is (default `p`). It can be the same key as Progressive Word Reveal's reveal key: while the question is still fading in, the press finishes the fade; after that it pauses. |
-| `auto_tune_enabled` | Learn a personal pace multiplier (0.85–2×) from how you actually reveal cards. See *Learn my pace* below. |
+| `learn_my_pace` | **Off by default.** The consent switch: while it's off aSFM records nothing about your reviews, writes no pace file, and auto-tune doesn't run. Ticked on the welcome screen or in Settings ▸ Your pace. |
+| `auto_tune_enabled` | Apply a personal pace multiplier (0.85–2×) from how you actually reveal cards. See *Learn my pace* below. |
 | `target_timer_wins_percent` | How often the answer should appear before you've revealed it yourself (default 10%). Drives both auto-tune and calibration. |
 | `more_time_button` | Show a small **More time** button above the countdown (with the pause key shown on it as a keycap). Same hold as the pause key, but visible — click it and the timer stops until you click (or press the key) again. Faint until hovered. |
 | `excluded_note_types` / `excluded_decks` | Skip the timer for these (a parent deck covers its subdecks). |
@@ -45,6 +46,10 @@ delay = clamp(delay, min_delay_seconds, max_delay_seconds)
 
 ### Learn my pace
 
+Nothing below happens until you turn on `learn_my_pace`. Without it, aSFM
+times cards from your settings alone, and **Calibrate** can still make a rough
+estimate from Anki's own review history: read on request, nothing saved.
+
 Auto-tune scales every delay by a learned pace until the timer beats you on
 about `target_timer_wins_percent` of cards. It is deliberately gentle: each
 card you reveal first shortens the timer ~0.5%, each timeout or More time
@@ -52,15 +57,34 @@ lengthens it ~5%, and it never goes below 0.85×. If you normally let the
 timer run, timeouts aren't counted as "too short" and the pace drifts back to
 1.0×.
 
+Review, learning, new and picture cards each keep **their own pace**, so a
+slow run of new cards can't lengthen your review timer (a kind with nothing
+learned yet follows the review pace). One-by-one cards aren't auto-tuned.
+Calibrating resets the review pace to 1.0× and rescales the learning and new
+paces so their real timings don't jump.
+
 **Calibrate from my reviews…** (in Settings) fits `base_seconds`,
 `seconds_per_word` and, if it's on, `seconds_per_answer_word` to your reveal
 times, and shows the suggestion before anything changes. It uses what aSFM
 has measured once it has seen 150 cards you revealed yourself; before that it
-makes a rough estimate from Anki's review history.
+makes a rough estimate from Anki's review history (and always does, while
+`learn_my_pace` is off).
+
+Once each kind has enough cards, Calibrate also suggests, each as its own
+tickable row: `unfamiliar_multiplier` and `new_multiplier` (40 cards of that
+kind), `difficulty_weight` (150 review cards spread over difficulties; it fits
+whether harder cards really take you longer, and never goes below 0),
+`fixed_time_base_seconds` (30 picture cards), and the one-by-one per-cloze /
+per-word or multiplier settings (30 one-by-one cards). Each is fitted from that
+kind's own times against the base / per-word formula being applied, so
+applying one resets that kind's pace to 1.0×.
 
 What's learned is kept per profile in `user_files/pace_<profile>.json`:
-the pace, a compact histogram of reveal times, and a one-line summary per
-session. Counts only, never card content, and a few KB at most.
+the paces, a compact histogram of reveal times, a per-kind tally (by length
+and difficulty, for fitting the learning / new / difficulty / picture settings
+later), and a one-line summary per session. Counts only, never card content or which cards, a few KB at most,
+and never sent anywhere. Turning learning off stops recording at once; the
+file is left in place so turning it back on picks up where you were.
 
 ### Word counting
 

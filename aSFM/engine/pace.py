@@ -45,7 +45,24 @@ from aqt import mw
 
 from ..config import DEFAULTS
 
+# A personal research logger can sit beside this file (engine/research.py). It
+# is gitignored, so it never ships: released copies simply don't have it.
+try:
+    from . import research as _research
+except ImportError:
+    _research = None
+
 PACE_MIN, PACE_MAX = 0.85, 2.0   # never more than 15% quicker; up to 2× slower
+
+# Each kind of card keeps its own pace, so a slow run of new cards can't
+# lengthen your review timer. "review" is the original top-level ``pace``.
+# One-by-one cards are tallied but not auto-tuned: their timer is several short
+# ones, not one wait. Learning and new cards are timed off the same base /
+# per-word formula as reviews, so calibration rebases them (see rebase_pace).
+CATEGORIES = ("review", "learning", "new", "picture", "one_by_one")
+TUNED = ("review", "learning", "new", "picture")
+FORMULA_BASED = ("learning", "new")
+D_BUCKETS = 5                # difficulty signal -1..1, in fifths
 STEP = 0.05                  # won: +4.6% / revealed first: -0.5% (10% target)
 MAX_REVEAL_S = 60.0          # longer = you walked away; the card is ignored
 SELF_ALPHA = 0.01            # slow average of "you revealed it" (~100 cards)
@@ -97,7 +114,8 @@ def _path() -> str:
 
 def _blank() -> dict:
     return {"version": 1, "pace": 1.0, "pace_cards": 0,
-            "hist": {}, "hist_n": 0.0, "self_n": 0.0, "sessions": []}
+            "hist": {}, "hist_n": 0.0, "self_n": 0.0, "sessions": [],
+            "paces": {}, "pace_counts": {}, "tally": {}, "tally_n": 0.0}
 
 
 def _new_session() -> dict:
@@ -135,6 +153,14 @@ def save() -> None:
         pass
 
 
+# ----- consent -----
+
+def learning(cfg: dict) -> bool:
+    """Has the user opted in to aSFM recording their reveals? Until they do,
+    nothing here touches the disk and the pace stays at 1.0."""
+    return bool(cfg.get("learn_my_pace", DEFAULTS["learn_my_pace"]))
+
+
 # ----- the learned pace -----
 
 def _target(cfg: dict) -> float:
@@ -142,38 +168,119 @@ def _target(cfg: dict) -> float:
     return min(0.5, max(0.05, float(pct) / 100.0))
 
 
-def current(cfg: dict) -> float:
-    """The multiplier to apply now: the learned pace, or 1.0 while auto-tune
-    is off (the learned value is kept, not lost, for when it's back on)."""
-    if not cfg.get("auto_tune_enabled", DEFAULTS["auto_tune_enabled"]):
+def category(inputs: dict, one_by_one: bool = False) -> str:
+    if inputs.get("fixed_time"):
+        return "picture"
+    if one_by_one:
+        return "one_by_one"
+    if inputs.get("is_new"):
+        return "new"
+    if inputs.get("unfamiliar"):
+        return "learning"
+    return "review"
+
+
+def _clamp(p) -> float:
+    return min(PACE_MAX, max(PACE_MIN, float(p)))
+
+
+def pace_of(cat: str = "review") -> float:
+    """The learned pace for a kind of card, ignoring the switches. A kind that
+    hasn't learned anything of its own yet follows your review pace: that is
+    what it ran on before the kinds were split."""
+    data = summary()
+    review = float(data.get("pace", 1.0))
+    if cat == "review" or cat not in TUNED:
+        return _clamp(review)
+    return _clamp(data.get("paces", {}).get(cat, review))
+
+
+def _set_pace(data: dict, cat: str, value: float) -> None:
+    if cat == "review":
+        data["pace"] = _clamp(value)
+    else:
+        data.setdefault("paces", {})[cat] = _clamp(value)
+
+
+def count_of(cat: str = "review") -> int:
+    data = summary()
+    if cat == "review":
+        return int(data.get("pace_cards", 0))
+    return int(data.get("pace_counts", {}).get(cat, 0))
+
+
+def current(cfg: dict, cat: str = "review") -> float:
+    """The multiplier to apply now: the learned pace for this kind of card,
+    or 1.0 while auto-tune is off (the learned value is kept, not lost, for
+    when it's back on)."""
+    if not learning(cfg) or not cfg.get("auto_tune_enabled",
+                                        DEFAULTS["auto_tune_enabled"]):
         return 1.0
     try:
-        return min(PACE_MAX, max(PACE_MIN, float(summary().get("pace", 1.0))))
+        return pace_of(cat)
     except Exception:
         return 1.0
 
 
+def _save_if_recorded() -> None:
+    # With learning off there may be no file on disk; writing one would
+    # record you anyway.
+    if os.path.exists(_path()):
+        save()
+
+
 def reset_pace() -> None:
+    """The Reset button: every kind back to 1.0×."""
     data = summary()
     data["pace"] = 1.0
     data["pace_cards"] = 0
-    save()
+    data["paces"] = {cat: 1.0 for cat in TUNED if cat != "review"}
+    data["pace_counts"] = {}
+    _save_if_recorded()
 
 
-def _nudge(won: bool, cfg: dict) -> None:
+# Which kind's pace a calibrated setting already carries.
+SETTING_KIND = {"unfamiliar_multiplier": "learning", "new_multiplier": "new",
+                "fixed_time_base_seconds": "picture"}
+
+
+def rebase_pace(refitted=()) -> None:
+    """After calibrating. The new base / per-word already carry your review
+    pace, so that goes back to 1.0×. A kind whose own setting was refitted
+    (``refitted``: kinds, see SETTING_KIND) goes to 1.0× too, since the fit
+    was made from its real times. Otherwise learning and new cards, which run
+    off the same formula, have their pace divided by the old review pace to
+    keep their real timings where they were; picture cards have their own set
+    time and keep theirs."""
+    data = summary()
+    old = pace_of("review")
+    for cat in FORMULA_BASED:
+        _set_pace(data, cat, 1.0 if cat in refitted else pace_of(cat) / old)
+    if "picture" in refitted:
+        _set_pace(data, "picture", 1.0)
+    data["pace"] = 1.0
+    data["pace_cards"] = 0
+    _save_if_recorded()
+
+
+def _nudge(won: bool, cfg: dict, cat: str) -> None:
     data = summary()
     t = _target(cfg)
     step = STEP * (1.0 - t) if won else -STEP * t
-    data["pace"] = min(PACE_MAX, max(PACE_MIN, float(data.get("pace", 1.0)) * math.exp(step)))
-    data["pace_cards"] = int(data.get("pace_cards", 0)) + 1
+    _set_pace(data, cat, pace_of(cat) * math.exp(step))
+    if cat == "review":
+        data["pace_cards"] = int(data.get("pace_cards", 0)) + 1
+    else:
+        counts = data.setdefault("pace_counts", {})
+        counts[cat] = int(counts.get(cat, 0)) + 1
 
 
-def _settle(data: dict) -> None:
+def _settle(data: dict, cat: str) -> None:
     """You let the timer run: no evidence either way, so drift gently back to
     1.0×. Without this, a pace learned (or pushed up by a run of timeouts)
     before you switched to letting it run would be stuck there for good."""
-    p = float(data.get("pace", 1.0))
-    data["pace"] = p + SETTLE * (1.0 - p)
+    p = pace_of(cat)
+    _set_pace(data, cat, p + SETTLE * (1.0 - p))
 
 
 def _reveals_yourself() -> bool:
@@ -230,21 +337,95 @@ def _hist_decay(data: dict) -> None:
     data["self_n"] = data.get("self_n", 0.0) * 0.5
 
 
+# ----- the per-kind tally -----
+#
+# Every kind of card, by (question words, answer words or cloze count,
+# difficulty). Times are raw seconds, nothing divided out, so a later fit can
+# work out the learning / new multipliers, the difficulty weight, the picture
+# time and the one-by-one timings from what you actually did. Counts only, and
+# halved like the histogram once it's full.
+
+def _d_bucket(signal: float) -> int:
+    return min(D_BUCKETS - 1, max(0, int((signal + 1.0) / 2.0 * D_BUCKETS)))
+
+
+def _tally_add(data: dict, c: dict, seconds: float, censored: bool) -> None:
+    # key = question words : answer words (one-by-one: clozes) : difficulty,
+    # and one-by-one also splits by answer words, which its timer uses too.
+    one_by_one = c["cat"] == "one_by_one"
+    second = c["clozes"] if one_by_one else c["answer_words"]
+    key = (f"{int(min(c['words'], Q_MAX) // Q_BUCKET)}:"
+           f"{int(min(second, A_MAX)) if one_by_one else int(min(second, A_MAX) // A_BUCKET)}:"
+           f"{_d_bucket(c['dsig'])}")
+    if one_by_one:
+        key += f":{int(min(c['answer_words'], A_MAX) // A_BUCKET)}"
+    cell = data.setdefault("tally", {}).setdefault(c["cat"], {}).setdefault(
+        key, {"n": 0.0, "sq": 0.0, "sa": 0.0, "sd": 0.0, "sw": 0.0, "t": {}, "c": {}})
+    cell["n"] += 1.0
+    cell["sq"] += c["words"]
+    cell["sa"] += second
+    cell["sd"] += c["dsig"]
+    cell["sw"] = cell.get("sw", 0.0) + c["answer_words"]
+    b = str(int(min(seconds, MAX_REVEAL_S) // T_BIN))
+    side = cell["c" if censored else "t"]
+    side[b] = side.get(b, 0.0) + 1.0
+    data["tally_n"] = data.get("tally_n", 0.0) + 1.0
+    if data["tally_n"] > HIST_CAP:
+        for cat in list(data["tally"]):
+            cells = data["tally"][cat]
+            for k in list(cells):
+                cl = cells[k]
+                for f in ("n", "sq", "sa", "sd", "sw"):
+                    cl[f] *= 0.5
+                for sd in ("t", "c"):
+                    cl[sd] = {b: w * 0.5 for b, w in cl[sd].items() if w * 0.5 >= 0.05}
+                if cl["n"] < 0.05:
+                    del cells[k]
+        data["tally_n"] *= 0.5
+
+
+def tally_counts() -> dict:
+    """Cards tallied so far, per kind (for the Your pace tab)."""
+    return {cat: sum(cl.get("n", 0.0) for cl in cells.values())
+            for cat, cells in summary().get("tally", {}).items()}
+
+
 # ----- per-card tracking (called from engine/injection.py) -----
 
-def start_card(card, cfg: dict, inputs: dict, delay_s: float) -> None:
-    """The timer started on this card's question."""
+def start_card(card, cfg: dict, inputs: dict, delay_s: float,
+               clozes: int = 0) -> None:
+    """The timer started on this card's question. ``clozes`` > 0 marks a
+    one-by-one card with that many clozes."""
     global _card
+    if not learning(cfg):
+        _card = None
+        return
+    cat = category(inputs, one_by_one=clozes > 0)
     _card = {
-        "cid": card.id, "t0": time.time(), "delay": delay_s,
+        "cid": card.id, "t0": time.time(), "delay": delay_s, "cat": cat,
         "words": inputs["words"], "answer_words": inputs["answer_words"],
+        "clozes": clozes, "dsig": _dsig(inputs),
         # Only settled review cards feed calibration: new / learning cards run
         # on their own multipliers, and picture cards have no length to fit.
-        "calibrate": (not inputs["fixed_time"] and not inputs["unfamiliar"]
-                      and not inputs["is_new"]),
+        "calibrate": cat == "review",
         "mult": _mult(cfg, inputs),
+        "pace": current(cfg, cat),
         "auto": False, "held": False,
     }
+    if _research is not None:
+        try:
+            _research.capture(card, cfg, inputs, _card, _session)
+        except Exception:
+            pass
+
+
+def _dsig(inputs) -> float:
+    from . import adaptive
+    try:
+        return adaptive._difficulty_signal(inputs["difficulty"], inputs["ease"],
+                                           inputs["lapses"], inputs["reps"])
+    except Exception:
+        return 0.0
 
 
 def _mult(cfg, inputs) -> float:
@@ -276,7 +457,7 @@ def end_card(card, cfg: dict) -> None:
     """The answer is showing. Record how it got there."""
     global _card, _session, _unsaved
     c, _card = _card, None
-    if c is None or card is None or c["cid"] != card.id:
+    if c is None or card is None or c["cid"] != card.id or not learning(cfg):
         return
     elapsed = time.time() - c["t0"]
     if elapsed <= 0 or (elapsed > MAX_REVEAL_S and not c["held"]):
@@ -299,13 +480,19 @@ def end_card(card, cfg: dict) -> None:
         s["self"] += 1
         s["reveal_s"].append(round(elapsed, 2))
 
-    if cfg.get("auto_tune_enabled", DEFAULTS["auto_tune_enabled"]):
+    if _research is not None:
+        try:
+            _research.record(c, elapsed, active)
+        except Exception:
+            pass
+
+    if cfg.get("auto_tune_enabled", DEFAULTS["auto_tune_enabled"]) and c["cat"] in TUNED:
         if c["held"] or (c["auto"] and active):
-            _nudge(True, cfg)
+            _nudge(True, cfg, c["cat"])
         elif yourself:
-            _nudge(False, cfg)
+            _nudge(False, cfg, c["cat"])
         elif c["auto"]:
-            _settle(data)
+            _settle(data, c["cat"])
 
     if not c["held"]:
         _note_outcome(yourself)
@@ -313,6 +500,8 @@ def end_card(card, cfg: dict) -> None:
     # Held cards include however long you sat on them, so they can't calibrate.
     # A timeout only says "you needed longer" if you normally reveal cards
     # yourself; while you're letting the timer run, it says nothing.
+    if yourself or (c["auto"] and active):
+        _tally_add(data, c, elapsed, censored=c["auto"])
     if c["calibrate"] and (yourself or (c["auto"] and active)):
         _hist_add(data["hist"], c["words"], c["answer_words"],
                   elapsed / c["mult"], censored=c["auto"])
@@ -331,6 +520,8 @@ def end_session() -> None:
     global _session
     s, _session = _session, None
     clear_card()
+    if not s and not _unsaved:
+        return                            # nothing recorded: don't write a file
     data = summary()
     if s and s["cards"]:
         times = sorted(s["reveal_s"])
@@ -433,8 +624,199 @@ def fit(hist: dict, cfg: dict):
     }
 
 
-def reveal_data_ready() -> bool:
-    return summary().get("self_n", 0.0) >= MIN_CALIBRATION
+def length_rows(cfg: dict, n_rows: int = 4, min_n: float = 10.0) -> list:
+    """Your most common question lengths, each with its typical answer length
+    and the time you'd revealed the target share of those cards by (the same
+    percentile calibration fits, difficulty evened out). For the preview.
+    Empty while learning is off or there isn't enough to say anything."""
+    if not learning(cfg):
+        return []
+    q = 1.0 - _target(cfg)
+    merged = {}
+    for key, cell in summary().get("hist", {}).items():
+        m = merged.setdefault(key.split(":")[0],
+                              {"n": 0.0, "sq": 0.0, "sa": 0.0, "t": {}, "c": {}})
+        for f in ("n", "sq", "sa"):
+            m[f] += cell.get(f, 0.0)
+        for side in ("t", "c"):
+            for b, w in cell.get(side, {}).items():
+                m[side][b] = m[side].get(b, 0.0) + w
+    cells = sorted((m for m in merged.values() if m["n"] >= min_n),
+                   key=lambda m: m["n"], reverse=True)[:n_rows]
+    rows = [{"words": int(round(m["sq"] / m["n"])),
+             "answer_words": int(round(m["sa"] / m["n"])),
+             "n": m["n"], "reveal_s": _percentile(m, q)} for m in cells]
+    return sorted(rows, key=lambda r: r["words"]) if len(rows) >= 2 else []
+
+
+# ----- calibrating the other settings, from the per-kind tally -----
+#
+# Each kind's times are compared with the plain base / per-word formula (the
+# one Calibrate is about to apply, else the current one) at the same lengths,
+# using the same percentile as everything else. Raw seconds in, so a fitted
+# setting already carries that kind's pace: applying it resets that pace to 1.
+
+MIN_KIND = {"learning": 40, "new": 40, "picture": 30, "one_by_one": 30,
+            "difficulty": 150}
+
+
+def _formula(cfg: dict, words: float, answer_words: float) -> float:
+    k = lambda key: float(cfg.get(key, DEFAULTS[key]))
+    answer = min(k("seconds_per_answer_word") * max(0.0, answer_words),
+                 max(0.0, k("max_answer_seconds")))
+    return k("base_seconds") + k("seconds_per_word") * words + answer
+
+
+def _kind_points(cat: str, q: float, dm=None) -> list:
+    """(weight, mean q words, mean second slot, mean answer words, mean
+    difficulty signal, percentile seconds) per usable cell.
+
+    With ``dm`` (difficulty signal -> multiplier) the difficulty buckets are
+    pooled, so a kind with few cards still has cells big enough to read a
+    percentile from. Each bucket's times are divided by its own multiplier
+    first — pooling raw times would let the hard cards set the percentile —
+    so pooled points come back difficulty-neutral (signal 0)."""
+    cells = summary().get("tally", {}).get(cat, {})
+    if dm is not None:
+        pooled = {}
+        for key, cell in cells.items():
+            n = cell.get("n", 0.0)
+            if n <= 0:
+                continue
+            parts = key.split(":")
+            m = pooled.setdefault(":".join(parts[:2] + parts[3:]), {
+                "n": 0.0, "sq": 0.0, "sa": 0.0, "sd": 0.0, "sw": 0.0, "t": {}, "c": {}})
+            for f in ("n", "sq", "sa", "sw"):
+                m[f] += cell.get(f, 0.0)
+            factor = dm(cell.get("sd", 0.0) / n)
+            for side in ("t", "c"):
+                for b, w in cell.get(side, {}).items():
+                    secs = (int(b) + 0.5) * T_BIN / factor
+                    nb = str(int(min(secs, MAX_REVEAL_S) // T_BIN))
+                    m[side][nb] = m[side].get(nb, 0.0) + w
+        cells = pooled
+    out = []
+    for cell in cells.values():
+        n = cell.get("n", 0.0)
+        if n < MIN_CELL:
+            continue
+        out.append((n, cell["sq"] / n, cell["sa"] / n, cell.get("sw", 0.0) / n,
+                    cell["sd"] / n, _percentile(cell, q)))
+    return out
+
+
+def _cards(cat: str) -> int:
+    return int(sum(cl.get("n", 0.0)
+                   for cl in summary().get("tally", {}).get(cat, {}).values()))
+
+
+def _ratio(points, ref) -> float:
+    """Weighted ratio of measured to reference seconds."""
+    num = sum(w * y for w, *_, y in points)
+    den = sum(w * ref(p) for p in points for w in [p[0]])
+    return num / den if den > 0 else 0.0
+
+
+def fit_kinds(cfg: dict, main=None) -> dict:
+    """Suggestions for the settings beyond base / per word. ``main`` is the
+    base / per-word fit that Calibrate will apply alongside (or None).
+
+    Returns {key: {"label", "value", "cards", "need"}}: ``value`` is None while
+    there isn't enough data (``need`` = how many cards it wants), and a
+    ``reason`` replaces both when it can't be measured at all.
+    """
+    if not learning(cfg):
+        return {}
+    ref_cfg = dict(cfg)
+    if main:
+        for key in ("base_seconds", "seconds_per_word", "seconds_per_answer_word"):
+            if key in main and (key != "seconds_per_answer_word" or
+                                float(cfg.get(key, 0)) > 0):
+                ref_cfg[key] = main[key]
+    q = 1.0 - _target(cfg)
+    k = lambda key: float(cfg.get(key, DEFAULTS[key]))
+    out = {}
+
+    def entry(key, label, cat, value=None, reason=None, need=None):
+        n = _cards(cat)
+        need = need or MIN_KIND[cat]
+        out[key] = {"label": label, "cards": n, "need": need,
+                    "value": value if n >= need and not reason else None,
+                    "reason": reason}
+
+    # Difficulty weight: on review cards, does the measured / formula ratio
+    # climb with difficulty? ratio ~ a + b * signal, weight = b / a.
+    pts = _kind_points("review", q)
+    fitted, reason = None, None
+    if len({round(p[4] * 2) for p in pts}) >= 3:
+        rows = [(w, [1.0, d], y / max(0.1, _formula(ref_cfg, qw, aw)))
+                for w, qw, _, aw, d, y in pts]
+        x = _solve(rows, 2)
+        if x and x[0] > 0:
+            fitted = round(min(1.0, max(0.0, x[1] / x[0])), 2)
+    elif _cards("review") >= MIN_KIND["difficulty"]:
+        reason = "cards too alike in difficulty to tell"
+    entry("difficulty_weight", "Difficulty weight", "review", fitted, reason,
+          need=MIN_KIND["difficulty"])
+    weight = out["difficulty_weight"]["value"]
+    if weight is None:
+        weight = k("difficulty_weight")
+
+    dm = lambda d: max(0.1, 1.0 + d * weight)
+
+    for key, label, cat, lo in (("unfamiliar_multiplier", "Learning cards", "learning", 1.0),
+                                ("new_multiplier", "New cards", "new", 1.0)):
+        pts = _kind_points(cat, q, dm)
+        value = None
+        if pts:
+            r = _ratio(pts, lambda p: _formula(ref_cfg, p[1], p[3]) * dm(p[4]))
+            value = round(min(5.0, max(lo, r)), 2) if r else None
+        entry(key, label, cat, value)
+    if not cfg.get("enable_on_new", DEFAULTS["enable_on_new"]) and _cards("new") == 0:
+        out["new_multiplier"]["reason"] = "timer is off on new cards"
+
+    if cfg.get("fixed_time_enabled", DEFAULTS["fixed_time_enabled"]):
+        pts = _kind_points("picture", q, dm)
+        value = None
+        if pts:
+            r = sum(w * y / dm(d) for w, _, _, _, d, y in pts) / sum(p[0] for p in pts)
+            value = round(min(60.0, max(0.5, r)), 1)
+        entry("fixed_time_base_seconds", "Picture cards", "picture", value)
+
+    mode = cfg.get("one_by_one_mode", DEFAULTS["one_by_one_mode"])
+    pts = _kind_points("one_by_one", q, dm)
+    if mode == "multiplier":
+        value = None
+        if pts:
+            r = _ratio(pts, lambda p: _formula(ref_cfg, p[1], p[3]) * dm(p[4]))
+            value = round(min(5.0, max(0.5, r)), 2) if r else None
+        entry("one_by_one_multiplier", "One-by-one multiplier", "one_by_one", value)
+    elif mode == "per_cloze":
+        # Whole-card time minus the question's reading time, split into a per
+        # cloze and a per answer-word part. A part that fits negative is
+        # dropped (held at 0) and the other refitted.
+        rows = []
+        for w, qw, clozes, aw, d, y in pts:
+            rest = y / dm(d) - _formula(ref_cfg, qw, 0)
+            rows.append((w, [clozes, aw], rest))
+        pc = pw = None
+        if len(rows) >= 2:
+            x = _solve(rows, 2)
+            if x and x[0] >= 0 and x[1] >= 0:
+                pc, pw = x
+            else:
+                pc_only = sum(w * c * r for w, (c, _), r in rows) / max(
+                    1e-9, sum(w * c * c for w, (c, _), _ in rows))
+                pc, pw = max(0.0, pc_only), 0.0
+        entry("one_by_one_seconds_per_cloze", "One-by-one, per cloze", "one_by_one",
+              round(min(30.0, pc), 1) if pc is not None else None)
+        entry("one_by_one_seconds_per_word", "One-by-one, per answer word", "one_by_one",
+              round(min(5.0, pw), 2) if pw is not None else None)
+    return out
+
+
+def reveal_data_ready(cfg: dict) -> bool:
+    return learning(cfg) and summary().get("self_n", 0.0) >= MIN_CALIBRATION
 
 
 def fit_from_reveals(cfg: dict):

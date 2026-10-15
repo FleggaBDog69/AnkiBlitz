@@ -11,3 +11,7 @@ __pycache__/
 *.pyo
 .DS_Store
 **/.DS_Store
+
+# Personal research logger for aSFM: lives only in Fletcher's install,
+# never committed, so build.py (git-tracked files only) can never ship it.
+aSFM/engine/research.py

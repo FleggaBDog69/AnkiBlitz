@@ -24,8 +24,18 @@ name; renaming would silently reset users' config on update. Confirmed live:
 `AnkiBlitz/` in this repo — edits here are live in Anki immediately, no copy
 step.
 
-The other three folders (`ankiblitz-core/`, `aSFM/`, `progressive-reveal/`)
-are **not** installed in his live `addons21/` — running a standalone spin-off
+**Since 2026-10-15 his daily driver is aSFM + Progressive Word Reveal, not
+AnkiBlitz** (`focus_suite` is disabled, not removed). `addons21/asfm` and
+`addons21/progressive_reveal` are installed COPIES (from the .ankiaddon), not
+symlinks: after editing `aSFM/`, sync with
+`rsync -a --exclude meta.json --exclude user_files --exclude __pycache__ aSFM/ ~/Library/Application\ Support/Anki2/addons21/asfm/`.
+`aSFM/engine/research.py` is his personal research logger (per-card JSONL in
+`user_files/research_<profile>.jsonl`), **gitignored on purpose so it never
+ships**; pace.py imports it softly. An AnkiWeb update of aSFM would delete it
+from the live folder (the data in user_files survives) — re-sync after.
+
+Otherwise, the spin-off folders (`ankiblitz-core/`, `aSFM/`, `progressive-reveal/`)
+were historically **not** installed in his live `addons21/` — running a standalone spin-off
 alongside the full AnkiBlitz would double up timers/counters. They're built
 and tested from this repo only.
 
