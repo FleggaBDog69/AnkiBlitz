@@ -43,7 +43,10 @@ def tracked(folder):
         ["git", "-C", ROOT, "ls-files", "-z", "--", folder],
         capture_output=True, text=True, check=True,
     ).stdout
-    return sorted(p for p in out.split("\0") if p)
+    # Dotfiles (the per-folder .gitignore that the standalone aSFM / PWR repos
+    # need) are repo plumbing, not part of the add-on.
+    return sorted(p for p in out.split("\0")
+                  if p and not os.path.basename(p).startswith("."))
 
 
 def build(folder, out_name):

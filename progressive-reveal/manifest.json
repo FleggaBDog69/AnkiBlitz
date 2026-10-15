@@ -5,7 +5,7 @@
   "version": "1.3.0",
   "human_version": "1.3.0",
   "description": "Fades the question in word by word at a reading pace you set, optionally locked to the card's own {{tts}} voice. Click or a key shows everything at once.",
-  "homepage": "https://github.com/FleggaBDog69/AnkiBlitz",
+  "homepage": "https://github.com/FleggaBDog69/Progressive-Word-Reveal",
   "min_point_version": 50,
   "max_point_version": 0,
   "conflicts": [

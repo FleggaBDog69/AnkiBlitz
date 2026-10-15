@@ -65,4 +65,4 @@ Core + aSFM + Progressive Word Reveal together equal the full AnkiBlitz. Don't r
 
 - Reworks the auto-reveal concept from **Glutanimate's Speed Focus Mode** (Copyright © 2017-2021 Aristotelis P., [glutanimate.com](https://glutanimate.com/)). The "More time" button is his idea too. Licensed under the GNU AGPLv3 **with** Glutanimate's Section 7 additional terms: preserve attribution, don't misrepresent origin, and no use of the Glutanimate name for endorsement. Full terms are in `LICENSE`.
 - To change the warning sound, drop your own `alert.flac`, `.ogg`, `.opus` or `.wav` into the add-on's `user_files/` folder. An `alert.mp3` works too, but only where Anki's external media player is running, because the reviewer can't play MP3 by itself.
-- Tested on Anki 2.1.50+ (Qt6). Found a problem? [Report it on GitHub](https://github.com/FleggaBDog69/AnkiBlitz/issues).
+- Tested on Anki 2.1.50+ (Qt6). Found a problem? [Report it on GitHub](https://github.com/FleggaBDog69/aSFM/issues).

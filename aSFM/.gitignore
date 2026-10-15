@@ -1,0 +1,9 @@
+# Anki writes user state here — never commit it.
+meta.json
+user_files/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Personal research logger: lives only in the author's install, never shipped.
+engine/research.py

@@ -5,7 +5,7 @@
   "version": "1.4.0",
   "human_version": "1.4.0",
   "description": "Adaptive auto-reveal: waits a delay computed from the card's visible length and FSRS difficulty, then shows the answer. Never grades. Includes a “More time” button and a pause key.",
-  "homepage": "https://github.com/FleggaBDog69/AnkiBlitz",
+  "homepage": "https://github.com/FleggaBDog69/aSFM",
   "min_point_version": 50,
   "max_point_version": 0,
   "conflicts": [

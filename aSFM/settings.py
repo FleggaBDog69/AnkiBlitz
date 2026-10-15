@@ -49,7 +49,7 @@ _PREVIEW_CARDS = [
 ]
 _TYPICAL = _PREVIEW_CARDS[1][1]
 _ANKIWEB_URL = "https://ankiweb.net/shared/info/1148593203"
-_ISSUES_URL = "https://github.com/FleggaBDog69/AnkiBlitz/issues"
+_ISSUES_URL = "https://github.com/FleggaBDog69/aSFM/issues"
 # Until aSFM has learned your own lengths: (question words, answer words).
 _DEFAULT_LENGTHS = ((8, 10), (12, 10), (16, 15), (24, 20))
 
