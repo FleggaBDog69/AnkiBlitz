@@ -12,6 +12,7 @@ held or released the timer.
 
 import json
 import os
+import shutil
 
 from aqt import gui_hooks, mw
 from aqt.reviewer import Reviewer
@@ -77,8 +78,25 @@ def alert_url() -> str:
     return ""
 
 
+def _external_player_works() -> bool:
+    """Whether Anki has a player for sound FILES. If mpv failed to start (as on
+    macOS 13), Anki falls back to mplayer, and when that isn't installed either,
+    every file it is handed pops up "Sound and video on cards will not function
+    until mpv or mplayer is installed". Skipping the fallback keeps that pop-up
+    from interrupting a review; the alert is just silent on that card."""
+    try:
+        from aqt import sound
+        if getattr(sound, "mpvManager", None) is not None:
+            return True
+    except Exception:
+        return False
+    return shutil.which("mplayer") is not None
+
+
 def _play_alert() -> None:
     """Fallback: hand the alert to Anki's own player (needs a working mpv)."""
+    if not _external_player_works():
+        return
     for path, _rel in _alert_candidates():
         try:
             av_player.play_file(path)
