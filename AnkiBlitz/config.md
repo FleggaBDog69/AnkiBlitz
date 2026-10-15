@@ -43,6 +43,25 @@ clamped to `[min_delay_seconds, max_delay_seconds]`.
   separately from the key, so you can have either, both or neither. While the
   timer is held the *paused* badge is clickable too — whatever you paused with
   can start you again.
+- `learn_my_pace` — **off by default; the consent switch.** While it's off
+  AnkiBlitz records nothing about your reviews, writes no pace file, and
+  auto-tune doesn't run; Calibrate can still make a rough estimate from Anki's
+  own review history (read on request, nothing saved). Not part of profiles.
+- `auto_tune_enabled` / `target_timer_wins_percent` — once learning is on,
+  auto-tune nudges a learned pace after every card until the timer beats you on
+  about that share of cards. Review, learning, new, picture and one-by-one
+  cards each keep **their own pace** (one-by-one is nudged per cloze), and a
+  kind with nothing learned yet follows the review pace.
+- **Calibrate** (Settings) fits `base_seconds` / `seconds_per_word` to your
+  reveal times, and — once each kind has enough cards — suggests the learning
+  and new multipliers, `difficulty_weight`, the picture time and the one-by-one
+  timings, each as its own tickable row. What's kept, per profile in
+  `user_files/pace_<profile>.json`: counts and timings by card length and
+  difficulty, never which cards; nothing is sent anywhere.
+- `picture_types_autodetected` — set once AnkiBlitz has looked for picture note
+  types (image occlusion, "Image Q/A", "IO…", or a `Question Mask` /
+  `OccludedImage` field) and filled them into `fixed_time_note_types`. It only
+  fills an empty list.
 - `excluded_note_types` / `excluded_decks` — skip the auto-reveal timer for these
   (a parent deck also covers its subdecks); those cards review normally.
 - `fixed_time_enabled` — turn the picture-card mode on/off.

@@ -20,10 +20,12 @@ from aqt.qt import (
     QDoubleSpinBox,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -44,17 +46,32 @@ from .engine import adaptive, breathing, pace, presets, tts_sync
 _CHECKED = Qt.CheckState.Checked
 _UNCHECKED = Qt.CheckState.Unchecked
 
-# Representative cards for the Speed Focus preview, mapped to adaptive.delay_for
-# primitives. "Easy" = a familiar review card with low FSRS difficulty; "New" =
-# a first-time card (unfamiliar, no FSRS state yet); "Hard" = a familiar review
-# card with high FSRS difficulty.
+# Representative cards for the preview, mapped to adaptive.delay_for primitives.
+# "Typical" sits at FSRS difficulty 5, where the difficulty factor is exactly
+# 1 — the same footing as the "You" column, whose times have it divided out.
 _PREVIEW_CARDS = [
     ("Easy", dict(ease=2500, lapses=0, reps=10, unfamiliar=False, is_new=False, difficulty=3.5)),
+    ("Typical", dict(ease=2500, lapses=1, reps=10, unfamiliar=False, is_new=False, difficulty=5.0)),
     ("Hard", dict(ease=1700, lapses=5, reps=15, unfamiliar=False, is_new=False, difficulty=8.5)),
     ("New", dict(ease=0, lapses=0, reps=0, unfamiliar=True, is_new=True, difficulty=None)),
 ]
+_TYPICAL = _PREVIEW_CARDS[1][1]
+# Word Reveal's preview rows.
 _PREVIEW_WORDS = (15, 25)
-_PREVIEW_ANSWERS = (5, 40)   # answer-side words, for the answer-length rows
+# Until aSFM has learned your own lengths: (question words, answer words).
+_DEFAULT_LENGTHS = ((8, 10), (12, 10), (16, 15), (24, 20))
+
+
+def _preview_lengths(cfg: dict):
+    """(rows, measured): your commonest lengths with your reveal times, or the
+    stock lengths with none."""
+    rows = pace.length_rows(cfg)
+    if rows:
+        return rows, True
+    return [{"words": q, "answer_words": a, "reveal_s": None}
+            for q, a in _DEFAULT_LENGTHS], False
+
+
 
 
 def _hint(text: str) -> QLabel:
@@ -199,6 +216,13 @@ class _FilterList(QWidget):
             item = self.list.item(i)
             item.setHidden(text not in item.text().lower())
 
+    def tick(self, names):
+        wanted = set(names)
+        for i in range(self.list.count()):
+            item = self.list.item(i)
+            if item.text() in wanted:
+                item.setCheckState(_CHECKED)
+
     def checked(self):
         out = []
         for i in range(self.list.count()):
@@ -328,6 +352,8 @@ class SpeedFocusPanel(QWidget):
             "ignore difficulty), then clamped to the shortest and longest wait. "
             "Difficulty comes from FSRS, or from ease and lapses on SM-2."))
 
+        self._build_kinds(layout, cfg)
+
         layout.addWidget(_section("Countdown and heads-up"))
         self.show_countdown = QCheckBox("Show a countdown bar along the bottom")
         self.show_countdown.setChecked(bool(cfg["show_countdown"]))
@@ -394,6 +420,15 @@ class SpeedFocusPanel(QWidget):
 
         layout.addWidget(_section("Learn my pace",
                                   "Let AnkiBlitz fit the timer to how fast you really are."))
+        self.learn = QCheckBox("Learn my pace from my reviews")
+        self.learn.setChecked(bool(cfg["learn_my_pace"]))
+        layout.addWidget(self.learn)
+        layout.addWidget(_hint(
+            "Off until you tick it. When on, AnkiBlitz keeps a small tally of how "
+            "quickly you reveal cards — counts and timings by card length, never "
+            "which cards — in one file on this computer. It's never sent "
+            "anywhere. Turning it off stops recording straight away."))
+
         target_form = _form()
         self.target = QSpinBox()
         self.target.setRange(5, 50)
@@ -406,122 +441,41 @@ class SpeedFocusPanel(QWidget):
         self.auto_tune.setChecked(bool(cfg["auto_tune_enabled"]))
         layout.addWidget(self.auto_tune)
 
-        pace_row = QHBoxLayout()
         self.pace_label = QLabel()
-        pace_row.addWidget(self.pace_label, 1)
+        layout.addWidget(self.pace_label)
+
+        # The detail lives in pop-ups, so this tab stays a handful of controls.
+        btn_row = QHBoxLayout()
+        self.calibrate_btn = QPushButton("Calibrate…")
+        self.calibrate_btn.setToolTip("Suggest timings from your own reveals")
+        self.calibrate_btn.clicked.connect(self._on_calibrate)
+        btn_row.addWidget(self.calibrate_btn)
+        self.details_btn = QPushButton("Details…")
+        self.details_btn.setToolTip("Each kind of card's pace, and recent sessions")
+        self.details_btn.clicked.connect(self._on_details)
+        btn_row.addWidget(self.details_btn)
         self.reset_pace_btn = QPushButton("Reset")
+        self.reset_pace_btn.setToolTip("Put every learned pace back to 1.00×")
         self.reset_pace_btn.clicked.connect(self._on_reset_pace)
-        pace_row.addWidget(self.reset_pace_btn)
-        layout.addLayout(pace_row)
-
-        calib_row = QHBoxLayout()
-        calibrate = QPushButton("Calibrate from my reviews…")
-        calibrate.clicked.connect(self._on_calibrate)
-        calib_row.addWidget(calibrate)
-        calib_row.addStretch(1)
-        layout.addLayout(calib_row)
-
-        self.sessions_label = QLabel()
-        self.sessions_label.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(self.sessions_label)
+        btn_row.addWidget(self.reset_pace_btn)
+        btn_row.addStretch(1)
+        layout.addLayout(btn_row)
         layout.addWidget(_hint(
             "“Timer beats me on” is how often the answer should show before you "
-            "reveal it. Auto-tune adjusts gently: about −0.5% when you reveal "
-            "first, +5% on a timeout or More time, and never more than 15% "
-            "quicker. Calibrate suggests timings from your own reveals (a rough "
-            "estimate from review history at first); nothing changes until you "
-            "apply and save. Saved per profile, numbers only."))
-        self._pace_reset_pending = False
+            "reveal it. Auto-tune nudges the timer after every card; Calibrate "
+            "fits your settings to your reveals in one go, and shows you the "
+            "numbers first."))
+        self._pace_reset_pending = None    # None | "all" (Reset) | "rebase" (Calibrate)
+        self._pace_refitted = set()        # kinds whose own setting Calibrate refitted
         self.auto_tune.toggled.connect(self._refresh_pace)
-        self._refresh_pace()
-
-        layout.addWidget(_section("Skip these",
-                                  "No timer at all — review them normally."))
-        notetypes, decks = _collect_names()
-        self.nt_list = _FilterList("Note types", notetypes, cfg["excluded_note_types"])
-        self.deck_list = _FilterList(
-            "Decks (a parent also covers its subdecks)", decks, cfg["excluded_decks"])
-        sf_lists = QHBoxLayout()
-        sf_lists.addWidget(self.nt_list, 1)
-        sf_lists.addWidget(self.deck_list, 1)
-        layout.addLayout(sf_lists)
-
-        # --- Picture / visual cards: set time, no word count ---
-        layout.addWidget(_section("Picture cards",
-                                  "Nothing to read, so a set time instead of a word count."))
-        self.fixed_enabled = QCheckBox("Use a set time for these note types and decks")
-        self.fixed_enabled.setChecked(bool(cfg["fixed_time_enabled"]))
-        layout.addWidget(self.fixed_enabled)
-
-        fixed_form = _form()
-        self.fixed_base = _double(0.5, 60.0, 0.5, 1, " s")
-        self.fixed_base.setValue(float(cfg["fixed_time_base_seconds"]))
-        fixed_form.addRow("Set time:", self.fixed_base)
-        layout.addLayout(fixed_form)
-        layout.addWidget(_hint(
-            "A set time instead of a word count, for the note types or decks "
-            "below. Only the difficulty weight still applies. Not part of "
-            "profiles."))
-
-        self.fixed_nt_list = _FilterList(
-            "Picture note types", notetypes, cfg["fixed_time_note_types"])
-        self.fixed_deck_list = _FilterList(
-            "Picture decks (a parent also covers its subdecks)",
-            decks, cfg["fixed_time_decks"])
-        fixed_lists = QHBoxLayout()
-        fixed_lists.addWidget(self.fixed_nt_list, 1)
-        fixed_lists.addWidget(self.fixed_deck_list, 1)
-        layout.addLayout(fixed_lists)
-        for w in (self.fixed_base, self.fixed_nt_list, self.fixed_deck_list):
-            self.fixed_enabled.toggled.connect(w.setEnabled)
-            w.setEnabled(self.fixed_enabled.isChecked())
-
-        # --- Cloze one-by-one cards: per-cloze timers or a multiplier ---
-        layout.addWidget(_section("One-by-one cloze cards",
-                                  "Cards with the AnKing “One by one” field filled."))
-        obo_form = _form()
-        self.obo_mode = QComboBox()
-        for label, value in (("A timer per cloze", "per_cloze"),
-                             ("Whole card × multiplier", "multiplier"),
-                             ("Off — time like any card", "off")):
-            self.obo_mode.addItem(label, value)
-        idx = self.obo_mode.findData(adaptive.one_by_one_mode(cfg))
-        self.obo_mode.setCurrentIndex(max(0, idx))
-        obo_form.addRow("Timing:", self.obo_mode)
-        self.obo_per_cloze = _double(0.0, 30.0, 0.5, 1, " s")
-        self.obo_per_cloze.setValue(float(cfg["one_by_one_seconds_per_cloze"]))
-        obo_form.addRow("Per cloze:", self.obo_per_cloze)
-        self.obo_per_word = _double(0.0, 5.0, 0.05, 2, " s")
-        self.obo_per_word.setValue(float(cfg["one_by_one_seconds_per_word"]))
-        obo_form.addRow("Per answer word:", self.obo_per_word)
-        self.obo_max = _double(0.5, 60.0, 0.5, 1, " s")
-        self.obo_max.setValue(float(cfg["one_by_one_max_cloze_seconds"]))
-        obo_form.addRow("Longest per cloze:", self.obo_max)
-        self.obo_mult = _double(0.5, 5.0, 0.05, 2, "×")
-        self.obo_mult.setValue(float(cfg["one_by_one_multiplier"]))
-        obo_form.addRow("Multiplier:", self.obo_mult)
-        layout.addLayout(obo_form)
-        layout.addWidget(_hint(
-            "For cards with the “One by one” field filled. A timer per "
-            "cloze uncovers the next cloze each time it runs out; uncovering one "
-            "yourself starts the next. The first cloze also gets the normal "
-            "question-reading time. Needs the AnKing template doing one-by-one on "
-            "the front. Not part of profiles."))
-
-        def _obo_mode_changed(*_):
-            mode = self.obo_mode.currentData()
-            for w in (self.obo_per_cloze, self.obo_per_word, self.obo_max):
-                w.setEnabled(mode == "per_cloze")
-            self.obo_mult.setEnabled(mode == "multiplier")
-        self.obo_mode.currentIndexChanged.connect(_obo_mode_changed)
-        _obo_mode_changed()
+        self.learn.toggled.connect(self._refresh_pace)
 
         layout.addStretch(1)
 
         # --- live preview: right column, pinned to the top so it stays in
         # view while you adjust the knobs on the left ---
         card, side = _preview_card("Preview", "Seconds until the answer shows")
-        card.setFixedWidth(300)
+        card.setFixedWidth(340)
         outer.addWidget(card, 0)
         self.preview = QLabel()
         self.preview.setTextFormat(Qt.TextFormat.RichText)
@@ -535,9 +489,92 @@ class SpeedFocusPanel(QWidget):
                   self.per_answer_word, self.max_answer):
             w.valueChanged.connect(self._update_preview)
         self.enable_on_new.toggled.connect(self._update_preview)
-        self._update_preview()
+        self.target.valueChanged.connect(self._update_preview)
+        self._refresh_pace()
 
-    def _current_cfg(self) -> dict:
+
+    def _build_kinds(self, layout, cfg):
+        """The "Kinds of card" section. Not part of profiles."""
+        # --- Kinds of card: skipped, picture, one-by-one. The deck / note-type
+        # lists live in a pop-up (_PickDialog); the tab only shows a summary.
+        self._names = _collect_names()
+        self._skip = {"nt": list(cfg["excluded_note_types"]),
+                      "decks": list(cfg["excluded_decks"])}
+        self._picture = {"nt": list(cfg["fixed_time_note_types"]),
+                         "decks": list(cfg["fixed_time_decks"])}
+        layout.addWidget(_section("Kinds of card",
+                                  "What skips the timer, and how pictures and "
+                                  "one-by-one clozes are timed."))
+        kinds = _form()
+        self.skip_btn = QPushButton()
+        self.skip_btn.clicked.connect(lambda: self._pick("skip"))
+        kinds.addRow("No timer on:", self.skip_btn)
+
+        self.fixed_enabled = QCheckBox("Set time")
+        self.fixed_enabled.setChecked(bool(cfg["fixed_time_enabled"]))
+        self.fixed_base = _double(0.5, 60.0, 0.5, 1, " s")
+        self.fixed_base.setValue(float(cfg["fixed_time_base_seconds"]))
+        self.picture_btn = QPushButton()
+        self.picture_btn.clicked.connect(lambda: self._pick("picture"))
+        pic_row = QHBoxLayout()
+        pic_row.setContentsMargins(0, 0, 0, 0)
+        for w in (self.fixed_enabled, self.fixed_base, self.picture_btn):
+            pic_row.addWidget(w)
+        pic_row.addStretch(1)
+        kinds.addRow("Picture cards:", pic_row)
+        for w in (self.fixed_base, self.picture_btn):
+            self.fixed_enabled.toggled.connect(w.setEnabled)
+            w.setEnabled(self.fixed_enabled.isChecked())
+
+        self.obo_mode = QComboBox()
+        for label, value in (("A timer per cloze", "per_cloze"),
+                             ("Whole card × multiplier", "multiplier"),
+                             ("Off — time like any card", "off")):
+            self.obo_mode.addItem(label, value)
+        idx = self.obo_mode.findData(adaptive.one_by_one_mode(cfg))
+        self.obo_mode.setCurrentIndex(max(0, idx))
+        kinds.addRow("One-by-one:", self.obo_mode)
+        self.obo_per_cloze = _double(0.0, 30.0, 0.5, 1, " s")
+        self.obo_per_cloze.setValue(float(cfg["one_by_one_seconds_per_cloze"]))
+        self.obo_per_word = _double(0.0, 5.0, 0.05, 2, " s")
+        self.obo_per_word.setValue(float(cfg["one_by_one_seconds_per_word"]))
+        self.obo_max = _double(0.5, 60.0, 0.5, 1, " s")
+        self.obo_max.setValue(float(cfg["one_by_one_max_cloze_seconds"]))
+        self.obo_mult = _double(0.5, 5.0, 0.05, 2, "×")
+        self.obo_mult.setValue(float(cfg["one_by_one_multiplier"]))
+        # One line per mode, so the form stays short.
+        self.obo_cloze_row = QWidget()
+        cl = QHBoxLayout(self.obo_cloze_row)
+        cl.setContentsMargins(0, 0, 0, 0)
+        for w in (self.obo_per_cloze, QLabel("+"), self.obo_per_word,
+                  QLabel("per word, up to"), self.obo_max):
+            cl.addWidget(w)
+        cl.addStretch(1)
+        kinds.addRow("Each cloze:", self.obo_cloze_row)
+        kinds.addRow("Multiplier:", self.obo_mult)
+        layout.addLayout(kinds)
+        layout.addWidget(_hint(
+            "Picture cards get a set time instead of a word count. One-by-one "
+            "cards (the AnKing “One by one” field) get a timer per cloze, each "
+            "uncovering the next; the first cloze also gets the question's "
+            "reading time. Needs the AnKing template doing one-by-one on the "
+            "front."))
+
+        def _obo_mode_changed(*_):
+            mode = self.obo_mode.currentData()
+            for w in (self.obo_per_cloze, self.obo_per_word, self.obo_max):
+                w.setEnabled(mode == "per_cloze")
+            self.obo_mult.setEnabled(mode == "multiplier")
+            # Show only the row the chosen mode uses (Qt 6.4+; older Qt just
+            # greys the other out, above).
+            if hasattr(kinds, "setRowVisible"):
+                kinds.setRowVisible(self.obo_cloze_row, mode == "per_cloze")
+                kinds.setRowVisible(self.obo_mult, mode == "multiplier")
+        self.obo_mode.currentIndexChanged.connect(_obo_mode_changed)
+        _obo_mode_changed()
+        self._refresh_pick_buttons()
+
+    def _current_cfg(self):
         return {
             "base_seconds": self.base.value(),
             "seconds_per_word": self.per_word.value(),
@@ -550,47 +587,69 @@ class SpeedFocusPanel(QWidget):
             "difficulty_weight": self.difficulty.value(),
         }
 
-    def _preview_rows(self):
-        """(label, question words, answer words) per preview row. The answer
-        column only appears while the answer-length term is on — otherwise every
-        pair of rows would print the same number twice."""
-        if self.per_answer_word.value() > 0:
-            return [(f"{q} + {a} words", q, a)
-                    for q in _PREVIEW_WORDS for a in _PREVIEW_ANSWERS]
-        return [(f"{q} words", q, 0) for q in _PREVIEW_WORDS]
-
     def _update_preview(self):
         cfg = self._current_cfg()
         p = self._preview_pace()
-        band, th = _table_style(self)
-        header = f"<tr><th align='left' {th}>Words</th>" + "".join(
-            f"<th align='right' {th}>{name}</th>" for name, _ in _PREVIEW_CARDS) + "</tr>"
-        rows = ""
+        p_new = self._preview_pace("new")
+        rows, measured = _preview_lengths(
+            {**cfg, "learn_my_pace": self.learn.isChecked(),
+             "target_timer_wins_percent": self.target.value()})
+        answers_on = self.per_answer_word.value() > 0
         new_on = self.enable_on_new.isChecked()
-
-        def cell(card, words, answer_words):
-            if card["is_new"] and not new_on:
-                return "<td align='right' style='color: gray;'>off</td>"
-            d = adaptive.delay_for(cfg, words=words, answer_words=answer_words,
-                                   pace=p, **card)
-            return f"<td align='right'><b>{d:.1f}</b> s</td>"
-
-        for i, (label, words, answer_words) in enumerate(self._preview_rows()):
-            cells = "".join(cell(card, words, answer_words)
-                            for _, card in _PREVIEW_CARDS)
+        cards = [(n, c) for n, c in _PREVIEW_CARDS if new_on or not c["is_new"]]
+        # No grid: a quiet header and banded rows, in the theme's own colours
+        # so it reads the same in light and dark mode.
+        pal = self.palette()
+        band = pal.color(QPalette.ColorRole.AlternateBase).name()
+        rule = pal.color(QPalette.ColorRole.Mid).name()
+        th = (f"style='color: gray; font-size: 11px; font-weight: 600;"
+              f" border-bottom: 1px solid {rule};'")
+        heads = ["Words"] + [n for n, _ in cards] + (["You"] if measured else [])
+        header = "<tr>" + "".join(
+            f"<th align='{'left' if i == 0 else 'right'}' {th}>{h}</th>"
+            for i, h in enumerate(heads)) + "</tr>"
+        body = ""
+        for i, r in enumerate(rows):
+            label = str(r["words"])
+            if answers_on:
+                label += (f" <span style='color: gray; font-size: 11px;'>"
+                          f"+{r['answer_words']}</span>")
+            cells = ""
+            for name, card in cards:
+                d = adaptive.delay_for(cfg, words=r["words"],
+                                       answer_words=r["answer_words"],
+                                       pace=p_new if card["is_new"] else p, **card)
+                weight = "<b>{:.1f}</b>" if name == "Typical" else "{:.1f}"
+                cells += f"<td align='right'>{weight.format(d)}</td>"
+            if measured:
+                cells += f"<td align='right'><i>{r['reveal_s']:.1f}</i></td>"
             bg = f" bgcolor='{band}'" if i % 2 else ""
-            rows += f"<tr{bg}><td>{label}</td>{cells}</tr>"
-        self.preview_hint.setText(
-            ("Rows are question + answer words. " if self.per_answer_word.value() > 0
-             else "Rows are question words. ")
-            + "Easy = a familiar review card; Hard = a lapsed card."
-            + ("" if new_on else " New cards are off (see “Run on new cards”).")
-            + (f" Includes your learned pace ({p:.2f}×)." if abs(p - 1.0) >= 0.005
-               else ""))
+            body += f"<tr{bg}><td>{label}</td>{cells}</tr>"
+
+        share = 100 - self.target.value()
+        notes = []
+        if measured:
+            notes.append("Rows are your most common card lengths.")
+        else:
+            notes.append("Rows are example card lengths.")
+        if answers_on:
+            notes.append("Grey +N is the answer's words.")
+        notes.append("Typical = average difficulty; Easy = familiar; Hard = lapsed.")
+        if measured:
+            notes.append(f"<b>You</b> = when you'd revealed {share}% of those "
+                         "cards yourself, at average difficulty. Compare it with "
+                         "Typical: higher means the timer is quicker than you.")
+        elif not self.learn.isChecked():
+            notes.append("Turn on “Learn my pace” to see your own reveal times "
+                         "and lengths here.")
+        if not new_on:
+            notes.append("New cards are off.")
+        if abs(p - 1.0) >= 0.005:
+            notes.append(f"Includes your learned pace ({p:.2f}×).")
+        self.preview_hint.setText(" ".join(notes))
         self.preview.setText(
-            "<table width='100%' cellspacing='0' cellpadding='6'>"
-            f"{header}{rows}</table>"
-        )
+            "<table width='100%' cellspacing='0' cellpadding='5'>"
+            f"{header}{body}</table>")
 
     def save(self):
         cfg = get_section(self.SECTION)
@@ -614,14 +673,15 @@ class SpeedFocusPanel(QWidget):
             "pause_key_enabled": self.pause_key_enabled.isChecked(),
             "pause_key": self.pause_key.key_value(),
             "more_time_button": self.more_time_button.isChecked(),
+            "learn_my_pace": self.learn.isChecked(),
             "auto_tune_enabled": self.auto_tune.isChecked(),
             "target_timer_wins_percent": self.target.value(),
-            "excluded_note_types": self.nt_list.checked(),
-            "excluded_decks": self.deck_list.checked(),
+            "excluded_note_types": list(self._skip["nt"]),
+            "excluded_decks": list(self._skip["decks"]),
             "fixed_time_enabled": self.fixed_enabled.isChecked(),
             "fixed_time_base_seconds": round(self.fixed_base.value(), 2),
-            "fixed_time_note_types": self.fixed_nt_list.checked(),
-            "fixed_time_decks": self.fixed_deck_list.checked(),
+            "fixed_time_note_types": list(self._picture["nt"]),
+            "fixed_time_decks": list(self._picture["decks"]),
             "one_by_one_mode": self.obo_mode.currentData(),
             "one_by_one_seconds_per_cloze": round(self.obo_per_cloze.value(), 2),
             "one_by_one_seconds_per_word": round(self.obo_per_word.value(), 2),
@@ -629,68 +689,110 @@ class SpeedFocusPanel(QWidget):
             "one_by_one_multiplier": round(self.obo_mult.value(), 2),
         })
         save_section(self.SECTION, cfg)
-        if self._pace_reset_pending:
+        if self._pace_reset_pending == "all":
             pace.reset_pace()
-
+        elif self._pace_reset_pending == "rebase":
+            pace.rebase_pace(self._pace_refitted)
 
     # ----- learn my pace -----
 
-    def _preview_pace(self) -> float:
-        if not self.auto_tune.isChecked() or self._pace_reset_pending:
+    def _preview_pace(self, cat: str = "review") -> float:
+        """The pace the next card of this kind would get once you save."""
+        pending = self._pace_reset_pending
+        if (not self.learn.isChecked() or not self.auto_tune.isChecked()
+                or pending == "all"):
             return 1.0
-        return pace.current({"auto_tune_enabled": True})
+        if pending == "rebase":
+            if cat == "review" or cat in self._pace_refitted:
+                return 1.0
+            if cat in pace.FORMULA_BASED:
+                return pace._clamp(pace.pace_of(cat) / pace.pace_of("review"))
+        return pace.pace_of(cat)
 
     def _refresh_pace(self, *_):
-        data = pace.summary()
-        n = int(data.get("pace_cards", 0))
-        if self._pace_reset_pending:
-            text = "Current pace: 1.00× (resets when you save)"
+        n = pace.count_of("review")
+        learning = self.learn.isChecked()
+        for w in (self.auto_tune, self.reset_pace_btn, self.details_btn):
+            w.setEnabled(learning)
+        if not learning:
+            text = "Not learning: nothing about your reviews is recorded."
+        elif self._pace_reset_pending == "all":
+            text = "Pace: 1.00× (reset when you save)"
+        elif self._pace_reset_pending == "rebase":
+            text = "Pace: 1.00× (calibrated, applies when you save)"
         elif not self.auto_tune.isChecked():
-            text = f"Auto-tune off. Learned pace {float(data.get('pace', 1.0)):.2f}× is kept."
+            text = f"Auto-tune off. Learned pace {pace.pace_of():.2f}× is kept."
         elif n == 0:
-            text = "Current pace: 1.00× (nothing learned yet)"
+            text = "Pace: 1.00× (nothing learned yet)"
         else:
-            text = (f"Current pace: {float(data.get('pace', 1.0)):.2f}× "
-                    f"· learned from {n} cards")
+            text = f"Pace: {pace.pace_of():.2f}× · learned from {n} cards"
         self.pace_label.setText(text)
-        self._refresh_sessions(data)
-        if hasattr(self, "preview"):      # built after this section
-            self._update_preview()
+        self._update_preview()
 
-    def _refresh_sessions(self, data):
-        rows = list(data.get("sessions", []))[-5:]
-        live = pace.session_so_far()
-        if live and live["cards"]:
-            t = sorted(live["reveal_s"])
-            rows.append({"date": "now", "cards": live["cards"], "self": live["self"],
-                         "median_s": t[len(t) // 2] if t else None, "pace": None})
-        # Hidden while empty, so a blank label doesn't leave a gap in the panel.
-        self.sessions_label.setVisible(bool(rows))
-        if not rows:
-            self.sessions_label.setText("")
-            return
-        body = ""
-        for r in reversed(rows):
-            share = f"{round(100 * r['self'] / r['cards'])}%" if r["cards"] else "–"
-            med = f"{r['median_s']:.1f} s" if r.get("median_s") else "–"
-            pc = f"{r['pace']:.2f}×" if r.get("pace") else "–"
-            body += (f"<tr><td>{r['date']}</td><td align='right'>{r['cards']}</td>"
-                     f"<td align='right'>{share}</td><td align='right'>{med}</td>"
-                     f"<td align='right'>{pc}</td></tr>")
-        self.sessions_label.setText(
-            "<table cellspacing='0' cellpadding='3'>"
-            "<tr><th align='left'>Session</th><th>Cards</th><th>You revealed</th>"
-            "<th>Median</th><th>Pace</th></tr>" + body + "</table>")
+    # ----- the deck / note-type pickers -----
+
+    @staticmethod
+    def _summary(sel) -> str:
+        parts = []
+        for key, one, many in (("decks", "deck", "decks"),
+                               ("nt", "note type", "note types")):
+            n = len(sel[key])
+            if n:
+                parts.append(f"{n} {one if n == 1 else many}")
+        return " · ".join(parts) + " — change…" if parts else "Choose…"
+
+    def _refresh_pick_buttons(self):
+        self.skip_btn.setText(self._summary(self._skip))
+        self.picture_btn.setText(self._summary(self._picture))
+
+    def _pick(self, which: str):
+        sel = self._skip if which == "skip" else self._picture
+        title, intro = (("No timer on these",
+                         "Cards from these decks or note types are reviewed "
+                         "normally, with no auto-reveal.")
+                        if which == "skip" else
+                        ("Picture cards",
+                         "These decks or note types get the set time instead "
+                         "of a word count — there's nothing to read."))
+        suggest = None
+        if which == "picture":
+            from .engine.notetypes import picture_notetypes
+            suggest = picture_notetypes(mw.col)
+        dlg = _PickDialog(self, title, intro, self._names, sel, suggest)
+        if dlg.exec():
+            sel["nt"], sel["decks"] = dlg.chosen()
+            self._refresh_pick_buttons()
+
+    def _on_details(self):
+        _PaceDetailsDialog(self).exec()
 
     def _on_reset_pace(self):
-        self._pace_reset_pending = True
+        self._pace_reset_pending = "all"
+        self._pace_refitted = set()
         self._refresh_pace()
 
+    # Calibratable settings beyond base / per word -> the spin box holding each.
+
+    def _extra_boxes(self):
+        return {"difficulty_weight": self.difficulty,
+                "unfamiliar_multiplier": self.unfamiliar,
+                "new_multiplier": self.new_mult,
+                "fixed_time_base_seconds": self.fixed_base,
+                "one_by_one_seconds_per_cloze": self.obo_per_cloze,
+                "one_by_one_seconds_per_word": self.obo_per_word,
+                "one_by_one_multiplier": self.obo_mult}
+
     def _on_calibrate(self):
-        # The whole config, not just the timing knobs: calibration has to skip
-        # picture cards the same way the timer does.
+        # The whole config as it stands in the dialog, not just the timing
+        # knobs: calibration has to skip picture cards the same way the timer
+        # does, and fits the other settings against what's on screen.
         cfg = {**get_section(self.SECTION), **self._current_cfg(),
-               "target_timer_wins_percent": self.target.value()}
+               "target_timer_wins_percent": self.target.value(),
+               "learn_my_pace": self.learn.isChecked(),
+               "enable_on_new": self.enable_on_new.isChecked(),
+               "fixed_time_enabled": self.fixed_enabled.isChecked(),
+               "one_by_one_mode": self.obo_mode.currentData(),
+               **{k: box.value() for k, box in self._extra_boxes().items()}}
         dlg = _CalibrateDialog(self, cfg)
         if dlg.exec() and dlg.result_values:
             r = dlg.result_values
@@ -698,10 +800,192 @@ class SpeedFocusPanel(QWidget):
             self.per_word.setValue(r["seconds_per_word"])
             if self.per_answer_word.value() > 0:
                 self.per_answer_word.setValue(r["seconds_per_answer_word"])
+            boxes = self._extra_boxes()
+            for key, value in dlg.extras_chosen.items():
+                boxes[key].setValue(value)
+                if key in pace.SETTING_KIND:
+                    self._pace_refitted.add(pace.SETTING_KIND[key])
             # The new values already reflect your pace, so the multiplier
             # starts again from 1 rather than being applied twice.
-            self._pace_reset_pending = True
+            if self._pace_reset_pending != "all":
+                self._pace_reset_pending = "rebase"
             self._refresh_pace()
+
+
+def _fit_to_content(dlg: QDialog) -> None:
+    """Size a dialog to everything it holds. Qt's adjustSize() stops at two
+    thirds of the screen, which on a laptop clips these; cap at the screen's
+    usable area instead."""
+    want = dlg.sizeHint()
+    screen = dlg.screen() or (mw.screen() if mw else None)
+    if screen is not None:
+        want = want.boundedTo(screen.availableGeometry().size() * 0.9)
+    dlg.resize(want)
+
+
+def _grid(headers, rows) -> QWidget:
+    """A small table as a grid of labels. (A rich-text <table> in a QLabel
+    gets its height measured wrong inside a dialog and loses rows.) First
+    column left-aligned, the rest right; a cell may be (text, "note") to show
+    it grey and left-aligned."""
+    box = QWidget()
+    grid = QGridLayout(box)
+    grid.setContentsMargins(0, 0, 0, 0)
+    grid.setHorizontalSpacing(16)
+    grid.setVerticalSpacing(6)
+    right, left = Qt.AlignmentFlag.AlignRight, Qt.AlignmentFlag.AlignLeft
+    for c, h in enumerate(headers):
+        lbl = QLabel(f"<b>{h}</b>")
+        lbl.setTextFormat(Qt.TextFormat.RichText)
+        grid.addWidget(lbl, 0, c, left if c == 0 else right)
+    for r, row in enumerate(rows, start=1):
+        for c, cell in enumerate(row):
+            note = isinstance(cell, tuple)
+            text = cell[0] if note else cell
+            lbl = QLabel(text)
+            if note:
+                lbl.setStyleSheet("color: gray;")
+            grid.addWidget(lbl, r, c, left if (c == 0 or note) else right)
+    grid.setColumnStretch(len(headers), 1)
+    return box
+
+
+def _session_rows() -> list:
+    rows = list(pace.summary().get("sessions", []))[-8:]
+    live = pace.session_so_far()
+    if live and live["cards"]:
+        t = sorted(live["reveal_s"])
+        rows.append({"date": "now", "cards": live["cards"], "self": live["self"],
+                     "median_s": t[len(t) // 2] if t else None, "pace": None})
+    out = []
+    for r in reversed(rows):
+        out.append([
+            str(r["date"]), str(r["cards"]),
+            f"{round(100 * r['self'] / r['cards'])}%" if r["cards"] else "–",
+            f"{r['median_s']:.1f} s" if r.get("median_s") else "–",
+            f"{r['pace']:.2f}×" if r.get("pace") else "–"])
+    return out
+
+
+class _PickDialog(QDialog):
+    """Choose decks and note types, in a pop-up so the tab stays short."""
+
+    def __init__(self, parent, title, intro, names, sel, suggest=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        # Wide enough for long shared-deck note-type names without a
+        # sideways scroll bar.
+        self.setMinimumSize(820, 420)
+        notetypes, decks = names
+        layout = QVBoxLayout(self)
+        layout.addWidget(_hint(intro))
+        lists = QHBoxLayout()
+        self.decks = _FilterList("Decks (a parent also covers its subdecks)",
+                                 decks, sel["decks"])
+        self.nts = _FilterList("Note types", notetypes, sel["nt"])
+        for fl in (self.decks, self.nts):
+            fl.list.setMaximumHeight(16777215)    # use the pop-up's height
+            lists.addWidget(fl, 1)
+        layout.addLayout(lists, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        if suggest:
+            # Ticks the likely picture types; never unticks anything.
+            add = buttons.addButton(f"Tick picture types ({len(suggest)})",
+                                    QDialogButtonBox.ButtonRole.ResetRole)
+            add.setToolTip("Image occlusion and similar: " + ", ".join(suggest))
+            add.clicked.connect(lambda: self.nts.tick(suggest))
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def chosen(self):
+        return self.nts.checked(), self.decks.checked()
+
+
+class _PaceDetailsDialog(QDialog):
+    """Read-only: each kind's pace, recent sessions, and how it all works.
+    Kept off the tab so the tab stays simple."""
+
+    _KINDS = (("review", "Review"), ("learning", "Learning / relearning"),
+              ("new", "New"), ("picture", "Picture"),
+              ("one_by_one", "One-by-one (clozes)"),
+              ("one_by_one_whole", "One-by-one (whole card)"))
+
+    def __init__(self, panel):
+        super().__init__(panel)
+        self.setWindowTitle("Your pace — details")
+        self.setMinimumWidth(500)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 12)
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(18, 14, 18, 6)
+        area = QScrollArea()
+        area.setWidgetResizable(True)
+        area.setFrameShape(QFrame.Shape.NoFrame)
+        area.setWidget(page)
+        outer.addWidget(area, 1)
+
+        layout.addWidget(_section("Each kind of card",
+                                  "Paces as they'll be after you save."))
+        tallied = pace.tally_counts()
+        kinds = []
+        for cat, name in self._KINDS:
+            if cat == "one_by_one_whole" and not tallied.get(cat):
+                continue      # only when a template skips the per-cloze timers
+            note = ""
+            if cat in pace.TUNED:
+                pc = f"{panel._preview_pace(cat):.2f}×"
+                if cat != "review" and not pace.count_of(cat):
+                    note = "follows review"
+            else:
+                pc, note = "–", "uses the one-by-one pace"
+            kinds.append([name, pc, str(int(tallied.get(cat, 0))), (note, "note")])
+        layout.addWidget(_grid(["Kind", "Pace", "Cards measured", ""], kinds))
+
+        layout.addWidget(_section("Recent sessions"))
+        sessions = _session_rows()
+        if sessions:
+            layout.addWidget(_grid(["Session", "Cards", "You revealed", "Median",
+                                    "Pace"], sessions))
+        else:
+            layout.addWidget(_hint("No sessions yet."))
+
+        layout.addWidget(_section("How it works"))
+        layout.addWidget(_hint(
+            "Auto-tune: each card you reveal first shortens that kind's timer "
+            "about 0.5%; each timeout or More time lengthens it about 5%. It "
+            "settles where the timer beats you on your target share of cards, "
+            "and never goes more than 15% quicker than your settings. Review, "
+            "learning, new, picture and one-by-one cards each keep their own "
+            "pace (one-by-one is nudged per cloze), so one kind can't drag "
+            "another; a kind with nothing learned yet follows your review pace."))
+        layout.addWidget(_hint(
+            "Calibrate: fits base and per word to the time you'd revealed your "
+            "target share of review cards by, at each length. Once there's "
+            "enough data it also suggests the learning and new multipliers, "
+            "the difficulty weight, the picture time and the one-by-one "
+            "timings, each from that kind's own cards. Applying resets the "
+            "paces those settings now carry. Without enough of your own "
+            "reveals it makes a rough estimate from Anki's review history."))
+        layout.addWidget(_hint(
+            "What's kept: counts and timings by card length and difficulty, "
+            "never which cards, in one file per profile on this computer. "
+            "Nothing is sent anywhere."))
+
+        layout.addStretch(1)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        buttons.setContentsMargins(18, 0, 18, 0)
+        outer.addWidget(buttons)
+        # A scroll area reports a small size hint; size to the page instead.
+        hint = page.sizeHint()
+        self.setMinimumHeight(0)
+        self.resize(max(500, hint.width() + 24), hint.height() + 70)
+        screen = self.screen() or (mw.screen() if mw else None)
+        if screen is not None:
+            self.resize(self.size().boundedTo(screen.availableGeometry().size() * 0.9))
 
 
 class _CalibrateDialog(QDialog):
@@ -709,26 +993,39 @@ class _CalibrateDialog(QDialog):
     hands them back only if you press Apply. Nothing is saved from here — the
     settings dialog's own Save does that."""
 
-    def __init__(self, parent, cfg):
+    def __init__(self, parent, cfg, saves_directly=False):
         super().__init__(parent)
         self.setWindowTitle("Calibrate from my reviews")
+        self.saves_directly = saves_directly
         self.setMinimumWidth(460)
         self.cfg = cfg
         self.result_values = None
+        self.extras_chosen = {}
+        self._extra_checks = {}
         layout = QVBoxLayout(self)
+        # Rich-text tables in a word-wrapped QLabel get measured short as the
+        # content grows; never let the dialog shrink below what it holds.
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.body = QLabel("Working…")
         self.body.setWordWrap(True)
         self.body.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(self.body)
+        # The other settings: one tickable row each, filled in by _fill.
+        self.extras_box = QWidget()
+        self.extras_grid = QGridLayout(self.extras_box)
+        self.extras_grid.setContentsMargins(0, 0, 0, 6)
+        self.extras_grid.setHorizontalSpacing(14)
+        self.extras_box.hide()
+        layout.addWidget(self.extras_box)
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
         self.apply_btn = self.buttons.addButton(
             "Apply", QDialogButtonBox.ButtonRole.AcceptRole)
         self.apply_btn.setEnabled(False)
-        self.buttons.accepted.connect(self.accept)
+        self.buttons.accepted.connect(self._on_apply)
         self.buttons.rejected.connect(self.reject)
         layout.addWidget(self.buttons)
 
-        if pace.reveal_data_ready():
+        if pace.reveal_data_ready(cfg):
             self._show(pace.fit_from_reveals(cfg), measured=True)
         elif mw.col is not None:
             from aqt.operations import QueryOp
@@ -782,16 +1079,109 @@ class _CalibrateDialog(QDialog):
                       f"({r.get('cards_seen', r['cards'])} cards). That history "
                       "times the answer side too, so an allowance is taken off, "
                       "and if you've been reviewing with a timer it partly "
-                      "reflects that timer. Once AnkiBlitz has watched "
-                      f"{pace.MIN_CALIBRATION} cards you reveal yourself, "
-                      "calibrating again uses those instead.")
+                      "reflects that timer. "
+                      + (f"Once AnkiBlitz has watched {pace.MIN_CALIBRATION} cards "
+                         "you reveal yourself, calibrating again uses those "
+                         "instead." if pace.learning(self.cfg) else
+                         "Turn on “Learn my pace” for a measured fit instead."))
+        reset = (" and resets the learned pace to 1.00×"
+                 if pace.learning(self.cfg) else "")
+        if self.saves_directly:
+            outro = (f"Apply saves these{reset}. "
+                     "You can change them any time in Settings.")
+        else:
+            outro = (f"Apply fills these, and any you tick below, into "
+                     f"Settings{reset}. Nothing changes until you save.")
         self.body.setText(
             source + "<br><br><table cellspacing='0' cellpadding='4'>"
             "<tr><th></th><th>Now</th><th>Suggested</th></tr>" + table +
-            "</table><br>Apply fills these into Settings and resets the learned "
-            "pace to 1.00×. Nothing changes until you save.")
+            "</table><br>" + self._seconds_table(r) + outro)
         self.result_values = r
         self.apply_btn.setEnabled(True)
+        _fit_to_content(self)
+        if measured:
+            self._fill_extras(pace.fit_kinds(self.cfg, r))
+
+    _FORMATS = {"difficulty_weight": "{:.2f}", "unfamiliar_multiplier": "{:.2f}×",
+                "new_multiplier": "{:.2f}×", "fixed_time_base_seconds": "{:.1f} s",
+                "one_by_one_seconds_per_cloze": "{:.1f} s",
+                "one_by_one_seconds_per_word": "{:.2f} s",
+                "one_by_one_multiplier": "{:.2f}×"}
+
+    def _fill_extras(self, extras: dict):
+        """One row per other setting: tick it to apply, or why it can't be
+        suggested yet. Each comes from that kind's own cards."""
+        if not extras:
+            return
+        grid = self.extras_grid
+        head = QLabel("<b>Other settings</b> <span style='color: gray;'>— from "
+                      "each kind's own cards; tick the ones to apply</span>")
+        head.setTextFormat(Qt.TextFormat.RichText)
+        grid.addWidget(head, 0, 0, 1, 3)
+        for col, text in ((1, "Now"), (2, "Suggested")):
+            lbl = QLabel(f"<span style='color: gray;'>{text}</span>")
+            lbl.setTextFormat(Qt.TextFormat.RichText)
+            grid.addWidget(lbl, 1, col, Qt.AlignmentFlag.AlignRight)
+        row = 2
+        for key, info in extras.items():
+            fmt = self._FORMATS.get(key, "{}")
+            now = fmt.format(float(self.cfg.get(key, 0.0)))
+            if info["value"] is not None:
+                box = QCheckBox(info["label"])
+                box.setChecked(True)
+                self._extra_checks[key] = (box, info["value"])
+                grid.addWidget(box, row, 0)
+                grid.addWidget(QLabel(now), row, 1, Qt.AlignmentFlag.AlignRight)
+                sug = QLabel(f"<b>{fmt.format(info['value'])}</b>")
+                sug.setTextFormat(Qt.TextFormat.RichText)
+                grid.addWidget(sug, row, 2, Qt.AlignmentFlag.AlignRight)
+            else:
+                why = info.get("reason") or (
+                    f"needs {info['need']} {info['unit']} ({info['cards']} so far)")
+                name = QLabel(f"<span style='color: gray;'>{info['label']}</span>")
+                name.setTextFormat(Qt.TextFormat.RichText)
+                grid.addWidget(name, row, 0)
+                grid.addWidget(QLabel(now), row, 1, Qt.AlignmentFlag.AlignRight)
+                why_lbl = QLabel(why)
+                why_lbl.setStyleSheet("color: gray; font-size: 11px;")
+                grid.addWidget(why_lbl, row, 2, Qt.AlignmentFlag.AlignRight)
+            row += 1
+        self.extras_box.show()
+        _fit_to_content(self)
+
+    def _on_apply(self):
+        self.extras_chosen = {key: value for key, (box, value)
+                              in self._extra_checks.items() if box.isChecked()}
+        self.accept()
+
+
+    def _seconds_table(self, r) -> str:
+        """The settings rows above can mislead: "Now" leaves out the learned
+        pace, and a reshape (base up, per word down) reads as "longer" when it
+        is quicker on most cards. So also show real seconds, per length."""
+        after_cfg = {**self.cfg, "base_seconds": r["base_seconds"],
+                     "seconds_per_word": r["seconds_per_word"]}
+        if float(self.cfg["seconds_per_answer_word"]) > 0:
+            after_cfg["seconds_per_answer_word"] = r["seconds_per_answer_word"]
+        now_pace = pace.current(self.cfg)
+        rows, measured = _preview_lengths(self.cfg)
+        body = ""
+        for row in rows:
+            kw = dict(words=row["words"], answer_words=row["answer_words"], **_TYPICAL)
+            now = adaptive.delay_for(self.cfg, pace=now_pace, **kw)
+            after = adaptive.delay_for(after_cfg, pace=1.0, **kw)
+            you = (f"<td align='right'><i>{row['reveal_s']:.1f}</i></td>"
+                   if measured else "")
+            body += (f"<tr><td>{row['words']} words</td>"
+                     f"<td align='right'>{now:.1f} s</td>"
+                     f"<td align='right'><b>{after:.1f} s</b></td>{you}</tr>")
+        you_head = "<th>You</th>" if measured else ""
+        return ("<b>In seconds</b>, for a card of average difficulty"
+                + (f" (your pace {now_pace:.2f}× included in Now)"
+                   if abs(now_pace - 1.0) >= 0.005 else "") + ":"
+                "<table cellspacing='0' cellpadding='4'>"
+                f"<tr><th></th><th>Now</th><th>After</th>{you_head}</tr>"
+                + body + "</table><br>")
 
 
 # --------------------------------------------------------------------------- #

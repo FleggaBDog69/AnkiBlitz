@@ -65,6 +65,14 @@ DEFAULTS = {
         # learned multiplier, steering until the timer beats you on about
         # target_timer_wins_percent of cards; calibration fits base / per-word
         # to the same target. The learned pace lives in user_files, not here.
+        # Opt-in: nothing about your reviews is recorded until you tick "Learn
+        # my pace" in Settings. While it's off no pace file is kept, auto-tune
+        # doesn't run, and Calibrate only reads Anki's own review log, on
+        # request, without saving anything. Not part of profiles.
+        "learn_my_pace": False,
+        # Picture note types are spotted once (engine/notetypes.py) and filled
+        # into fixed_time_note_types, only while that list is still empty.
+        "picture_types_autodetected": False,
         "auto_tune_enabled": True,
         "target_timer_wins_percent": 10,
         "excluded_note_types": [],    # skip the auto-reveal timer for these note types
@@ -399,6 +407,22 @@ def migrate() -> None:
         presets.seed_user_setup_once()
     except Exception:
         pass
+
+
+def autodetect_picture_types(col) -> None:
+    """One time: if you've never chosen picture note types, pre-select the
+    ones that look like pictures (image occlusion and friends)."""
+    cfg = _all()
+    sf = cfg.get("speed_focus")
+    if not isinstance(sf, dict) or sf.get("picture_types_autodetected"):
+        return
+    if not sf.get("fixed_time_note_types"):
+        from .engine.notetypes import picture_notetypes
+        found = picture_notetypes(col)
+        if found:
+            sf["fixed_time_note_types"] = found
+    sf["picture_types_autodetected"] = True
+    _write_all(cfg)
 
 
 def first_run_pending() -> bool:

@@ -276,6 +276,7 @@
       // Uncover the next cloze, not the answer. The template answers with an
       // anking:1b1-reveal event, which arms the next cloze's timer (or, after
       // the last one, the template flips to the answer itself).
+      obo.autoNext = true;   // so the report says the timer did this one
       window.revealNextCloze();
       return;
     }
@@ -309,9 +310,24 @@
     }
   }
 
+  // Tell Python how each cloze went: which one, whether the timer uncovered
+  // it, whether it was held, and how long it was up. The template flips to
+  // the answer by itself after the last cloze, so without this every
+  // one-by-one card would look like you revealed it.
+  function reportCloze() {
+    var now = Date.now();
+    var index = obo.total - obo.left;
+    pycmd("focus:cloze:" + index + ":" + (obo.autoNext ? 1 : 0) + ":"
+      + (obo.heldThis ? 1 : 0) + ":" + Math.max(0, now - obo.clozeT0));
+    obo.clozeT0 = now;
+    obo.autoNext = false;
+    obo.heldThis = !!autoPaused;   // still held as the next cloze starts
+  }
+
   function oboRevealed(left) {
     if (!oboActive() || !pendingAuto) return;
     if (!(left < obo.left)) return;   // another word of the same cloze (Shift+N)
+    reportCloze();
     obo.left = left;
     if (left <= 0) {                  // the template flips to the answer now
       stopAlert();
@@ -517,6 +533,7 @@
       return;
     }
     autoPaused = true;
+    if (oboActive()) obo.heldThis = true;
     stopAlert();
     var now = Date.now();
     pauseLeftMs = autoDeadline ? Math.max(0, autoDeadline - now) : 0;
@@ -783,7 +800,8 @@
     obo = null;
     var oboPlan = pendingAuto && pendingAuto.oneByOne;
     if (oboPlan && oboPlan.mode === "per_cloze" && oboPlan.delaysMs && oboPlan.delaysMs.length) {
-      obo = { delaysMs: oboPlan.delaysMs, active: false, total: 0, left: 0 };
+      obo = { delaysMs: oboPlan.delaysMs, active: false, total: 0, left: 0,
+              clozeT0: Date.now(), autoNext: false, heldThis: autoPaused };
       var st = window.ankingOneByOne;
       if (st && st.root && document.body.contains(st.root)) {
         oboBegin(st.total, st.remaining());

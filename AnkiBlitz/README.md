@@ -5,7 +5,9 @@ menu, and one settings window:
 
 - **Adaptive auto-reveal** (Speed Focus) — shows the answer automatically after a
   delay computed from the card's length and difficulty. **It never grades for
-  you** — you still press the button.
+  you** — you still press the button. It can learn your pace if you let it
+  (opt-in, local only), per kind of card, and calibrate its settings from your
+  own reveals.
 - **Progressive word reveal** — fades the question in word-by-word at a set
   reading pace, optionally synced to `{{tts}}` playback.
 - **Blitz sessions** — focused, timed review runs (by card count, time, or a

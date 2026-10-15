@@ -231,7 +231,8 @@ def _on_show_question(*args, **kwargs) -> None:
         # launch waiting for your first key) never runs one: nothing to learn.
         if track and not payload["autoPaused"] and not payload.get("paused"):
             pace.start_card(card, get_section("speed_focus"),
-                            track["inputs"], track["delay"])
+                            track["inputs"], track["delay"],
+                            cloze_words=track.get("cloze_words"))
         else:
             pace.clear_card()
     except Exception:
@@ -280,6 +281,14 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
         # (and drop the rest of its queue, so the next tag doesn't start up).
         try:
             av_player.stop_and_clear_queue()
+        except Exception:
+            pass
+        return (True, None)
+    if action.startswith("cloze:"):
+        # cloze:<index>:<timer uncovered it 0/1>:<held 0/1>:<ms it was up>
+        try:
+            index, auto, held, ms = action[len("cloze:"):].split(":")
+            pace.note_cloze(int(index), auto == "1", held == "1", int(ms) / 1000.0)
         except Exception:
             pass
         return (True, None)

@@ -8,7 +8,7 @@ Bundles concepts from Glutanimate's Speed Focus Mode (AGPL) and from Patrick Lee
 Progressive Word Reveal and Sprint Mode (https://www.patricklee.com.au/).
 """
 
-from aqt import gui_hooks
+from aqt import gui_hooks, mw
 
 from . import config
 from .engine import (
@@ -27,6 +27,10 @@ def _on_profile_open() -> None:
         return
     config.ensure_defaults()
     config.migrate()
+    try:
+        config.autodetect_picture_types(mw.col)
+    except Exception:
+        pass
     # Show the one-time first-run wizard (modal) BEFORE registering features, so
     # Quick Start's deferred auto-launch can't fire while the dialog is open.
     onboarding.maybe_show_first_run_wizard()

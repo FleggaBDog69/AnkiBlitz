@@ -71,19 +71,23 @@ def question_payload(card) -> dict:
     one_by_one = None
     if auto_on:
         inputs = adaptive.card_inputs(card, sf)
-        cur_pace = pace.current(sf)
+        # Each kind of card (review / learning / new / picture / one-by-one)
+        # has its own pace.
+        cur_pace = pace.current(sf, pace.category(inputs))
         delay_s = adaptive.delay_for(sf, pace=cur_pace, **inputs)
-        plan = adaptive.one_by_one_plan(sf, card, inputs, cur_pace)
+        # Stripped before the payload reaches the webview; the pace tracker
+        # needs the card's inputs and doesn't want to measure them twice.
+        track = {"inputs": inputs, "delay": delay_s, "cloze_words": None}
+        plan = adaptive.one_by_one_plan(sf, card, inputs,
+                                        pace.current(sf, "one_by_one"))
         if plan:
-            # A one-by-one card's wait isn't a read-the-question wait, so it
-            # stays out of the pace tracker (track stays None).
+            # A one-by-one card's wait isn't a read-the-question wait: it's its
+            # own kind, tracked cloze by cloze (see the focus:cloze message).
             delay_s = plan["delay"]
             one_by_one = {"mode": plan["mode"],
                           "delaysMs": [int(d * 1000) for d in plan.get("delays", [])]}
-        else:
-            # Stripped before the payload reaches the webview; the pace tracker
-            # needs the card's inputs and doesn't want to measure them twice.
-            track = {"inputs": inputs, "delay": delay_s}
+            track = {"inputs": inputs, "delay": delay_s,
+                     "cloze_words": adaptive.one_by_one_cloze_words(card) or [0]}
         delay_ms = int(delay_s * 1000)
 
     return {
