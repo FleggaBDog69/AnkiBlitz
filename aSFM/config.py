@@ -72,6 +72,10 @@ DEFAULTS = {
     "one_by_one_seconds_per_word": 0.4,    # per word of that cloze's answer
     "one_by_one_max_cloze_seconds": 8.0,   # ceiling for any single cloze
     "one_by_one_multiplier": 1.3,          # whole-card delay x this (multiplier mode)
+    # Picture note types are spotted once (engine/notetypes.py) and filled into
+    # fixed_time_note_types, but only while that list is still empty: a list
+    # you've set is never touched. Flipped to True once done.
+    "picture_types_autodetected": False,
     # First-run welcome (welcome.py). Flipped to False once it has been seen;
     # an update that adds this key shows it once to existing users as well.
     "show_welcome": True,
@@ -109,6 +113,21 @@ def ensure_defaults() -> None:
             changed = True
     if changed:
         _write_all(cfg)
+
+
+def autodetect_picture_types(col) -> None:
+    """One time: if you've never chosen picture note types, pre-select the
+    ones that look like pictures (image occlusion and friends)."""
+    cfg = _all()
+    if cfg.get("picture_types_autodetected"):
+        return
+    if not cfg.get("fixed_time_note_types"):
+        from .engine.notetypes import picture_notetypes
+        found = picture_notetypes(col)
+        if found:
+            cfg["fixed_time_note_types"] = found
+    cfg["picture_types_autodetected"] = True
+    _write_all(cfg)
 
 
 def enabled() -> bool:

@@ -176,6 +176,13 @@ class _FilterList(QWidget):
             item = self.list.item(i)
             item.setHidden(text not in item.text().lower())
 
+    def tick(self, names):
+        wanted = set(names)
+        for i in range(self.list.count()):
+            item = self.list.item(i)
+            if item.text() in wanted:
+                item.setCheckState(_CHECKED)
+
     def checked(self):
         out = []
         for i in range(self.list.count()):
@@ -309,6 +316,7 @@ class _Panel(QWidget):
             "learning modifier, nudged by up to ± the difficulty weight (0 = "
             "ignore difficulty), then clamped to the shortest and longest wait. "
             "Difficulty comes from FSRS, or from ease and lapses on SM-2."))
+        self._build_kinds(layout, cfg)
         layout.addStretch(1)
 
         # ===== On screen: the countdown, the heads-up, holding the timer =====
@@ -422,87 +430,11 @@ class _Panel(QWidget):
             "reveal it. Auto-tune nudges the timer after every card; Calibrate "
             "fits your settings to your reveals in one go, and shows you the "
             "numbers first."))
-        layout.addStretch(1)
         self._pace_reset_pending = None    # None | "all" (Reset) | "rebase" (Calibrate)
         self._pace_refitted = set()        # kinds whose own setting Calibrate refitted
         self.auto_tune.toggled.connect(self._refresh_pace)
         self.learn.toggled.connect(self._refresh_pace)
 
-        # ===== Cards: what to skip, picture cards, one-by-one clozes =====
-        layout = _tab(self.tabs, "Cards")
-        layout.addWidget(_section("Skip these",
-                                  "No timer at all — review them normally."))
-        notetypes, decks = _collect_names()
-        self.nt_list = _FilterList("Note types", notetypes, cfg["excluded_note_types"])
-        self.deck_list = _FilterList(
-            "Decks (a parent also covers its subdecks)", decks, cfg["excluded_decks"])
-        sf_lists = QHBoxLayout()
-        sf_lists.addWidget(self.nt_list, 1)
-        sf_lists.addWidget(self.deck_list, 1)
-        layout.addLayout(sf_lists)
-
-        layout.addWidget(_section("Picture cards",
-                                  "Nothing to read, so a set time instead of a word count."))
-        self.fixed_enabled = QCheckBox("Use a set time for these note types and decks")
-        self.fixed_enabled.setChecked(bool(cfg["fixed_time_enabled"]))
-        layout.addWidget(self.fixed_enabled)
-        fixed_form = _form()
-        self.fixed_base = _double(0.5, 60.0, 0.5, 1, " s")
-        self.fixed_base.setValue(float(cfg["fixed_time_base_seconds"]))
-        fixed_form.addRow("Set time:", self.fixed_base)
-        layout.addLayout(fixed_form)
-        layout.addWidget(_hint("Only the difficulty weight still applies."))
-        self.fixed_nt_list = _FilterList(
-            "Picture note types", notetypes, cfg["fixed_time_note_types"])
-        self.fixed_deck_list = _FilterList(
-            "Picture decks (a parent also covers its subdecks)",
-            decks, cfg["fixed_time_decks"])
-        fixed_lists = QHBoxLayout()
-        fixed_lists.addWidget(self.fixed_nt_list, 1)
-        fixed_lists.addWidget(self.fixed_deck_list, 1)
-        layout.addLayout(fixed_lists)
-        for w in (self.fixed_base, self.fixed_nt_list, self.fixed_deck_list):
-            self.fixed_enabled.toggled.connect(w.setEnabled)
-            w.setEnabled(self.fixed_enabled.isChecked())
-
-        # --- Cloze one-by-one cards: per-cloze timers or a multiplier ---
-        layout.addWidget(_section("One-by-one cloze cards",
-                                  "Cards with the AnKing “One by one” field filled."))
-        obo_form = _form()
-        self.obo_mode = QComboBox()
-        for label, value in (("A timer per cloze", "per_cloze"),
-                             ("Whole card × multiplier", "multiplier"),
-                             ("Off — time like any card", "off")):
-            self.obo_mode.addItem(label, value)
-        idx = self.obo_mode.findData(adaptive.one_by_one_mode(cfg))
-        self.obo_mode.setCurrentIndex(max(0, idx))
-        obo_form.addRow("Timing:", self.obo_mode)
-        self.obo_per_cloze = _double(0.0, 30.0, 0.5, 1, " s")
-        self.obo_per_cloze.setValue(float(cfg["one_by_one_seconds_per_cloze"]))
-        obo_form.addRow("Per cloze:", self.obo_per_cloze)
-        self.obo_per_word = _double(0.0, 5.0, 0.05, 2, " s")
-        self.obo_per_word.setValue(float(cfg["one_by_one_seconds_per_word"]))
-        obo_form.addRow("Per answer word:", self.obo_per_word)
-        self.obo_max = _double(0.5, 60.0, 0.5, 1, " s")
-        self.obo_max.setValue(float(cfg["one_by_one_max_cloze_seconds"]))
-        obo_form.addRow("Longest per cloze:", self.obo_max)
-        self.obo_mult = _double(0.5, 5.0, 0.05, 2, "×")
-        self.obo_mult.setValue(float(cfg["one_by_one_multiplier"]))
-        obo_form.addRow("Multiplier:", self.obo_mult)
-        layout.addLayout(obo_form)
-        layout.addWidget(_hint(
-            "A timer per cloze uncovers the next cloze each time it runs out; "
-            "uncovering one yourself starts the next. The first cloze also gets "
-            "the normal question-reading time. Needs the AnKing template doing "
-            "one-by-one on the front."))
-
-        def _obo_mode_changed(*_):
-            mode = self.obo_mode.currentData()
-            for w in (self.obo_per_cloze, self.obo_per_word, self.obo_max):
-                w.setEnabled(mode == "per_cloze")
-            self.obo_mult.setEnabled(mode == "multiplier")
-        self.obo_mode.currentIndexChanged.connect(_obo_mode_changed)
-        _obo_mode_changed()
         layout.addStretch(1)
 
         # ===== the preview, pinned beside the tabs =====
@@ -530,6 +462,87 @@ class _Panel(QWidget):
         self.enable_on_new.toggled.connect(self._update_preview)
         self.target.valueChanged.connect(self._update_preview)
         self._refresh_pace()
+
+    def _build_kinds(self, layout, cfg):
+        """The "Kinds of card" section of the Timing tab."""
+        # --- Kinds of card: skipped, picture, one-by-one. The deck / note-type
+        # lists live in a pop-up (_PickDialog); the tab only shows a summary.
+        self._names = _collect_names()
+        self._skip = {"nt": list(cfg["excluded_note_types"]),
+                      "decks": list(cfg["excluded_decks"])}
+        self._picture = {"nt": list(cfg["fixed_time_note_types"]),
+                         "decks": list(cfg["fixed_time_decks"])}
+        layout.addWidget(_section("Kinds of card",
+                                  "What skips the timer, and how pictures and "
+                                  "one-by-one clozes are timed."))
+        kinds = _form()
+        self.skip_btn = QPushButton()
+        self.skip_btn.clicked.connect(lambda: self._pick("skip"))
+        kinds.addRow("No timer on:", self.skip_btn)
+
+        self.fixed_enabled = QCheckBox("Set time")
+        self.fixed_enabled.setChecked(bool(cfg["fixed_time_enabled"]))
+        self.fixed_base = _double(0.5, 60.0, 0.5, 1, " s")
+        self.fixed_base.setValue(float(cfg["fixed_time_base_seconds"]))
+        self.picture_btn = QPushButton()
+        self.picture_btn.clicked.connect(lambda: self._pick("picture"))
+        pic_row = QHBoxLayout()
+        pic_row.setContentsMargins(0, 0, 0, 0)
+        for w in (self.fixed_enabled, self.fixed_base, self.picture_btn):
+            pic_row.addWidget(w)
+        pic_row.addStretch(1)
+        kinds.addRow("Picture cards:", pic_row)
+        for w in (self.fixed_base, self.picture_btn):
+            self.fixed_enabled.toggled.connect(w.setEnabled)
+            w.setEnabled(self.fixed_enabled.isChecked())
+
+        self.obo_mode = QComboBox()
+        for label, value in (("A timer per cloze", "per_cloze"),
+                             ("Whole card × multiplier", "multiplier"),
+                             ("Off — time like any card", "off")):
+            self.obo_mode.addItem(label, value)
+        idx = self.obo_mode.findData(adaptive.one_by_one_mode(cfg))
+        self.obo_mode.setCurrentIndex(max(0, idx))
+        kinds.addRow("One-by-one:", self.obo_mode)
+        self.obo_per_cloze = _double(0.0, 30.0, 0.5, 1, " s")
+        self.obo_per_cloze.setValue(float(cfg["one_by_one_seconds_per_cloze"]))
+        self.obo_per_word = _double(0.0, 5.0, 0.05, 2, " s")
+        self.obo_per_word.setValue(float(cfg["one_by_one_seconds_per_word"]))
+        self.obo_max = _double(0.5, 60.0, 0.5, 1, " s")
+        self.obo_max.setValue(float(cfg["one_by_one_max_cloze_seconds"]))
+        self.obo_mult = _double(0.5, 5.0, 0.05, 2, "×")
+        self.obo_mult.setValue(float(cfg["one_by_one_multiplier"]))
+        # One line per mode, so the form stays short.
+        self.obo_cloze_row = QWidget()
+        cl = QHBoxLayout(self.obo_cloze_row)
+        cl.setContentsMargins(0, 0, 0, 0)
+        for w in (self.obo_per_cloze, QLabel("+"), self.obo_per_word,
+                  QLabel("per word, up to"), self.obo_max):
+            cl.addWidget(w)
+        cl.addStretch(1)
+        kinds.addRow("Each cloze:", self.obo_cloze_row)
+        kinds.addRow("Multiplier:", self.obo_mult)
+        layout.addLayout(kinds)
+        layout.addWidget(_hint(
+            "Picture cards get a set time instead of a word count. One-by-one "
+            "cards (the AnKing “One by one” field) get a timer per cloze, each "
+            "uncovering the next; the first cloze also gets the question's "
+            "reading time. Needs the AnKing template doing one-by-one on the "
+            "front."))
+
+        def _obo_mode_changed(*_):
+            mode = self.obo_mode.currentData()
+            for w in (self.obo_per_cloze, self.obo_per_word, self.obo_max):
+                w.setEnabled(mode == "per_cloze")
+            self.obo_mult.setEnabled(mode == "multiplier")
+            # Show only the row the chosen mode uses (Qt 6.4+; older Qt just
+            # greys the other out, above).
+            if hasattr(kinds, "setRowVisible"):
+                kinds.setRowVisible(self.obo_cloze_row, mode == "per_cloze")
+                kinds.setRowVisible(self.obo_mult, mode == "multiplier")
+        self.obo_mode.currentIndexChanged.connect(_obo_mode_changed)
+        _obo_mode_changed()
+        self._refresh_pick_buttons()
 
     def _current_cfg(self):
         return {
@@ -632,12 +645,12 @@ class _Panel(QWidget):
             "learn_my_pace": self.learn.isChecked(),
             "auto_tune_enabled": self.auto_tune.isChecked(),
             "target_timer_wins_percent": self.target.value(),
-            "excluded_note_types": self.nt_list.checked(),
-            "excluded_decks": self.deck_list.checked(),
+            "excluded_note_types": list(self._skip["nt"]),
+            "excluded_decks": list(self._skip["decks"]),
             "fixed_time_enabled": self.fixed_enabled.isChecked(),
             "fixed_time_base_seconds": round(self.fixed_base.value(), 2),
-            "fixed_time_note_types": self.fixed_nt_list.checked(),
-            "fixed_time_decks": self.fixed_deck_list.checked(),
+            "fixed_time_note_types": list(self._picture["nt"]),
+            "fixed_time_decks": list(self._picture["decks"]),
             "one_by_one_mode": self.obo_mode.currentData(),
             "one_by_one_seconds_per_cloze": round(self.obo_per_cloze.value(), 2),
             "one_by_one_seconds_per_word": round(self.obo_per_word.value(), 2),
@@ -684,6 +697,40 @@ class _Panel(QWidget):
             text = f"Pace: {pace.pace_of():.2f}× · learned from {n} cards"
         self.pace_label.setText(text)
         self._update_preview()
+
+    # ----- the deck / note-type pickers -----
+
+    @staticmethod
+    def _summary(sel) -> str:
+        parts = []
+        for key, one, many in (("decks", "deck", "decks"),
+                               ("nt", "note type", "note types")):
+            n = len(sel[key])
+            if n:
+                parts.append(f"{n} {one if n == 1 else many}")
+        return " · ".join(parts) + " — change…" if parts else "Choose…"
+
+    def _refresh_pick_buttons(self):
+        self.skip_btn.setText(self._summary(self._skip))
+        self.picture_btn.setText(self._summary(self._picture))
+
+    def _pick(self, which: str):
+        sel = self._skip if which == "skip" else self._picture
+        title, intro = (("No timer on these",
+                         "Cards from these decks or note types are reviewed "
+                         "normally, with no auto-reveal.")
+                        if which == "skip" else
+                        ("Picture cards",
+                         "These decks or note types get the set time instead "
+                         "of a word count — there's nothing to read."))
+        suggest = None
+        if which == "picture":
+            from .engine.notetypes import picture_notetypes
+            suggest = picture_notetypes(mw.col)
+        dlg = _PickDialog(self, title, intro, self._names, sel, suggest)
+        if dlg.exec():
+            sel["nt"], sel["decks"] = dlg.chosen()
+            self._refresh_pick_buttons()
 
     def _on_details(self):
         _PaceDetailsDialog(self).exec()
@@ -788,12 +835,48 @@ def _session_rows() -> list:
     return out
 
 
+class _PickDialog(QDialog):
+    """Choose decks and note types, in a pop-up so the tab stays short."""
+
+    def __init__(self, parent, title, intro, names, sel, suggest=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setMinimumSize(560, 360)
+        notetypes, decks = names
+        layout = QVBoxLayout(self)
+        layout.addWidget(_hint(intro))
+        lists = QHBoxLayout()
+        self.decks = _FilterList("Decks (a parent also covers its subdecks)",
+                                 decks, sel["decks"])
+        self.nts = _FilterList("Note types", notetypes, sel["nt"])
+        for fl in (self.decks, self.nts):
+            fl.list.setMaximumHeight(16777215)    # use the pop-up's height
+            lists.addWidget(fl, 1)
+        layout.addLayout(lists, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        if suggest:
+            # Ticks the likely picture types; never unticks anything.
+            add = buttons.addButton(f"Tick picture types ({len(suggest)})",
+                                    QDialogButtonBox.ButtonRole.ResetRole)
+            add.setToolTip("Image occlusion and similar: " + ", ".join(suggest))
+            add.clicked.connect(lambda: self.nts.tick(suggest))
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def chosen(self):
+        return self.nts.checked(), self.decks.checked()
+
+
 class _PaceDetailsDialog(QDialog):
     """Read-only: each kind's pace, recent sessions, and how it all works.
     Kept off the tab so the tab stays simple."""
 
     _KINDS = (("review", "Review"), ("learning", "Learning / relearning"),
-              ("new", "New"), ("picture", "Picture"), ("one_by_one", "One-by-one"))
+              ("new", "New"), ("picture", "Picture"),
+              ("one_by_one", "One-by-one (clozes)"),
+              ("one_by_one_whole", "One-by-one (whole card)"))
 
     def __init__(self, panel):
         super().__init__(panel)
@@ -815,13 +898,15 @@ class _PaceDetailsDialog(QDialog):
         tallied = pace.tally_counts()
         kinds = []
         for cat, name in self._KINDS:
+            if cat == "one_by_one_whole" and not tallied.get(cat):
+                continue      # only when a template skips the per-cloze timers
             note = ""
             if cat in pace.TUNED:
                 pc = f"{panel._preview_pace(cat):.2f}×"
                 if cat != "review" and not pace.count_of(cat):
                     note = "follows review"
             else:
-                pc, note = "–", "not auto-tuned"
+                pc, note = "–", "uses the one-by-one pace"
             kinds.append([name, pc, str(int(tallied.get(cat, 0))), (note, "note")])
         layout.addWidget(_grid(["Kind", "Pace", "Cards measured", ""], kinds))
 
@@ -1018,7 +1103,7 @@ class _CalibrateDialog(QDialog):
                 grid.addWidget(sug, row, 2, Qt.AlignmentFlag.AlignRight)
             else:
                 why = info.get("reason") or (
-                    f"needs {info['need']} cards ({info['cards']} so far)")
+                    f"needs {info['need']} {info['unit']} ({info['cards']} so far)")
                 name = QLabel(f"<span style='color: gray;'>{info['label']}</span>")
                 name.setTextFormat(Qt.TextFormat.RichText)
                 grid.addWidget(name, row, 0)

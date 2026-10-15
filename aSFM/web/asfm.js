@@ -68,6 +68,7 @@
       // Uncover the next cloze, not the answer. The template answers with an
       // anking:1b1-reveal event, which arms the next cloze's timer (or, after
       // the last one, the template flips to the answer itself).
+      obo.autoNext = true;   // so the report says the timer did this one
       window.revealNextCloze();
       return;
     }
@@ -99,9 +100,24 @@
     if (started && pending) armClozeTimer(oboDelay());
   }
 
+  // Tell Python how each cloze went: which one, whether the timer uncovered
+  // it, whether it was held, and how long it was up. The template flips to
+  // the answer by itself after the last cloze, so without this every
+  // one-by-one card would look like you revealed it.
+  function reportCloze() {
+    var now = Date.now();
+    var index = obo.total - obo.left;
+    pycmd("asfm:cloze:" + index + ":" + (obo.autoNext ? 1 : 0) + ":"
+      + (obo.heldThis ? 1 : 0) + ":" + Math.max(0, now - obo.clozeT0));
+    obo.clozeT0 = now;
+    obo.autoNext = false;
+    obo.heldThis = !!autoPaused;   // still held as the next cloze starts
+  }
+
   function oboRevealed(left) {
     if (!oboActive() || !pending) return;
     if (!(left < obo.left)) return;   // another word of the same cloze (Shift+N)
+    reportCloze();
     obo.left = left;
     if (left <= 0) {                  // the template flips to the answer now
       cancel();
@@ -187,6 +203,7 @@
       return;
     }
     autoPaused = true;
+    if (oboActive()) obo.heldThis = true;
     waitingOnWords = false;   // resuming re-checks the fade
     stopAlert();
     var now = Date.now();
@@ -540,7 +557,8 @@
     obo = null;
     var plan = payload.enabled && payload.oneByOne;
     if (plan && plan.mode === "per_cloze" && plan.delaysMs && plan.delaysMs.length) {
-      obo = { delaysMs: plan.delaysMs, active: false, total: 0, left: 0, waitMs: 0 };
+      obo = { delaysMs: plan.delaysMs, active: false, total: 0, left: 0, waitMs: 0,
+              clozeT0: Date.now(), autoNext: false, heldThis: autoPaused };
       var st = window.ankingOneByOne;
       if (st && st.root && document.body.contains(st.root)) {
         obo.active = true;

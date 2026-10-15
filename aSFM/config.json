@@ -31,5 +31,6 @@
   "one_by_one_seconds_per_word": 0.4,
   "one_by_one_max_cloze_seconds": 8.0,
   "one_by_one_multiplier": 1.3,
+  "picture_types_autodetected": false,
   "show_welcome": true
 }

@@ -56,11 +56,14 @@ PACE_MIN, PACE_MAX = 0.85, 2.0   # never more than 15% quicker; up to 2× slower
 
 # Each kind of card keeps its own pace, so a slow run of new cards can't
 # lengthen your review timer. "review" is the original top-level ``pace``.
-# One-by-one cards are tallied but not auto-tuned: their timer is several short
-# ones, not one wait. Learning and new cards are timed off the same base /
-# per-word formula as reviews, so calibration rebases them (see rebase_pace).
-CATEGORIES = ("review", "learning", "new", "picture", "one_by_one")
-TUNED = ("review", "learning", "new", "picture")
+# One-by-one cards are tracked cloze by cloze (the reviewer reports each one),
+# and each cloze nudges their pace; when a template never runs the per-cloze
+# timers, the whole card is tallied as "one_by_one_whole" instead. Learning
+# and new cards are timed off the same base / per-word formula as reviews, so
+# calibration rebases them (see rebase_pace).
+CATEGORIES = ("review", "learning", "new", "picture", "one_by_one",
+              "one_by_one_whole")
+TUNED = ("review", "learning", "new", "picture", "one_by_one")
 FORMULA_BASED = ("learning", "new")
 D_BUCKETS = 5                # difficulty signal -1..1, in fifths
 STEP = 0.05                  # won: +4.6% / revealed first: -0.5% (10% target)
@@ -241,7 +244,10 @@ def reset_pace() -> None:
 
 # Which kind's pace a calibrated setting already carries.
 SETTING_KIND = {"unfamiliar_multiplier": "learning", "new_multiplier": "new",
-                "fixed_time_base_seconds": "picture"}
+                "fixed_time_base_seconds": "picture",
+                "one_by_one_seconds_per_cloze": "one_by_one",
+                "one_by_one_seconds_per_word": "one_by_one",
+                "one_by_one_multiplier": "one_by_one"}
 
 
 def rebase_pace(refitted=()) -> None:
@@ -352,20 +358,40 @@ def _d_bucket(signal: float) -> int:
 def _tally_add(data: dict, c: dict, seconds: float, censored: bool) -> None:
     # key = question words : answer words (one-by-one: clozes) : difficulty,
     # and one-by-one also splits by answer words, which its timer uses too.
-    one_by_one = c["cat"] == "one_by_one"
+    one_by_one = c["cat"] == "one_by_one_whole"
     second = c["clozes"] if one_by_one else c["answer_words"]
     key = (f"{int(min(c['words'], Q_MAX) // Q_BUCKET)}:"
            f"{int(min(second, A_MAX)) if one_by_one else int(min(second, A_MAX) // A_BUCKET)}:"
            f"{_d_bucket(c['dsig'])}")
     if one_by_one:
         key += f":{int(min(c['answer_words'], A_MAX) // A_BUCKET)}"
-    cell = data.setdefault("tally", {}).setdefault(c["cat"], {}).setdefault(
+    _tally_cell_add(data, c["cat"], key, c["words"], second, c["dsig"],
+                    c["answer_words"], seconds, censored)
+
+
+def _tally_cloze(data: dict, c: dict, index: int, seconds: float,
+                 censored: bool) -> None:
+    """One cloze of a one-by-one card. Key = first cloze? : question words
+    (first cloze only, it also carries the reading) : difficulty : this
+    cloze's answer words. ``sw`` holds the first-cloze flag."""
+    words = c["cloze_words"]
+    cw = words[min(index, len(words) - 1)] if words else 0
+    first = 1 if index == 0 else 0
+    qw = c["words"] if first else 0
+    key = (f"{first}:{int(min(qw, Q_MAX) // Q_BUCKET)}:{_d_bucket(c['dsig'])}:"
+           f"{int(min(cw, A_MAX) // A_BUCKET)}")
+    _tally_cell_add(data, "one_by_one", key, qw, cw, c["dsig"], first,
+                    seconds, censored)
+
+
+def _tally_cell_add(data, cat, key, words, second, dsig, sw, seconds, censored):
+    cell = data.setdefault("tally", {}).setdefault(cat, {}).setdefault(
         key, {"n": 0.0, "sq": 0.0, "sa": 0.0, "sd": 0.0, "sw": 0.0, "t": {}, "c": {}})
     cell["n"] += 1.0
-    cell["sq"] += c["words"]
+    cell["sq"] += words
     cell["sa"] += second
-    cell["sd"] += c["dsig"]
-    cell["sw"] = cell.get("sw", 0.0) + c["answer_words"]
+    cell["sd"] += dsig
+    cell["sw"] = cell.get("sw", 0.0) + sw
     b = str(int(min(seconds, MAX_REVEAL_S) // T_BIN))
     side = cell["c" if censored else "t"]
     side[b] = side.get(b, 0.0) + 1.0
@@ -393,18 +419,20 @@ def tally_counts() -> dict:
 # ----- per-card tracking (called from engine/injection.py) -----
 
 def start_card(card, cfg: dict, inputs: dict, delay_s: float,
-               clozes: int = 0) -> None:
-    """The timer started on this card's question. ``clozes`` > 0 marks a
-    one-by-one card with that many clozes."""
+               cloze_words=None) -> None:
+    """The timer started on this card's question. ``cloze_words`` (answer
+    words per cloze, in reveal order) marks a one-by-one card."""
     global _card
     if not learning(cfg):
         _card = None
         return
+    clozes = len(cloze_words) if cloze_words else 0
     cat = category(inputs, one_by_one=clozes > 0)
     _card = {
         "cid": card.id, "t0": time.time(), "delay": delay_s, "cat": cat,
         "words": inputs["words"], "answer_words": inputs["answer_words"],
-        "clozes": clozes, "dsig": _dsig(inputs),
+        "clozes": clozes, "cloze_words": list(cloze_words or []),
+        "cloze_events": [], "dsig": _dsig(inputs),
         # Only settled review cards feed calibration: new / learning cards run
         # on their own multipliers, and picture cards have no length to fit.
         "calibrate": cat == "review",
@@ -447,6 +475,13 @@ def note_auto_fire() -> None:
         _card["auto"] = True
 
 
+def note_cloze(index: int, auto: bool, held: bool, seconds: float) -> None:
+    """A one-by-one cloze was uncovered (reported by the reviewer)."""
+    if _card is not None and _card["cat"] == "one_by_one":
+        _card["cloze_events"].append(
+            {"i": index, "auto": auto, "held": held, "s": round(seconds, 3)})
+
+
 def note_hold() -> None:
     """More time / the pause key, pressed while this card's timer ran."""
     if _card is not None:
@@ -462,6 +497,13 @@ def end_card(card, cfg: dict) -> None:
     elapsed = time.time() - c["t0"]
     if elapsed <= 0 or (elapsed > MAX_REVEAL_S and not c["held"]):
         return                            # walked away: tells us nothing
+
+    if c["cloze_events"]:
+        # The template shows a one-by-one card's answer itself, so whether
+        # the timer "got there first" is down to who uncovered the last cloze.
+        last = c["cloze_events"][-1]
+        c["auto"] = last["auto"]
+        c["held"] = c["held"] or last["held"]
 
     if _session is None:
         _session = _new_session()
@@ -485,6 +527,13 @@ def end_card(card, cfg: dict) -> None:
             _research.record(c, elapsed, active)
         except Exception:
             pass
+
+    if c["cat"] == "one_by_one":
+        _end_one_by_one(c, cfg, data, active)
+        _unsaved += 1
+        if _unsaved >= SAVE_EVERY:
+            save()
+        return
 
     if cfg.get("auto_tune_enabled", DEFAULTS["auto_tune_enabled"]) and c["cat"] in TUNED:
         if c["held"] or (c["auto"] and active):
@@ -513,6 +562,41 @@ def end_card(card, cfg: dict) -> None:
     _unsaved += 1
     if _unsaved >= SAVE_EVERY:
         save()
+
+
+def _end_one_by_one(c: dict, cfg: dict, data: dict, active: bool) -> None:
+    """Score a one-by-one card cloze by cloze, as if each were its own card:
+    the same nudges, the same 'counts only if you usually reveal' guard.
+    Without per-cloze reports (a template that never ran the per-cloze
+    timers) the whole card is tallied as one_by_one_whole."""
+    tune = cfg.get("auto_tune_enabled", DEFAULTS["auto_tune_enabled"])
+    events = c["cloze_events"]
+    if not events:
+        c = dict(c, cat="one_by_one_whole")
+        yourself = not c["auto"] and not c["held"]
+        if tune:
+            if c["held"] or (c["auto"] and active):
+                _nudge(True, cfg, "one_by_one")
+            elif yourself:
+                _nudge(False, cfg, "one_by_one")
+        if not c["held"]:
+            _note_outcome(yourself)
+        if yourself or (c["auto"] and active):
+            _tally_add(data, c, time.time() - c["t0"], censored=c["auto"])
+        return
+    for ev in events:
+        if ev["s"] > MAX_REVEAL_S and not ev["held"]:
+            continue
+        yourself = not ev["auto"] and not ev["held"]
+        if tune:
+            if ev["held"] or (ev["auto"] and active):
+                _nudge(True, cfg, "one_by_one")
+            elif yourself:
+                _nudge(False, cfg, "one_by_one")
+        if not ev["held"]:
+            _note_outcome(yourself)
+        if yourself or (ev["auto"] and active):
+            _tally_cloze(data, c, ev["i"], ev["s"], censored=ev["auto"])
 
 
 def end_session() -> None:
@@ -656,8 +740,9 @@ def length_rows(cfg: dict, n_rows: int = 4, min_n: float = 10.0) -> list:
 # using the same percentile as everything else. Raw seconds in, so a fitted
 # setting already carries that kind's pace: applying it resets that pace to 1.
 
-MIN_KIND = {"learning": 40, "new": 40, "picture": 30, "one_by_one": 30,
-            "difficulty": 150}
+MIN_KIND = {"learning": 40, "new": 40, "picture": 30, "one_by_one": 60,
+            "one_by_one_whole": 30, "difficulty": 150}
+UNIT = {"one_by_one": "clozes"}
 
 
 def _formula(cfg: dict, words: float, answer_words: float) -> float:
@@ -741,6 +826,7 @@ def fit_kinds(cfg: dict, main=None) -> dict:
         n = _cards(cat)
         need = need or MIN_KIND[cat]
         out[key] = {"label": label, "cards": n, "need": need,
+                    "unit": UNIT.get(cat, "cards"),
                     "value": value if n >= need and not reason else None,
                     "reason": reason}
 
@@ -784,30 +870,33 @@ def fit_kinds(cfg: dict, main=None) -> dict:
         entry("fixed_time_base_seconds", "Picture cards", "picture", value)
 
     mode = cfg.get("one_by_one_mode", DEFAULTS["one_by_one_mode"])
-    pts = _kind_points("one_by_one", q, dm)
     if mode == "multiplier":
+        pts = _kind_points("one_by_one_whole", q, dm)
         value = None
         if pts:
             r = _ratio(pts, lambda p: _formula(ref_cfg, p[1], p[3]) * dm(p[4]))
             value = round(min(5.0, max(0.5, r)), 2) if r else None
-        entry("one_by_one_multiplier", "One-by-one multiplier", "one_by_one", value)
+        entry("one_by_one_multiplier", "One-by-one multiplier", "one_by_one_whole", value)
     elif mode == "per_cloze":
-        # Whole-card time minus the question's reading time, split into a per
-        # cloze and a per answer-word part. A part that fits negative is
-        # dropped (held at 0) and the other refitted.
+        # Each cloze's time = per cloze + per word x its answer words; the
+        # first cloze also carries the question's reading time, which comes
+        # off first. A part that fits negative is held at 0 and the other
+        # refitted on its own.
         rows = []
-        for w, qw, clozes, aw, d, y in pts:
-            rest = y / dm(d) - _formula(ref_cfg, qw, 0)
-            rows.append((w, [clozes, aw], rest))
+        for w, qw, cw, first, _d, y in _kind_points("one_by_one", q, dm):
+            reading = _formula(ref_cfg, qw, 0) if first >= 0.5 else 0.0
+            rows.append((w, cw, y - reading))
         pc = pw = None
         if len(rows) >= 2:
-            x = _solve(rows, 2)
+            x = _solve([(w, [1.0, cw], r) for w, cw, r in rows], 2)
             if x and x[0] >= 0 and x[1] >= 0:
                 pc, pw = x
+            elif x and x[1] < 0:
+                pc = max(0.0, sum(w * r for w, _, r in rows) / sum(w for w, _, _ in rows))
+                pw = 0.0
             else:
-                pc_only = sum(w * c * r for w, (c, _), r in rows) / max(
-                    1e-9, sum(w * c * c for w, (c, _), _ in rows))
-                pc, pw = max(0.0, pc_only), 0.0
+                den = sum(w * cw * cw for w, cw, _ in rows)
+                pc, pw = 0.0, max(0.0, sum(w * cw * r for w, cw, r in rows) / den) if den else 0.0
         entry("one_by_one_seconds_per_cloze", "One-by-one, per cloze", "one_by_one",
               round(min(30.0, pc), 1) if pc is not None else None)
         entry("one_by_one_seconds_per_word", "One-by-one, per answer word", "one_by_one",

@@ -22,6 +22,11 @@ def _on_profile_open() -> None:
     if _initialized:
         return
     config.ensure_defaults()
+    try:
+        from aqt import mw
+        config.autodetect_picture_types(mw.col)
+    except Exception:
+        pass
     injection.register()
     build_menu()
     _initialized = True

@@ -42,6 +42,7 @@ delay = clamp(delay, min_delay_seconds, max_delay_seconds)
 | `one_by_one_seconds_per_cloze` / `one_by_one_seconds_per_word` | Per cloze: this many seconds, plus this many per word of that cloze's answer, then the card's familiarity / difficulty modifiers. The first cloze also gets the normal question-reading time. |
 | `one_by_one_max_cloze_seconds` | The longest any single cloze waits. |
 | `one_by_one_multiplier` | Multiplier mode: the whole-card delay × this. |
+| `picture_types_autodetected` | Set once aSFM has looked for picture note types (image occlusion, "Image Q/A", "IO…", or a `Question Mask` / `OccludedImage` field) and filled them into `fixed_time_note_types`. It only fills an empty list; a list you've set is never touched. The picker also has a **Tick picture types** button. |
 | `show_welcome` | Show the welcome / calibration window on the next start. Set back to `true` to see it again (or use the Tools menu). |
 
 ### Learn my pace

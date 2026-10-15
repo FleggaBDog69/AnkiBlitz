@@ -173,19 +173,20 @@ def question_payload(card) -> dict:
                                                   DEFAULTS["enable_on_new"]):
         return off
     inputs = adaptive.card_inputs(card, cfg)
-    # Each kind of card (review / learning / new / picture) has its own pace.
+    # Each kind of card (review / learning / new / picture / one-by-one) has
+    # its own pace.
     cur_pace = pace.current(cfg, pace.category(inputs))
     delay_s = adaptive.delay_for(cfg, pace=cur_pace, **inputs)
-    track = {"inputs": inputs, "delay": delay_s, "clozes": 0}
+    track = {"inputs": inputs, "delay": delay_s, "cloze_words": None}
     one_by_one = None
-    plan = adaptive.one_by_one_plan(cfg, card, inputs, cur_pace)
+    plan = adaptive.one_by_one_plan(cfg, card, inputs,
+                                    pace.current(cfg, "one_by_one"))
     if plan:
-        # A one-by-one card's wait isn't a read-the-question wait: it's
-        # tallied as its own kind, and never moves a pace.
+        # A one-by-one card's wait isn't a read-the-question wait: it's its
+        # own kind, tracked cloze by cloze (see the asfm:cloze message).
         delay_s = plan["delay"]
         track = {"inputs": inputs, "delay": delay_s,
-                 "clozes": max(1, len(plan.get("delays") or
-                                      adaptive.one_by_one_cloze_words(card)))}
+                 "cloze_words": adaptive.one_by_one_cloze_words(card) or [0]}
         one_by_one = {"mode": plan["mode"],
                       "delaysMs": [int(d * 1000) for d in plan.get("delays", [])]}
     return {
@@ -223,7 +224,7 @@ def _on_show_question(*args, **kwargs) -> None:
         # there's nothing to learn from it.
         if track and not payload.get("autoPaused"):
             pace.start_card(card, get_config(), track["inputs"], track["delay"],
-                            clozes=track["clozes"])
+                            cloze_words=track["cloze_words"])
         else:
             pace.clear_card()
     except Exception:
@@ -253,6 +254,14 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
         if rv and rv.card and rv.state == "question":
             pace.note_auto_fire()   # before _showAnswer, which ends the card
             rv._showAnswer()
+        return (True, None)
+    if action.startswith("cloze:"):
+        # cloze:<index>:<timer uncovered it 0/1>:<held 0/1>:<ms it was up>
+        try:
+            index, auto, held, ms = action[len("cloze:"):].split(":")
+            pace.note_cloze(int(index), auto == "1", held == "1", int(ms) / 1000.0)
+        except Exception:
+            pass
         return (True, None)
     if action == "warn":
         _play_alert()
