@@ -137,3 +137,16 @@ first, then build.
 
 There is no separate lint/format command recorded for this repo — don't
 invent one.
+
+**aSFM and PWR also have standalone public repos** (since 2026-10-15):
+`FleggaBDog69/aSFM` and `FleggaBDog69/Progressive-Word-Reveal`. They are
+`git subtree split` mirrors of `aSFM/` and `progressive-reveal/` — this
+monorepo stays the source of truth, so never commit to them directly. After
+pushing main, update them with:
+
+```
+git subtree split --prefix=aSFM -b split/asfm && git push asfm split/asfm:main
+git subtree split --prefix=progressive-reveal -b split/pwr && git push pwr split/pwr:main
+```
+
+Each folder has its own `.gitignore` for those repos; build.py skips dotfiles.
