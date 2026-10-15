@@ -17,7 +17,6 @@ import shutil
 from aqt import gui_hooks, mw
 from aqt.reviewer import Reviewer
 from aqt.sound import av_player
-from aqt.utils import tooltip
 
 from ..config import DEFAULTS, PACKAGE, get_config
 from . import adaptive, pace
@@ -164,17 +163,6 @@ def _pause_block(cfg: dict) -> dict:
     }
 
 
-def _resume_hint(block: dict) -> str:
-    """How to lift the hold, naming only inputs that are switched on — the
-    same wording as the on-card badge (resumeHint in asfm.js)."""
-    key = block["pauseKey"].upper()
-    if block["moreTimeButton"] and block["pauseEnabled"]:
-        return f"click the badge or press {key} to resume"
-    if block["moreTimeButton"]:
-        return "click the badge to resume"
-    return f"press {key} to resume"
-
-
 def clear_pause() -> None:
     """Drop the sticky hold (profile closing), so the next profile doesn't
     open on a paused timer it never asked for."""
@@ -290,11 +278,8 @@ def _on_js_message(handled, message: str, context, *args, **kwargs):
         rv = mw.reviewer
         if _auto_paused and rv and rv.state == "question":
             pace.note_hold()
-        tooltip(
-            f"⏸ Auto-reveal paused — {_resume_hint(_pause_block(get_config()))}"
-            if _auto_paused else "▶ Auto-reveal resumed",
-            period=1800,
-        )
+        # No tooltip: the on-card paused badge and More time button
+        # already show the state, and a pop-up on every press was noise.
         return (True, None)
     return handled
 
